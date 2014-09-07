@@ -3,15 +3,15 @@ project(rviz_plugins)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-find_package(Qt4 REQUIRED)
+find_package(Qt4 COMPONENTS QtCore QtGui QtNetwork REQUIRED)
 include(${QT_USE_FILE})
 find_package(OpenCV REQUIRED)
-find_package(OGRE REQUIRED)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rviz
   nav_msgs
+  sensor_msgs
 )
 
 catkin_package()
@@ -32,12 +32,12 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}
   ${OpenCV_INCLUDE_DIR}
-  /usr/include/OGRE
   ${Qt4_INCLUDE_DIR}
+  /usr/include/OGRE
   src
 )
 
-add_definitions("-Wall -Wunused")
+add_definitions("-Wall -Wunused -std=c++11")
 
 set(PROJECT_SOURCE_FILES
   ${${PROJECT_NAME}_SOURCES}
@@ -47,7 +47,6 @@ set(PROJECT_SOURCE_FILES
 add_library(${PROJECT_NAME}
   ${PROJECT_SOURCE_FILES}
 )
-message(STATUS "Project source files: ${PROJECT_SOURCE_FILES}")
 
 target_link_libraries(${PROJECT_NAME}
   ${QT_LIBRARIES}

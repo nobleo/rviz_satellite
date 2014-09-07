@@ -30,24 +30,29 @@
 #ifndef AERIAL_MAP_DISPLAY_H
 #define AERIAL_MAP_DISPLAY_H
 
+#include <ros/ros.h>
+#include <ros/time.h>
+#include <rviz/display.h>
+
 #include <OGRE/OgreTexture.h>
 #include <OGRE/OgreMaterial.h>
 #include <OGRE/OgreVector3.h>
 
-#include <nav_msgs/MapMetaData.h>
-#include <ros/time.h>
+#include <sensor_msgs/NavSatFix.h>
 
-#include <nav_msgs/OccupancyGrid.h>
+#include <QObject>
+#include <QtConcurrentRun>
+#include <QFuture>
+#include <QHttp>
+#include <QUrl>
+#include <QByteArray>
+#include <QFile>
 
-#include "rviz/display.h"
-
-namespace Ogre
-{
+namespace Ogre {
 class ManualObject;
 }
 
-namespace rviz
-{
+namespace rviz {
 
 class FloatProperty;
 class IntProperty;
@@ -83,7 +88,7 @@ protected Q_SLOTS:
   void updateAlpha();
   void updateTopic();
   void updateDrawUnder();
-
+  void requestFinished(int id, bool error);
 
 protected:
   // overrides from Display
@@ -93,12 +98,17 @@ protected:
   virtual void subscribe();
   virtual void unsubscribe();
 
-  void incomingAerialMap(const nav_msgs::OccupancyGrid::ConstPtr& msg);
+  void navFixCallback(const sensor_msgs::NavSatFixConstPtr& msg);
 
+  void loadImagery();
+  
   void clear();
 
   void transformAerialMap();
 
+  static void latLonToTileCoords(double lat, double lon, unsigned int zoom, 
+                                 double&x, double& y);
+  
   Ogre::ManualObject* manual_object_;
   Ogre::TexturePtr texture_;
   Ogre::MaterialPtr material_;
@@ -112,7 +122,7 @@ protected:
   Ogre::Quaternion orientation_;
   std::string frame_;
 
-  ros::Subscriber map_sub_;
+  ros::Subscriber coord_sub_;
 
   RosTopicProperty* topic_property_;
   FloatProperty* resolution_property_;
@@ -123,10 +133,14 @@ protected:
   FloatProperty* alpha_property_;
   Property* draw_under_property_;
 
-  nav_msgs::OccupancyGrid::ConstPtr updated_map_;
-  nav_msgs::OccupancyGrid::ConstPtr current_map_;
   boost::mutex mutex_;
-  bool new_map_;
+  bool new_coords_;
+  double ref_lat_;
+  double ref_lon_;
+  
+  //  networking objects
+  QHttp * http_;
+  int request_id_;
 };
 
 } // namespace rviz
