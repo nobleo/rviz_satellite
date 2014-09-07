@@ -30,6 +30,8 @@
 #include <boost/bind.hpp>
 #include <boost/regex.hpp>
 
+#include <FreeImage.h>
+
 #include <OGRE/OgreManualObject.h>
 #include <OGRE/OgreMaterialManager.h>
 #include <OGRE/OgreSceneManager.h>
@@ -89,30 +91,56 @@ QString escapeURLString(const std::string& str) {
 
 Ogre::TexturePtr 
 textureFromBytes(const QByteArray& ba, const std::string& name) { 
-  Ogre::DataStreamPtr ds;
-  ds.bind(new Ogre::MemoryDataStream(ba.data(),ba.size()));
-  //  check that the right codec is loaded
-  char * magic = const_cast<char*>(ba.data());
-  Ogre::Codec * codec = Ogre::ImageCodec::getCodec(magic,ba.size());
-  if (!codec) {
-    throw std::runtime_error("Failed to find image codec");
-  } else {
-    ROS_INFO("Loading codec: %s", codec->getType().c_str());
+  
+  static bool fi_init = false;
+  if (!fi_init) {
+    FreeImage_Initialise();
   }
-  if (!Ogre::ImageCodec::isCodecRegistered(codec->getType())) {
-    Ogre::ImageCodec::registerCodec(codec);
+  
+  void * data = const_cast<char*>(ba.data());
+  FIMEMORY * mem = FreeImage_OpenMemory(reinterpret_cast<BYTE*>(data),
+                                        ba.size());
+  FREE_IMAGE_FORMAT fif = FreeImage_GetFileTypeFromMemory(mem, 0);
+  if (fif == FIF_UNKNOWN) {
+    FreeImage_CloseMemory(mem);
+    throw std::runtime_error("Image format is not supported for loading");
   }
-  //  load from file in memory
-  Ogre::Image img;
-  img.load(ds,codec->getType());
+  FIBITMAP * bmp = FreeImage_LoadFromMemory(fif,mem,0);
+  FreeImage_CloseMemory(mem);
+  if (!bmp) {
+    throw std::runtime_error("Failed to decode image");
+  }
+  FIBITMAP * converted = FreeImage_ConvertTo24Bits(bmp);
+  FreeImage_Unload(bmp);
+  if (!converted) {
+    throw std::runtime_error("Failed to convert image to 24 bit");
+  }
+  
+  const unsigned w = FreeImage_GetWidth(converted);
+  const unsigned h = FreeImage_GetHeight(converted);
+  const unsigned data_size = w*h*3;
+  BYTE* image_data = FreeImage_GetBits(converted);
+  
+  ROS_INFO("Loading a %u x %u texture", w, h);
   
   //  create texture
-  const Ogre::String resGroup = 
-      Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME; 
-  
-  Ogre::TextureManager& textureManager = 
-      Ogre::TextureManager::getSingleton();
-  Ogre::TexturePtr texture = textureManager.loadImage(name, resGroup, img);
+  Ogre::TexturePtr texture;
+  try {
+    Ogre::DataStreamPtr data_stream;
+    data_stream.bind(new Ogre::MemoryDataStream(image_data,data_size));
+    
+    const Ogre::String res_group = 
+        Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME; 
+    Ogre::TextureManager& texture_manager = 
+          Ogre::TextureManager::getSingleton();
+    texture = texture_manager.loadRawData(name,res_group,data_stream,w,h,
+                                    Ogre::PF_R8G8B8, Ogre::TEX_TYPE_2D, 0);
+  } catch (...) {
+    //  clean up FreeImage before re-throwing
+    FreeImage_Unload(converted);
+    throw;
+  }
+
   return texture;
 }
 
@@ -293,12 +321,6 @@ void AerialMapDisplay::requestFinished(int id, bool error) {
   if (http_->currentId() == id) {
     const QByteArray data = http_->readAll();
     ROS_INFO("Finished loading request %i (%i bytes)", id, data.size());
-    
-    //  debug: write to disk
-    QFile file("/home/gareth/test.jpg");
-    file.open(QIODevice::WriteOnly);
-    file.write(data);
-    file.close();
     
     try {
       textureFromBytes(data,"my_sweet_texture");

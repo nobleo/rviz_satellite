@@ -109,6 +109,7 @@ protected:
   static void latLonToTileCoords(double lat, double lon, unsigned int zoom, 
                                  double&x, double& y);
   
+  //  scene graph objects
   Ogre::ManualObject* manual_object_;
   Ogre::TexturePtr texture_;
   Ogre::MaterialPtr material_;

@@ -6,6 +6,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 find_package(Qt4 COMPONENTS QtCore QtGui QtNetwork REQUIRED)
 include(${QT_USE_FILE})
 find_package(OpenCV REQUIRED)
+find_package(FreeImage REQUIRED)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -33,6 +34,7 @@ include_directories(
   ${CMAKE_CURRENT_BINARY_DIR}
   ${OpenCV_INCLUDE_DIR}
   ${Qt4_INCLUDE_DIR}
+  ${FreeImage_INCLUDE_DIRS}
   /usr/include/OGRE
   src
 )
@@ -52,4 +54,5 @@ target_link_libraries(${PROJECT_NAME}
   ${QT_LIBRARIES}
   ${OpenCV_LIBRARIES}
   ${catkin_LIBRARIES}
+  ${FreeImage_LIBRARIES}
 )
