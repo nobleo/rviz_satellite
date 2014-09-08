@@ -1,3 +1,14 @@
+/*
+ * TileLoader.cpp
+ *
+ *  Copyright (c) 2014 Gaeth Cross. All rights reserved.
+ *
+ *  This file is part of rviz_satellite.
+ *
+ *	Created on: 07/09/2014
+ *		  Author: gareth
+ */
+
 #include "tileloader.h"
 
 #include <QUrl>
@@ -9,7 +20,7 @@
 #include <boost/regex.hpp>
 
 static size_t replaceRegex(const boost::regex &ex, std::string &str,
-                    const std::string &replace) {
+                           const std::string &replace) {
   std::string::const_iterator start = str.begin(), end = str.end();
   boost::match_results<std::string::const_iterator> what;
   boost::match_flag_type flags = boost::match_default;
@@ -22,8 +33,8 @@ static size_t replaceRegex(const boost::regex &ex, std::string &str,
   return count;
 }
 
-//static std::vector<boost::match_results<std::string::const_iterator>>
-//extractRegex(const boost::regex &ex, const std::string &str) {
+// static std::vector<boost::match_results<std::string::const_iterator>>
+// extractRegex(const boost::regex &ex, const std::string &str) {
 //  std::string::const_iterator start = str.begin(), end = str.end();
 //  boost::match_results<std::string::const_iterator> what;
 //  boost::match_flag_type flags = boost::match_default;
@@ -42,9 +53,7 @@ void TileLoader::MapTile::abortLoading() {
   }
 }
 
-bool TileLoader::MapTile::hasImage() const {
-  return !image_.isNull();
-}
+bool TileLoader::MapTile::hasImage() const { return !image_.isNull(); }
 
 TileLoader::TileLoader(const std::string &service, double latitude,
                        double longitude, unsigned int zoom, unsigned int blocks,
@@ -67,7 +76,7 @@ TileLoader::TileLoader(const std::string &service, double latitude,
 void TileLoader::start() {
   //  discard previous set of tiles and all pending requests
   abort();
-  
+
   qnam_ = new QNetworkAccessManager(this);
   QObject::connect(qnam_, SIGNAL(finished(QNetworkReply *)), this,
                    SLOT(finishedRequest(QNetworkReply *)));
@@ -86,7 +95,7 @@ void TileLoader::start() {
       const QNetworkRequest request = QNetworkRequest(uri);
       QNetworkReply *rep = qnam_->get(request);
       emit initiatedRequest(request);
-      tiles_.push_back( MapTile(x,y,rep) );
+      tiles_.push_back(MapTile(x, y, rep));
     }
   }
 }
@@ -100,16 +109,13 @@ double TileLoader::resolution() const {
 void TileLoader::latLonToTileCoords(double lat, double lon, unsigned int zoom,
                                     double &x, double &y) {
   if (zoom > 19) {
-    throw std::invalid_argument("Zoom level " + std::to_string(zoom)
-                                + " too high");
-  }
-  else if (lat < -85.0511 || lat > 85.0511) {
-    throw std::invalid_argument("Latitude " + std::to_string(lat)
-                                + " invalid");
-  }
-  else if (lon < -180 && lon > 180) {
-    throw std::invalid_argument("Longitude " + std::to_string(lon)
-                                + " invalid");
+    throw std::invalid_argument("Zoom level " + std::to_string(zoom) +
+                                " too high");
+  } else if (lat < -85.0511 || lat > 85.0511) {
+    throw std::invalid_argument("Latitude " + std::to_string(lat) + " invalid");
+  } else if (lon < -180 && lon > 180) {
+    throw std::invalid_argument("Longitude " + std::to_string(lon) +
+                                " invalid");
   }
 
   const double rho = M_PI / 180;
@@ -128,10 +134,10 @@ double TileLoader::zoomToResolution(double lat, unsigned int zoom) {
 
 void TileLoader::finishedRequest(QNetworkReply *reply) {
   const QNetworkRequest request = reply->request();
-  
+
   //  find corresponding tile
-  MapTile * tile=0;
-  for (MapTile& t : tiles_) {
+  MapTile *tile = 0;
+  for (MapTile &t : tiles_) {
     if (t.reply() == reply) {
       tile = &t;
     }
@@ -140,7 +146,7 @@ void TileLoader::finishedRequest(QNetworkReply *reply) {
     //  removed from list already, ignore this reply
     return;
   }
-  
+
   if (reply->error() == QNetworkReply::NoError) {
     //  decode an image
     QImageReader reader(reply);
@@ -160,12 +166,12 @@ void TileLoader::finishedRequest(QNetworkReply *reply) {
     err += " with code " + QString::number(reply->error());
     emit errorOcurred(err);
   }
-  
+
   //  check if all tiles have images
-  bool loaded=true;
-  for (MapTile& tile : tiles_) {
+  bool loaded = true;
+  for (MapTile &tile : tiles_) {
     if (!tile.hasImage()) {
-      loaded=false;
+      loaded = false;
     }
   }
   if (loaded) {
@@ -212,7 +218,7 @@ QUrl TileLoader::uriForTile(int x, int y) const {
                std::to_string(y));
   replaceRegex(boost::regex("\\{z\\}", boost::regex::icase), object,
                std::to_string(zoom_));
-  
+
   const QString qstr = QString::fromStdString(object);
   return QUrl(qstr);
 }
@@ -221,7 +227,7 @@ int TileLoader::maxTiles() const { return (1 << zoom_) - 1; }
 
 void TileLoader::abort() {
   tiles_.clear();
-  
+
   //  destroy network access manager
   if (qnam_) {
     delete qnam_;

@@ -1,9 +1,8 @@
 <?xml version="1.0"?>
 <package>
-  <name>rviz_plugins</name>
+  <name>rviz_satellite</name>
   <version>0.0.1</version>
-  <description>Additional plugins for RViz</description>
-  <author>Shaoejie Shen</author>
+  <description>Display satellite map tiles in RViz</description>
   <author>Gareth Cross</author>
   <maintainer email="gcross.code@icloud.com">gcross</maintainer>
   <license>Proprietary</license>

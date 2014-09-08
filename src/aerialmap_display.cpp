@@ -140,12 +140,12 @@ Ogre::TexturePtr textureFromImage(const QImage &image,
 namespace rviz {
 
 AerialMapDisplay::AerialMapDisplay()
-    : Display(), map_id_(0), scene_id_(0),
-      loaded_(false), new_coords_(false), received_msg_(false), loader_(0) {
-  
-  static unsigned int map_ids=0;
-  map_id_ = map_ids++;  //  global counter of map ids
- 
+    : Display(), map_id_(0), scene_id_(0), loaded_(false), new_coords_(false),
+      received_msg_(false), loader_(0) {
+
+  static unsigned int map_ids = 0;
+  map_id_ = map_ids++; //  global counter of map ids
+
   topic_property_ = new RosTopicProperty(
       "Topic", "", QString::fromStdString(
                        ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
@@ -158,7 +158,7 @@ AerialMapDisplay::AerialMapDisplay()
   alpha_property_->setMin(0);
   alpha_property_->setMax(1);
   alpha_property_->setShouldBeSaved(true);
-  
+
   draw_under_property_ =
       new Property("Draw Behind", false,
                    "Rendering option, controls whether or not the map is always"
@@ -166,28 +166,29 @@ AerialMapDisplay::AerialMapDisplay()
                    this, SLOT(updateDrawUnder()));
   draw_under_property_->setShouldBeSaved(true);
   draw_under_ = draw_under_property_->getValue().toBool();
-  
+
   //  output, resolution of the map in meters/pixel
   resolution_property_ = new FloatProperty(
       "Resolution", 0, "Resolution of the map. (Read only)", this);
   resolution_property_->setReadOnly(true);
-  
+
   //  properties for map
   object_uri_property_ = new StringProperty(
-        "Object URI", "http://otile1.mqcdn.com/tiles/1.0.0/sat/{z}/{x}/{y}.jpg",
-        "URL from which to retrieve map tiles.", this, SLOT(updateObjectURI()));
+      "Object URI", "http://otile1.mqcdn.com/tiles/1.0.0/sat/{z}/{x}/{y}.jpg",
+      "URL from which to retrieve map tiles.", this, SLOT(updateObjectURI()));
   object_uri_property_->setShouldBeSaved(true);
   object_uri_ = object_uri_property_->getStdString();
-  
-  zoom_property_ = new IntProperty("Zoom", 16, "Zoom level (0 - 19 usually)", 
+
+  zoom_property_ = new IntProperty("Zoom", 16, "Zoom level (0 - 19 usually)",
                                    this, SLOT(updateZoom()));
   zoom_property_->setShouldBeSaved(true);
   zoom_ = zoom_property_->getInt();
-  
-  blocks_property_ = new IntProperty("Blocks", 3, "Number of adjacent blocks (6 max)",
-                                     this, SLOT(updateBlocks()));
+
+  blocks_property_ =
+      new IntProperty("Blocks", 3, "Number of adjacent blocks (6 max)", this,
+                      SLOT(updateBlocks()));
   blocks_property_->setShouldBeSaved(true);
-  
+
   //  updating one triggers reload
   updateBlocks();
 }
@@ -243,7 +244,7 @@ void AerialMapDisplay::updateDrawUnder() {
 
 void AerialMapDisplay::updateObjectURI() {
   object_uri_ = object_uri_property_->getStdString();
-  loadImagery();  //  reload all imagery
+  loadImagery(); //  reload all imagery
 }
 
 void AerialMapDisplay::updateZoom() {
@@ -251,12 +252,12 @@ void AerialMapDisplay::updateZoom() {
   //  validate
   zoom = std::max(0, std::min(19, zoom));
   zoom_ = zoom;
-  loadImagery();  //  reload
+  loadImagery(); //  reload
 }
 
 void AerialMapDisplay::updateBlocks() {
   int blocks = blocks_property_->getInt();
-  blocks = std::max(0, std::min(6, blocks));  //  arbitrary limit for now
+  blocks = std::max(0, std::min(6, blocks)); //  arbitrary limit for now
   blocks_ = blocks;
   loadImagery();
 }
@@ -274,8 +275,8 @@ void AerialMapDisplay::clear() {
     return;
   }
   //  there is a scene in existence, clean it up
-  
-  for (MapObject& obj : objects_) {
+
+  for (MapObject &obj : objects_) {
     //  destroy object
     scene_manager_->destroyManualObject(obj.object);
     //  destory texture
@@ -293,23 +294,23 @@ void AerialMapDisplay::clear() {
   loaded_ = false;
 }
 
-void AerialMapDisplay::update(float,float) {
+void AerialMapDisplay::update(float, float) {
   boost::mutex::scoped_lock lock(mutex_);
   if (!new_coords_) {
     //  only update when new data is available
     return;
   }
   new_coords_ = false;
-  
-  clear();  //  clear if already loaded
+
+  clear(); //  clear if already loaded
   setStatus(StatusProperty::Ok, "Message", "Rendering new AerialMap");
-    
+
   if (frame_.empty()) {
     frame_ = "world";
   }
   //  creates all geometry
   assembleScene();
-  
+
   /// @todo: why do this here?
   if (loader_) {
     resolution_property_->setValue(loader_->resolution());
@@ -345,17 +346,15 @@ void AerialMapDisplay::loadImagery() {
     return;
   }
   if (object_uri_.empty()) {
-    setStatus(StatusProperty::Error,"Message",
+    setStatus(StatusProperty::Error, "Message",
               "Received message but object URI is not set");
   }
   const std::string service = object_uri_;
   try {
-    loader_ =
-      new TileLoader(service,
-                     ref_lat_, ref_lon_, zoom_, blocks_, this);
-  } catch (std::exception& e) {
-    setStatus(StatusProperty::Error, "Message",
-              QString(e.what()));
+    loader_ = new TileLoader(service, ref_lat_, ref_lon_, zoom_, blocks_, this);
+  }
+  catch (std::exception &e) {
+    setStatus(StatusProperty::Error, "Message", QString(e.what()));
     return;
   }
 
@@ -377,8 +376,8 @@ void AerialMapDisplay::assembleScene() {
   }
   //  iterate over all tiles and create an object for each of them
   const double resolution = loader_->resolution();
-  const std::vector<TileLoader::MapTile>& tiles = loader_->tiles();
-  for (const TileLoader::MapTile& tile : tiles) {
+  const std::vector<TileLoader::MapTile> &tiles = loader_->tiles();
+  for (const TileLoader::MapTile &tile : tiles) {
     const int w = tile.image().width();
     const int h = tile.image().height();
     //  we here assume that the tiles are uniformly sized...
@@ -386,16 +385,15 @@ void AerialMapDisplay::assembleScene() {
     const double tileH = h * resolution;
     const double origin_x = -loader_->originX() * tileW;
     const double origin_y = -(1 - loader_->originY()) * tileH;
-    
+
     //  determine location of this tile
     const double x = (tile.x() - loader_->tileX()) * tileW + origin_x;
     const double y = -(tile.y() - loader_->tileY()) * tileH + origin_y;
     //  don't re-use any ids
-    const std::string name_suffix = std::to_string(tile.x())
-        + "_" + std::to_string(tile.y())
-        + "_" + std::to_string(map_id_)
-        + "_" + std::to_string(scene_id_);
-    
+    const std::string name_suffix =
+        std::to_string(tile.x()) + "_" + std::to_string(tile.y()) + "_" +
+        std::to_string(map_id_) + "_" + std::to_string(scene_id_);
+
     Ogre::TexturePtr tex;
     if (tile.hasImage()) {
       //  one material per texture
@@ -404,11 +402,12 @@ void AerialMapDisplay::assembleScene() {
           matName, Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
       material->setReceiveShadows(false);
       material->getTechnique(0)->setLightingEnabled(false);
-      material->setDepthBias(-16.0f, 0.0f); /// @todo: what the fuck does this do?
+      material->setDepthBias(-16.0f,
+                             0.0f); /// @todo: what the fuck does this do?
       material->setCullingMode(Ogre::CULL_NONE);
       material->setDepthWriteEnabled(false);
-      
-      //  create textureing unit  
+
+      //  create textureing unit
       Ogre::Pass *pass = material->getTechnique(0)->getPass(0);
       Ogre::TextureUnitState *tex_unit = NULL;
       if (pass->getNumTextureUnitStates() > 0) {
@@ -416,19 +415,19 @@ void AerialMapDisplay::assembleScene() {
       } else {
         tex_unit = pass->createTextureUnitState();
       }
-      
+
       //  only add if we have a texture for it
       tex = textureFromImage(tile.image(), "texture_" + name_suffix);
-      
+
       ROS_INFO("Rendering with texture: %s", tex->getName().c_str());
       tex_unit->setTextureName(tex->getName());
       tex_unit->setTextureFiltering(Ogre::TFO_BILINEAR);
-      
+
       //  create an object
       const std::string obj_name = "object_" + name_suffix;
-      Ogre::ManualObject * obj = scene_manager_->createManualObject(obj_name);
+      Ogre::ManualObject *obj = scene_manager_->createManualObject(obj_name);
       scene_node_->attachObject(obj);
-      
+
       //  configure depth & alpha properties
       if (alpha_ >= 0.9998) {
         material->setDepthWriteEnabled(!draw_under_);
@@ -437,20 +436,19 @@ void AerialMapDisplay::assembleScene() {
         material->setSceneBlending(Ogre::SBT_TRANSPARENT_ALPHA);
         material->setDepthWriteEnabled(false);
       }
-      
+
       if (draw_under_) {
         obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_4);
       } else {
         obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_MAIN);
       }
-      
+
       tex_unit->setAlphaOperation(Ogre::LBX_SOURCE1, Ogre::LBS_MANUAL,
                                   Ogre::LBS_CURRENT, alpha_);
-      
+
       //  create a quad for this tile
-      obj->begin(material->getName(),
-                 Ogre::RenderOperation::OT_TRIANGLE_LIST);
-      
+      obj->begin(material->getName(), Ogre::RenderOperation::OT_TRIANGLE_LIST);
+
       //  bottom left
       obj->position(x, y, 0.0f);
       obj->textureCoord(0.0f, 0.0f);
@@ -465,7 +463,7 @@ void AerialMapDisplay::assembleScene() {
       obj->position(x, y + tileH, 0.0f);
       obj->textureCoord(0.0f, 1.0f);
       obj->normal(0.0f, 0.0f, 1.0f);
-      
+
       //  bottom left
       obj->position(x, y, 0.0f);
       obj->textureCoord(0.0f, 0.0f);
@@ -480,14 +478,14 @@ void AerialMapDisplay::assembleScene() {
       obj->position(x + tileW, y + tileH, 0.0f);
       obj->textureCoord(1.0f, 1.0f);
       obj->normal(0.0f, 0.0f, 1.0f);
-      
+
       obj->end();
-      
+
       if (draw_under_property_->getValue().toBool()) {
         //  render under everything else
         obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_4);
       }
-      
+
       MapObject object;
       object.object = obj;
       object.texture = tex;
