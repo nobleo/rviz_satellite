@@ -140,10 +140,8 @@ Ogre::TexturePtr textureFromImage(const QImage &image,
 namespace rviz {
 
 AerialMapDisplay::AerialMapDisplay()
-    : Display(), map_id_(0),
-      manual_object_(NULL), material_(0), loaded_(false),
-      resolution_(0.0f), width_(0), height_(0), position_(Ogre::Vector3::ZERO),
-      orientation_(Ogre::Quaternion::IDENTITY), new_coords_(false), loader_(0) {
+    : Display(), map_id_(0), scene_id_(0),
+      loaded_(false), new_coords_(false), loader_(0) {
   
   static unsigned int map_ids=0;
   map_id_ = map_ids++;  //  global counter of map ids
@@ -156,6 +154,7 @@ AerialMapDisplay::AerialMapDisplay()
   alpha_property_ = new FloatProperty(
       "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
       SLOT(updateAlpha()));
+  alpha_ = alpha_property_->getValue().toFloat();
   alpha_property_->setMin(0);
   alpha_property_->setMax(1);
 
@@ -164,29 +163,11 @@ AerialMapDisplay::AerialMapDisplay()
                    "Rendering option, controls whether or not the map is always"
                    " drawn behind everything else.",
                    this, SLOT(updateDrawUnder()));
+  draw_under_ = draw_under_property_->getValue().toBool();
 
   resolution_property_ = new FloatProperty(
-      "Resolution", 0, "Resolution of the map. (not editable)", this);
+      "Resolution", 0, "Resolution of the map.", this);
   resolution_property_->setReadOnly(true);
-
-  width_property_ = new IntProperty(
-      "Width", 0, "Width of the map, in meters. (not editable)", this);
-  width_property_->setReadOnly(true);
-
-  height_property_ = new IntProperty(
-      "Height", 0, "Height of the map, in meters. (not editable)", this);
-  height_property_->setReadOnly(true);
-
-  position_property_ = new VectorProperty(
-      "Position", Ogre::Vector3::ZERO, "Position of the bottom left corner of "
-                                       "the map, in meters. (not editable)",
-      this);
-  position_property_->setReadOnly(true);
-
-  orientation_property_ =
-      new QuaternionProperty("Orientation", Ogre::Quaternion::IDENTITY,
-                             "Orientation of the map. (not editable)", this);
-  orientation_property_->setReadOnly(true);
 }
 
 AerialMapDisplay::~AerialMapDisplay() {
@@ -194,17 +175,7 @@ AerialMapDisplay::~AerialMapDisplay() {
   clear();
 }
 
-void AerialMapDisplay::onInitialize() {
-  const std::string name = "AerialMapObjectMaterial" + std::to_string(map_id_);
-  material_ = Ogre::MaterialManager::getSingleton().create(
-      name, Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
-  material_->setReceiveShadows(false);
-  material_->getTechnique(0)->setLightingEnabled(false);
-  material_->setDepthBias(-16.0f, 0.0f);
-  material_->setCullingMode(Ogre::CULL_NONE);
-  material_->setDepthWriteEnabled(false);
-  updateAlpha();
-}
+void AerialMapDisplay::onInitialize() {}
 
 void AerialMapDisplay::onEnable() { subscribe(); }
 
@@ -236,48 +207,22 @@ void AerialMapDisplay::subscribe() {
 void AerialMapDisplay::unsubscribe() { coord_sub_.shutdown(); }
 
 void AerialMapDisplay::updateAlpha() {
-  float alpha = alpha_property_->getFloat();
-
-  Ogre::Pass *pass = material_->getTechnique(0)->getPass(0);
-  Ogre::TextureUnitState *tex_unit = NULL;
-  if (pass->getNumTextureUnitStates() > 0) {
-    tex_unit = pass->getTextureUnitState(0);
-  } else {
-    tex_unit = pass->createTextureUnitState();
-  }
-
-  tex_unit->setAlphaOperation(Ogre::LBX_SOURCE1, Ogre::LBS_MANUAL,
-                              Ogre::LBS_CURRENT, alpha);
-
-  if (alpha < 0.9998) {
-    material_->setSceneBlending(Ogre::SBT_TRANSPARENT_ALPHA);
-    material_->setDepthWriteEnabled(false);
-  } else {
-    material_->setSceneBlending(Ogre::SBT_REPLACE);
-    material_->setDepthWriteEnabled(!draw_under_property_->getValue().toBool());
-  }
+  alpha_ = alpha_property_->getFloat();
+  new_coords_ = true;
+  ROS_INFO("Changing alpha to %f", alpha_);
 }
 
 void AerialMapDisplay::updateDrawUnder() {
-  bool draw_under = draw_under_property_->getValue().toBool();
-
-  if (alpha_property_->getFloat() >= 0.9998) {
-    material_->setDepthWriteEnabled(!draw_under);
-  }
-
-  if (manual_object_) {
-    if (draw_under) {
-      manual_object_->setRenderQueueGroup(Ogre::RENDER_QUEUE_4);
-    } else {
-      manual_object_->setRenderQueueGroup(Ogre::RENDER_QUEUE_MAIN);
-    }
-  }
+  /// @todo: figure out why this property only applies to some objects
+  draw_under_ = draw_under_property_->getValue().toBool();
+  new_coords_ = true; //  force update
+  ROS_INFO("Changing draw_under to %s", ((draw_under_) ? "true" : "false"));
 }
 
 void AerialMapDisplay::updateTopic() {
   unsubscribe();
-  subscribe();
   clear();
+  subscribe();
 }
 
 void AerialMapDisplay::clear() {
@@ -286,14 +231,21 @@ void AerialMapDisplay::clear() {
   if (!loaded_) {
     return;
   }
-  //  there is a scene in existence
-
-  scene_manager_->destroyManualObject(manual_object_);
-  manual_object_ = NULL;
-
-  std::string tex_name = texture_->getName();
-  texture_.setNull();
-  Ogre::TextureManager::getSingleton().unload(tex_name);
+  //  there is a scene in existence, clean it up
+  
+  for (MapObject& obj : objects_) {
+    //  destroy object
+    scene_manager_->destroyManualObject(obj.object);
+    //  destory texture
+    const std::string tex_name = obj.texture->getName();
+    obj.texture.setNull();
+    Ogre::TextureManager::getSingleton().unload(tex_name);
+    //  destroy material
+    const std::string mat_name = obj.material->getName();
+    obj.material.setNull();
+    Ogre::MaterialManager::getSingleton().unload(mat_name);
+  }
+  objects_.clear();
 
   //  done cleaning up
   loaded_ = false;
@@ -306,18 +258,20 @@ void AerialMapDisplay::update(float,float) {
     return;
   }
   new_coords_ = false;
-
-  clear();
-  setStatus(StatusProperty::Ok, "Message", "Rendering new AerialMap");
   
+  clear();  //  clear if already loaded
+  setStatus(StatusProperty::Ok, "Message", "Rendering new AerialMap");
+    
   if (frame_.empty()) {
     frame_ = "world";
   }
-  
+  //  creates all geometry
   assembleScene();
-
+  
   /// @todo: why do this here?
-  resolution_property_->setValue(loader_->resolution());
+  if (loader_) {
+    resolution_property_->setValue(loader_->resolution());
+  }
 
   transformAerialMap();
 
@@ -362,7 +316,10 @@ void AerialMapDisplay::loadImagery() {
   loader_->start();
 }
 
-void AerialMapDisplay::assembleScene() {  
+void AerialMapDisplay::assembleScene() {
+  if (!loader_) {
+    return; //  don't add to scene
+  }
   //  iterate over all tiles and create an object for each of them
   const double resolution = loader_->resolution();
   const std::vector<TileLoader::MapTile>& tiles = loader_->tiles();
@@ -378,10 +335,11 @@ void AerialMapDisplay::assembleScene() {
     //  determine location of this tile
     const double x = (tile.x() - loader_->tileX()) * tileW + origin_x;
     const double y = -(tile.y() - loader_->tileY()) * tileH + origin_y;
-    
+    //  don't re-use any ids
     const std::string name_suffix = std::to_string(tile.x())
         + "_" + std::to_string(tile.y())
-        + "_" + std::to_string(map_id_);
+        + "_" + std::to_string(map_id_)
+        + "_" + std::to_string(scene_id_);
     
     Ogre::TexturePtr tex;
     if (tile.hasImage()) {
@@ -415,6 +373,24 @@ void AerialMapDisplay::assembleScene() {
       const std::string obj_name = "object_" + name_suffix;
       Ogre::ManualObject * obj = scene_manager_->createManualObject(obj_name);
       scene_node_->attachObject(obj);
+      
+      //  configure depth & alpha properties
+      if (alpha_ >= 0.9998) {
+        material->setDepthWriteEnabled(!draw_under_);
+        material->setSceneBlending(Ogre::SBT_REPLACE);
+      } else {
+        material->setSceneBlending(Ogre::SBT_TRANSPARENT_ALPHA);
+        material->setDepthWriteEnabled(false);
+      }
+      
+      if (draw_under_) {
+        obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_4);
+      } else {
+        obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_MAIN);
+      }
+      
+      tex_unit->setAlphaOperation(Ogre::LBX_SOURCE1, Ogre::LBS_MANUAL,
+                                  Ogre::LBS_CURRENT, alpha_);
       
       //  create a quad for this tile
       obj->begin(material->getName(),
@@ -464,6 +440,7 @@ void AerialMapDisplay::assembleScene() {
       objects_.push_back(object);
     }
   }
+  scene_id_++;
   loaded_ = true;
 }
 
@@ -490,6 +467,8 @@ void AerialMapDisplay::transformAerialMap() {
   Ogre::Vector3 position;
   Ogre::Quaternion orientation;
 
+  /// @todo: For now just use the null transform
+  /// Add an option for this later
   geometry_msgs::Pose pose;
   pose.orientation.w = 1;
   pose.orientation.x = 0;

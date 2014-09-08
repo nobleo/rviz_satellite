@@ -79,17 +79,12 @@ public:
   virtual void reset();
   virtual void update(float, float);
 
-  float getResolution() { return resolution_; }
-  int getWidth() { return width_; }
-  int getHeight() { return height_; }
-  Ogre::Vector3 getPosition() { return position_; }
-  Ogre::Quaternion getOrientation() { return orientation_; }
-
 protected Q_SLOTS:
   void updateAlpha();
   void updateTopic();
   void updateDrawUnder();
 
+  //  slots for TileLoader messages
   void initiatedRequest(QNetworkRequest request);
   void receivedImage(QNetworkRequest request);
   void finishedLoading();
@@ -114,6 +109,7 @@ protected:
   void transformAerialMap();
   
   unsigned int map_id_;
+  unsigned int scene_id_;
   
   /// Instance of a tile w/ associated ogre data
   struct MapObject {
@@ -122,38 +118,27 @@ protected:
     Ogre::MaterialPtr material;
   };
   std::vector<MapObject> objects_;
-  
-  //  scene graph objects
-  Ogre::ManualObject* manual_object_;
-  Ogre::TexturePtr texture_;
-  Ogre::MaterialPtr material_;
   bool loaded_;
 
   std::string topic_;
-  float resolution_;
-  int width_;
-  int height_;
-  Ogre::Vector3 position_;
-  Ogre::Quaternion orientation_;
   std::string frame_;
 
   ros::Subscriber coord_sub_;
-
+  
+  //  properties
   RosTopicProperty* topic_property_;
   FloatProperty* resolution_property_;
-  IntProperty* width_property_;
-  IntProperty* height_property_;
-  VectorProperty* position_property_;
-  QuaternionProperty* orientation_property_;
   FloatProperty* alpha_property_;
   Property* draw_under_property_;
-
+  
+  float alpha_;
+  bool draw_under_;
+  
+  //  tile management
   boost::mutex mutex_;
   bool new_coords_;
   double ref_lat_;
   double ref_lon_;
-  
-  //  networking objects
   TileLoader * loader_;
 };
 
