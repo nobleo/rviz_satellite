@@ -27,6 +27,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <QtGlobal>
+#include <QImage>
+
 #include <boost/bind.hpp>
 #include <boost/regex.hpp>
 
@@ -40,7 +43,6 @@
 #include <OGRE/OgreImageCodec.h>
 
 #include <ros/ros.h>
-
 #include <tf/transform_listener.h>
 
 #include "rviz/frame_manager.h"
@@ -56,86 +58,55 @@
 
 #include "aerialmap_display.h"
 
-size_t replaceRegex(const boost::regex &ex, std::string& str, 
-                    const std::string& replace) {
-  std::string::const_iterator start = str.begin(), end = str.end();
-  boost::match_results<std::string::const_iterator> what;
-  boost::match_flag_type flags = boost::match_default;
-  size_t count=0;
-  while(boost::regex_search(start, end, what, ex, flags))
-  {
-    str.replace(what.position(), what.length(), replace);
-    start = what[0].second;
-    count++;
-  }
-  return count;
-}
+Ogre::TexturePtr textureFromBytes(const QByteArray &ba,
+                                  const std::string &name) {
 
-std::vector<boost::match_results<std::string::const_iterator>> 
-extractRegex(const boost::regex &ex, const std::string &str) {
-  std::string::const_iterator start = str.begin(), end = str.end();
-  boost::match_results<std::string::const_iterator> what;
-  boost::match_flag_type flags = boost::match_default;
-  std::vector<boost::match_results<std::string::const_iterator> > matches;
-  while(boost::regex_search(start, end, what, ex, flags))
-  {
-    matches.push_back(what);
-    start = what[0].second;
-  }
-  return matches;
-}
-
-QString escapeURLString(const std::string& str) {
-  return QString(QUrl(QString::fromUtf8(str.c_str())).encodedPath());
-}
-
-Ogre::TexturePtr 
-textureFromBytes(const QByteArray& ba, const std::string& name) { 
-  
   static bool fi_init = false;
   if (!fi_init) {
     FreeImage_Initialise();
   }
-  
-  void * data = const_cast<char*>(ba.data());
-  FIMEMORY * mem = FreeImage_OpenMemory(reinterpret_cast<BYTE*>(data),
-                                        ba.size());
+
+  void *data = const_cast<char *>(ba.data());
+  FIMEMORY *mem =
+      FreeImage_OpenMemory(reinterpret_cast<BYTE *>(data), ba.size());
   FREE_IMAGE_FORMAT fif = FreeImage_GetFileTypeFromMemory(mem, 0);
   if (fif == FIF_UNKNOWN) {
     FreeImage_CloseMemory(mem);
     throw std::runtime_error("Image format is not supported for loading");
   }
-  FIBITMAP * bmp = FreeImage_LoadFromMemory(fif,mem,0);
+  FIBITMAP *bmp = FreeImage_LoadFromMemory(fif, mem, 0);
   FreeImage_CloseMemory(mem);
   if (!bmp) {
     throw std::runtime_error("Failed to decode image");
   }
-  FIBITMAP * converted = FreeImage_ConvertTo24Bits(bmp);
+  FIBITMAP *converted = FreeImage_ConvertTo24Bits(bmp);
   FreeImage_Unload(bmp);
   if (!converted) {
     throw std::runtime_error("Failed to convert image to 24 bit");
   }
-  
+
   const unsigned w = FreeImage_GetWidth(converted);
   const unsigned h = FreeImage_GetHeight(converted);
-  const unsigned data_size = w*h*3;
-  BYTE* image_data = FreeImage_GetBits(converted);
-  
+  const unsigned data_size = w * h * 3;
+  BYTE *image_data = FreeImage_GetBits(converted);
+
   ROS_INFO("Loading a %u x %u texture", w, h);
-  
+
   //  create texture
   Ogre::TexturePtr texture;
   try {
     Ogre::DataStreamPtr data_stream;
-    data_stream.bind(new Ogre::MemoryDataStream(image_data,data_size));
-    
-    const Ogre::String res_group = 
-        Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME; 
-    Ogre::TextureManager& texture_manager = 
-          Ogre::TextureManager::getSingleton();
-    texture = texture_manager.loadRawData(name,res_group,data_stream,w,h,
+    data_stream.bind(new Ogre::MemoryDataStream(image_data, data_size));
+
+    const Ogre::String res_group =
+        Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME;
+    Ogre::TextureManager &texture_manager =
+        Ogre::TextureManager::getSingleton();
+    texture =
+        texture_manager.loadRawData(name, res_group, data_stream, w, h,
                                     Ogre::PF_R8G8B8, Ogre::TEX_TYPE_2D, 0);
-  } catch (...) {
+  }
+  catch (...) {
     //  clean up FreeImage before re-throwing
     FreeImage_Unload(converted);
     throw;
@@ -144,530 +115,381 @@ textureFromBytes(const QByteArray& ba, const std::string& name) {
   return texture;
 }
 
-namespace rviz
-{
+Ogre::TexturePtr textureFromImage(const QImage &image,
+                                  const std::string &name) {
+  ROS_INFO("Loading a %i x %i texture", image.width(), image.height());
+  //  convert to 24bit rgb
+  QImage converted = image.convertToFormat(QImage::Format_RGB888).mirrored();
 
-AerialMapDisplay::AerialMapDisplay()
-  : Display()
-  , manual_object_( NULL )
-  , material_( 0 )
-  , loaded_( false )
-  , resolution_( 0.0f )
-  , width_( 0 )
-  , height_( 0 )
-  , position_(Ogre::Vector3::ZERO)
-  , orientation_(Ogre::Quaternion::IDENTITY)
-  , new_coords_(false)
-  , http_(0)
-{
-  topic_property_ = new RosTopicProperty( "Topic", "",
-                                          QString::fromStdString( ros::message_traits::datatype<sensor_msgs::NavSatFix>() ),
-                                          "nav_msgs::Odometry topic to subscribe to.",
-                                          this, SLOT( updateTopic() ));
+  //  create texture
+  Ogre::TexturePtr texture;
+  Ogre::DataStreamPtr data_stream;
+  data_stream.bind(new Ogre::MemoryDataStream((void *)converted.constBits(),
+                                              converted.byteCount()));
 
-  alpha_property_ = new FloatProperty( "Alpha", 0.7,
-                                       "Amount of transparency to apply to the map.",
-                                       this, SLOT( updateAlpha() ));
-  alpha_property_->setMin( 0 );
-  alpha_property_->setMax( 1 );
-
-  draw_under_property_ = new Property( "Draw Behind", false,
-                                       "Rendering option, controls whether or not the map is always"
-                                       " drawn behind everything else.",
-                                       this, SLOT( updateDrawUnder() ));
-
-  resolution_property_ = new FloatProperty( "Resolution", 0,
-                                            "Resolution of the map. (not editable)", this );
-  resolution_property_->setReadOnly( true );
-
-  width_property_ = new IntProperty( "Width", 0,
-                                     "Width of the map, in meters. (not editable)", this );
-  width_property_->setReadOnly( true );
-  
-  height_property_ = new IntProperty( "Height", 0,
-                                      "Height of the map, in meters. (not editable)", this );
-  height_property_->setReadOnly( true );
-
-  position_property_ = new VectorProperty( "Position", Ogre::Vector3::ZERO,
-                                           "Position of the bottom left corner of the map, in meters. (not editable)",
-                                           this );
-  position_property_->setReadOnly( true );
-
-  orientation_property_ = new QuaternionProperty( "Orientation", Ogre::Quaternion::IDENTITY,
-                                                  "Orientation of the map. (not editable)",
-                                                  this );
-  orientation_property_->setReadOnly( true );
+  const Ogre::String res_group =
+      Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME;
+  Ogre::TextureManager &texture_manager = Ogre::TextureManager::getSingleton();
+  //  swap byte order when going from QImage to Ogre
+  texture = texture_manager.loadRawData(name, res_group, data_stream,
+                                        converted.width(), converted.height(),
+                                        Ogre::PF_B8G8R8, Ogre::TEX_TYPE_2D, 0);
+  return texture;
 }
 
-AerialMapDisplay::~AerialMapDisplay()
-{
+namespace rviz {
+
+AerialMapDisplay::AerialMapDisplay()
+    : Display(), map_id_(0),
+      manual_object_(NULL), material_(0), loaded_(false),
+      resolution_(0.0f), width_(0), height_(0), position_(Ogre::Vector3::ZERO),
+      orientation_(Ogre::Quaternion::IDENTITY), new_coords_(false), loader_(0) {
+  
+  static unsigned int map_ids=0;
+  map_id_ = map_ids++;  //  global counter of map ids
+  
+  topic_property_ = new RosTopicProperty(
+      "Topic", "", QString::fromStdString(
+                       ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
+      "nav_msgs::Odometry topic to subscribe to.", this, SLOT(updateTopic()));
+
+  alpha_property_ = new FloatProperty(
+      "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
+      SLOT(updateAlpha()));
+  alpha_property_->setMin(0);
+  alpha_property_->setMax(1);
+
+  draw_under_property_ =
+      new Property("Draw Behind", false,
+                   "Rendering option, controls whether or not the map is always"
+                   " drawn behind everything else.",
+                   this, SLOT(updateDrawUnder()));
+
+  resolution_property_ = new FloatProperty(
+      "Resolution", 0, "Resolution of the map. (not editable)", this);
+  resolution_property_->setReadOnly(true);
+
+  width_property_ = new IntProperty(
+      "Width", 0, "Width of the map, in meters. (not editable)", this);
+  width_property_->setReadOnly(true);
+
+  height_property_ = new IntProperty(
+      "Height", 0, "Height of the map, in meters. (not editable)", this);
+  height_property_->setReadOnly(true);
+
+  position_property_ = new VectorProperty(
+      "Position", Ogre::Vector3::ZERO, "Position of the bottom left corner of "
+                                       "the map, in meters. (not editable)",
+      this);
+  position_property_->setReadOnly(true);
+
+  orientation_property_ =
+      new QuaternionProperty("Orientation", Ogre::Quaternion::IDENTITY,
+                             "Orientation of the map. (not editable)", this);
+  orientation_property_->setReadOnly(true);
+}
+
+AerialMapDisplay::~AerialMapDisplay() {
   unsubscribe();
   clear();
 }
 
-void AerialMapDisplay::onInitialize()
-{
-  static int count = 0;
-  std::stringstream ss;
-  ss << "AerialMapObjectMaterial" << count++;
-  material_ = Ogre::MaterialManager::getSingleton().create( ss.str(),
-                                                            Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME );
+void AerialMapDisplay::onInitialize() {
+  const std::string name = "AerialMapObjectMaterial" + std::to_string(map_id_);
+  material_ = Ogre::MaterialManager::getSingleton().create(
+      name, Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
   material_->setReceiveShadows(false);
   material_->getTechnique(0)->setLightingEnabled(false);
-  material_->setDepthBias( -16.0f, 0.0f );
-  material_->setCullingMode( Ogre::CULL_NONE );
+  material_->setDepthBias(-16.0f, 0.0f);
+  material_->setCullingMode(Ogre::CULL_NONE);
   material_->setDepthWriteEnabled(false);
-
   updateAlpha();
 }
 
-void AerialMapDisplay::onEnable()
-{
-  subscribe();
-}
+void AerialMapDisplay::onEnable() { subscribe(); }
 
-void AerialMapDisplay::onDisable()
-{
+void AerialMapDisplay::onDisable() {
   unsubscribe();
   clear();
 }
 
-void AerialMapDisplay::subscribe()
-{
-  if ( !isEnabled() )
-  {
+void AerialMapDisplay::subscribe() {
+  if (!isEnabled()) {
     return;
   }
 
-  if( !topic_property_->getTopic().isEmpty() )
-  {
-    try
-    {
-      coord_sub_ = update_nh_.subscribe(
-            topic_property_->getTopicStd(), 1, 
-            &AerialMapDisplay::navFixCallback, 
-            this);
-      
-      setStatus( StatusProperty::Ok, "Topic", "OK" );
+  if (!topic_property_->getTopic().isEmpty()) {
+    try {
+      coord_sub_ =
+          update_nh_.subscribe(topic_property_->getTopicStd(), 1,
+                               &AerialMapDisplay::navFixCallback, this);
+
+      setStatus(StatusProperty::Ok, "Topic", "OK");
     }
-    catch( ros::Exception& e )
-    {
-      setStatus( StatusProperty::Error, "Topic", QString( "Error subscribing: " ) + e.what() );
+    catch (ros::Exception &e) {
+      setStatus(StatusProperty::Error, "Topic",
+                QString("Error subscribing: ") + e.what());
     }
   }
 }
 
-void AerialMapDisplay::unsubscribe()
-{
-  coord_sub_.shutdown();
-}
+void AerialMapDisplay::unsubscribe() { coord_sub_.shutdown(); }
 
-void AerialMapDisplay::updateAlpha()
-{
+void AerialMapDisplay::updateAlpha() {
   float alpha = alpha_property_->getFloat();
 
-  Ogre::Pass* pass = material_->getTechnique( 0 )->getPass( 0 );
-  Ogre::TextureUnitState* tex_unit = NULL;
-  if( pass->getNumTextureUnitStates() > 0 )
-  {
-    tex_unit = pass->getTextureUnitState( 0 );
-  }
-  else
-  {
+  Ogre::Pass *pass = material_->getTechnique(0)->getPass(0);
+  Ogre::TextureUnitState *tex_unit = NULL;
+  if (pass->getNumTextureUnitStates() > 0) {
+    tex_unit = pass->getTextureUnitState(0);
+  } else {
     tex_unit = pass->createTextureUnitState();
   }
 
-  tex_unit->setAlphaOperation( Ogre::LBX_SOURCE1, Ogre::LBS_MANUAL, Ogre::LBS_CURRENT, alpha );
+  tex_unit->setAlphaOperation(Ogre::LBX_SOURCE1, Ogre::LBS_MANUAL,
+                              Ogre::LBS_CURRENT, alpha);
 
-  if( alpha < 0.9998 )
-  {
-    material_->setSceneBlending( Ogre::SBT_TRANSPARENT_ALPHA );
-    material_->setDepthWriteEnabled( false );
-  }
-  else
-  {
-    material_->setSceneBlending( Ogre::SBT_REPLACE );
-    material_->setDepthWriteEnabled( !draw_under_property_->getValue().toBool() );
+  if (alpha < 0.9998) {
+    material_->setSceneBlending(Ogre::SBT_TRANSPARENT_ALPHA);
+    material_->setDepthWriteEnabled(false);
+  } else {
+    material_->setSceneBlending(Ogre::SBT_REPLACE);
+    material_->setDepthWriteEnabled(!draw_under_property_->getValue().toBool());
   }
 }
 
-void AerialMapDisplay::updateDrawUnder()
-{
+void AerialMapDisplay::updateDrawUnder() {
   bool draw_under = draw_under_property_->getValue().toBool();
 
-  if( alpha_property_->getFloat() >= 0.9998 )
-  {
-    material_->setDepthWriteEnabled( !draw_under );
+  if (alpha_property_->getFloat() >= 0.9998) {
+    material_->setDepthWriteEnabled(!draw_under);
   }
 
-  if( manual_object_ )
-  {
-    if( draw_under )
-    {
-      manual_object_->setRenderQueueGroup( Ogre::RENDER_QUEUE_4 );
-    }
-    else
-    {
-      manual_object_->setRenderQueueGroup( Ogre::RENDER_QUEUE_MAIN );
+  if (manual_object_) {
+    if (draw_under) {
+      manual_object_->setRenderQueueGroup(Ogre::RENDER_QUEUE_4);
+    } else {
+      manual_object_->setRenderQueueGroup(Ogre::RENDER_QUEUE_MAIN);
     }
   }
 }
 
-void AerialMapDisplay::requestFinished(int id, bool error) {
-  if (error) {
-    ROS_ERROR("Error loading map tile (request id %i)", id);
-    return;
-  }
-  if (http_->currentId() == id) {
-    const QByteArray data = http_->readAll();
-    ROS_INFO("Finished loading request %i (%i bytes)", id, data.size());
-    
-    try {
-      textureFromBytes(data,"my_sweet_texture");
-    } catch (std::exception& e) {
-      ROS_ERROR("Exception: %s", e.what());
-    }
-  }
-}
-
-void AerialMapDisplay::updateTopic()
-{
+void AerialMapDisplay::updateTopic() {
   unsubscribe();
   subscribe();
   clear();
 }
 
-void AerialMapDisplay::clear()
-{
-  setStatus( StatusProperty::Warn, "Message", "No map received" );
+void AerialMapDisplay::clear() {
+  setStatus(StatusProperty::Warn, "Message", "No map received");
 
-  if( !loaded_ )
-  {
+  if (!loaded_) {
     return;
   }
+  //  there is a scene in existence
 
-  scene_manager_->destroyManualObject( manual_object_ );
+  scene_manager_->destroyManualObject(manual_object_);
   manual_object_ = NULL;
 
   std::string tex_name = texture_->getName();
   texture_.setNull();
-  Ogre::TextureManager::getSingleton().unload( tex_name );
+  Ogre::TextureManager::getSingleton().unload(tex_name);
 
+  //  done cleaning up
   loaded_ = false;
 }
 
-void AerialMapDisplay::update( float wall_dt, float ros_dt )
-{
-  {
-    boost::mutex::scoped_lock lock(mutex_);
-
-    if (new_coords_) {
-      
-    }
-    
-    //current_map_ = updated_map_;
-  }
-
-  //if (!current_map_ || !new_map_)
-  if (!new_coords_)
-  {
+void AerialMapDisplay::update(float,float) {
+  boost::mutex::scoped_lock lock(mutex_);
+  if (!new_coords_) {
+    //  only update when new data is available
     return;
   }
-
-//  if (current_map_->data.empty())
-//  {
-//    return;
-//  }
-
   new_coords_ = false;
 
-//  if( current_map_->info.width * current_map_->info.height == 0 )
-//  {
-//    std::stringstream ss;
-//    ss << "AerialMap is zero-sized (" << current_map_->info.width << "x" << current_map_->info.height << ")";
-//    setStatus( StatusProperty::Error, "AerialMap", QString::fromStdString( ss.str() ));
-//    return;
-//  }
-
   clear();
-
-  setStatus( StatusProperty::Ok, "Message", "AerialMap received" );
-
-//  ROS_DEBUG( "Received a %d X %d map @ %.3f m/pix\n",
-//             current_map_->info.width,
-//             current_map_->info.height,
-//             current_map_->info.resolution );
-
-  float resolution = 1;//current_map_->info.resolution;
-
-  int width = 256;//current_map_->info.width;
-  int height = 256;//current_map_->info.height;
-
-
-//  Ogre::Vector3 position( current_map_->info.origin.position.x,
-//                          current_map_->info.origin.position.y,
-//                          current_map_->info.origin.position.z );
-//  Ogre::Quaternion orientation( current_map_->info.origin.orientation.w,
-//                                current_map_->info.origin.orientation.x,
-//                                current_map_->info.origin.orientation.y,
-//                                current_map_->info.origin.orientation.z );
+  setStatus(StatusProperty::Ok, "Message", "Rendering new AerialMap");
   
-  Ogre::Vector3 position(0,0,0);
-  Ogre::Quaternion orientation(1,0,0,0);
-  
-  //frame_ = current_map_->header.frame_id;
-  if (frame_.empty())
-  {
+  if (frame_.empty()) {
     frame_ = "world";
   }
-
-  // Expand it to be RGB data
-  unsigned int pixels_size = width * height * 3;
-  unsigned char* pixels = new unsigned char[pixels_size];
-  memset(pixels, 0, pixels_size);
-
-  for (int i=0; i < height; i++) {
-    for (int j=0; j < width; j++) {
-      float r = (i*1.0) / height;
-      float g = (j*1.0) / width;
-      pixels[(i*width)*3 + j*3] = static_cast<unsigned char>(r * 255);
-      pixels[(i*width)*3 + j*3 + 1] = static_cast<unsigned char>(g * 255);
-    }
-  }
   
-  bool map_status_set = false;
-  unsigned int num_pixels_to_copy = pixels_size;
-  if( pixels_size != width*height*3 ) // current_map_->data.size() )
-  {
-    //  unreachable bullshit...
-    std::stringstream ss;
-   // ss << "Data size doesn't match width*height: width = " << width
-   //    << ", height = " << height << ", data size = " << current_map_->data.size();
-    setStatus( StatusProperty::Error, "AerialMap", QString::fromStdString( ss.str() ));
-    map_status_set = true;
+  assembleScene();
 
-    // Keep going, but don't read past the end of the data.
-  //  if( current_map_->data.size() < pixels_size )
-  //  {
-  //    num_pixels_to_copy = current_map_->data.size();
-  //  }
-  }
-
-  //  What the fuck was this even for??
-  // TODO: a fragment shader could do this on the video card, and
-  // would allow a non-grayscale color to mark the out-of-range
-  // values.
-//  for( unsigned int pixel_index = 0; pixel_index < num_pixels_to_copy; pixel_index++ )
-//  {
-//    pixels[ pixel_index ] = current_map_->data[ pixel_index ];    
-//  }
-
-  Ogre::DataStreamPtr pixel_stream;
-  pixel_stream.bind(new Ogre::MemoryDataStream(pixels, pixels_size));
-  static int tex_count = 0;
-  std::stringstream ss;
-  ss << "AerialMapTexture" << tex_count++;
-  try
-  {
-    texture_ = Ogre::TextureManager::getSingleton().loadRawData( ss.str(), Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME,
-                                                                 pixel_stream, width, height, Ogre::PF_R8G8B8, Ogre::TEX_TYPE_2D,
-                                                                 0);
-    
-    if( !map_status_set )
-    {
-      setStatus( StatusProperty::Ok, "AerialMap", "AerialMap OK" );
-    }
-  }
-  catch(Ogre::RenderingAPIException&)
-  {
-    Ogre::Image image;
-    pixel_stream->seek(0);
-    float fwidth = width;
-    float fheight = height;
-    if( width > height )
-    {
-      float aspect = fheight / fwidth;
-      fwidth = 2048;
-      fheight = fwidth * aspect;
-    }
-    else
-    {
-      float aspect = fwidth / fheight;
-      fheight = 2048;
-      fwidth = fheight * aspect;
-    }
-
-    {
-      std::stringstream ss;
-      ss << "AerialMap is larger than your graphics card supports.  Downsampled from [" << width << "x" << height << "] to [" << fwidth << "x" << fheight << "]";
-      setStatus(StatusProperty::Ok, "AerialMap", QString::fromStdString( ss.str() ));
-    }
-
-    ROS_WARN("Failed to create full-size map texture, likely because your graphics card does not support textures of size > 2048.  Downsampling to [%d x %d]...", (int)fwidth, (int)fheight);
-    //ROS_INFO("Stream size [%d], width [%f], height [%f], w * h [%f]", pixel_stream->size(), width, height, width * height);
-    image.loadRawData(pixel_stream, width, height, Ogre::PF_R8G8B8);
-    image.resize(fwidth, fheight, Ogre::Image::FILTER_NEAREST);
-    ss << "Downsampled";
-    texture_ = Ogre::TextureManager::getSingleton().loadImage(ss.str(), Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, image);
-  }
-
-  delete [] pixels;
-
-  Ogre::Pass* pass = material_->getTechnique(0)->getPass(0);
-  Ogre::TextureUnitState* tex_unit = NULL;
-  if (pass->getNumTextureUnitStates() > 0)
-  {
-    tex_unit = pass->getTextureUnitState(0);
-  }
-  else
-  {
-    tex_unit = pass->createTextureUnitState();
-  }
-
-  tex_unit->setTextureName(texture_->getName());
-  tex_unit->setTextureFiltering( Ogre::TFO_NONE );
-
-  static int map_count = 0;
-  std::stringstream ss2;
-  ss2 << "AerialMapObject" << map_count++;
-  manual_object_ = scene_manager_->createManualObject( ss2.str() );
-  scene_node_->attachObject( manual_object_ );
-
-  manual_object_->begin(material_->getName(), Ogre::RenderOperation::OT_TRIANGLE_LIST);
-  {
-    // First triangle
-    {
-      // Bottom left
-      manual_object_->position( 0.0f, 0.0f, 0.0f );
-      manual_object_->textureCoord(0.0f, 0.0f);
-      manual_object_->normal( 0.0f, 0.0f, 1.0f );
-
-      // Top right
-      manual_object_->position( resolution*width, resolution*height, 0.0f );
-      manual_object_->textureCoord(1.0f, 1.0f);
-      manual_object_->normal( 0.0f, 0.0f, 1.0f );
-
-      // Top left
-      manual_object_->position( 0.0f, resolution*height, 0.0f );
-      manual_object_->textureCoord(0.0f, 1.0f);
-      manual_object_->normal( 0.0f, 0.0f, 1.0f );
-    }
-
-    // Second triangle
-    {
-      // Bottom left
-      manual_object_->position( 0.0f, 0.0f, 0.0f );
-      manual_object_->textureCoord(0.0f, 0.0f);
-      manual_object_->normal( 0.0f, 0.0f, 1.0f );
-
-      // Bottom right
-      manual_object_->position( resolution*width, 0.0f, 0.0f );
-      manual_object_->textureCoord(1.0f, 0.0f);
-      manual_object_->normal( 0.0f, 0.0f, 1.0f );
-
-      // Top right
-      manual_object_->position( resolution*width, resolution*height, 0.0f );
-      manual_object_->textureCoord(1.0f, 1.0f);
-      manual_object_->normal( 0.0f, 0.0f, 1.0f );
-    }
-  }
-  manual_object_->end();
-
-  if( draw_under_property_->getValue().toBool() )
-  {
-    manual_object_->setRenderQueueGroup(Ogre::RENDER_QUEUE_4);
-  }
-
-  resolution_property_->setValue( resolution );
-  width_property_->setValue( width );
-  height_property_->setValue( height );
-  position_property_->setVector( position );
-  orientation_property_->setQuaternion( orientation );
+  /// @todo: why do this here?
+  resolution_property_->setValue(loader_->resolution());
 
   transformAerialMap();
 
   loaded_ = true;
-
   context_->queueRender();
 }
 
-void AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr& msg) {
-  boost::mutex::scoped_lock lock(mutex_); /// @todo: is this necessary?
-  new_coords_ = true;
-  
-  ref_lat_ = msg->latitude;
-  ref_lon_ = msg->longitude;
-  ROS_INFO("Reference point set to: %f, %f", ref_lat_, ref_lon_);
-  
-  //  re-load imagery
-  loadImagery();
+void
+AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
+  //  only re-load if coordinates changed, in case the topic is not latched
+  if (msg->latitude != ref_lat_ && msg->longitude != ref_lon_) {
+    ref_lat_ = msg->latitude;
+    ref_lon_ = msg->longitude;
+    ROS_INFO("Reference point set to: %f, %f", ref_lat_, ref_lon_);
+
+    setStatus(StatusProperty::Warn, "Message", "Loading map tiles.");
+
+    //  re-load imagery
+    loadImagery();
+  }
 }
 
 void AerialMapDisplay::loadImagery() {
-  
-  //  figure out which tile to load
-  double xtile,ytile;
-  const unsigned int zoom = 17;
-  latLonToTileCoords(ref_lat_,ref_lon_,zoom,xtile,ytile);
-  
-  const unsigned int xi = std::floor(xtile);
-  const unsigned int yi = std::floor(ytile);
-  
-  //  formulate URL
-  std::string full_url = 
-      "http://otile1.mqcdn.com/tiles/1.0.0/sat/{z}/{x}/{y}.jpg";
-  replaceRegex(boost::regex("(http){1}s?://", boost::regex::icase),
-               full_url, "");
-  
-  std::vector<boost::match_results<std::string::const_iterator>> url_parts = 
-      extractRegex(boost::regex("[\\d\\w0-9.]+", boost::regex::icase),
-                   full_url);
-  if (url_parts.empty()) {
-    ROS_WARN("Failed to extract base url...");
-    return;
+  if (loader_) {
+    loader_->abort();
+    delete loader_;
   }
-  boost::match_results<std::string::const_iterator> match = url_parts.front();
-  
-  //  extract the host name
-  std::string hostname;
-  hostname.resize(match.length());
-  std::copy(match[0].first, match[0].second, hostname.begin());
-  full_url.erase(match.position(), match.length());
-  
-  ROS_INFO("Request path: %s", full_url.c_str());
-  ROS_INFO("Hostname: %s", hostname.c_str());
-  
-  //  insert numerical values
-  replaceRegex(boost::regex("\\{x\\}", boost::regex::icase),
-               full_url, std::to_string(xi));
-  replaceRegex(boost::regex("\\{y\\}", boost::regex::icase),
-               full_url, std::to_string(yi));
-  replaceRegex(boost::regex("\\{z\\}", boost::regex::icase),
-               full_url, std::to_string(zoom));
-  
-  ROS_INFO("Request path: %s", full_url.c_str());
-  
-  if (!http_) {
-    //  create HTTP object
-    http_ = new QHttp(escapeURLString(hostname), 80, this);
-    //  listen to relevant signals for loading data
-    QObject::connect(http_,SIGNAL(requestFinished(int,bool)),this,
-                     SLOT(requestFinished(int,bool)));
-  }
-  
-  request_id_ = http_->get(escapeURLString(full_url), 0);
+  const std::string service = "http://api.tiles.mapbox.com/v4/gcross.jeke6dl6/{z}/{x}/{y}.png?access_token=sk.eyJ1IjoiZ2Nyb3NzIiwiYSI6ImlUZzhUSHMifQ.oYgC6isvxMGoxy9ogjDBVw";
+  loader_ =
+      new TileLoader(service,//"http://otile1.mqcdn.com/tiles/1.0.0/sat/{z}/{x}/{y}.jpg",
+                     ref_lat_, ref_lon_, 19, 1, this);
+
+  QObject::connect(loader_, SIGNAL(errorOcurred(QString)), this,
+                   SLOT(errorOcurred(QString)));
+  QObject::connect(loader_, SIGNAL(finishedLoading()), this,
+                   SLOT(finishedLoading()));
+  QObject::connect(loader_, SIGNAL(initiatedRequest(QNetworkRequest)), this,
+                   SLOT(initiatedRequest(QNetworkRequest)));
+  QObject::connect(loader_, SIGNAL(receivedImage(QNetworkRequest)), this,
+                   SLOT(receivedImage(QNetworkRequest)));
+  //  start loading images
+  loader_->start();
 }
 
-void AerialMapDisplay::transformAerialMap()
-{
-//  if (!current_map_)
-//  {
-//    return;
-//  }
+void AerialMapDisplay::assembleScene() {  
+  //  iterate over all tiles and create an object for each of them
+  const double resolution = loader_->resolution();
+  const std::vector<TileLoader::MapTile>& tiles = loader_->tiles();
+  for (const TileLoader::MapTile& tile : tiles) {
+    const int w = tile.image().width();
+    const int h = tile.image().height();
+    //  we here assume that the tiles are uniformly sized...
+    const double tileW = w * resolution;
+    const double tileH = h * resolution;
+    const double origin_x = -loader_->originX() * tileW;
+    const double origin_y = -(1 - loader_->originY()) * tileH;
+    
+    //  determine location of this tile
+    const double x = (tile.x() - loader_->tileX()) * tileW + origin_x;
+    const double y = -(tile.y() - loader_->tileY()) * tileH + origin_y;
+    
+    const std::string name_suffix = std::to_string(tile.x())
+        + "_" + std::to_string(tile.y())
+        + "_" + std::to_string(map_id_);
+    
+    Ogre::TexturePtr tex;
+    if (tile.hasImage()) {
+      //  one material per texture
+      std::string matName = "material_" + name_suffix;
+      Ogre::MaterialPtr material = Ogre::MaterialManager::getSingleton().create(
+          matName, Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+      material->setReceiveShadows(false);
+      material->getTechnique(0)->setLightingEnabled(false);
+      material->setDepthBias(-16.0f, 0.0f); /// @todo: what the fuck does this do?
+      material->setCullingMode(Ogre::CULL_NONE);
+      material->setDepthWriteEnabled(false);
+      
+      //  create textureing unit  
+      Ogre::Pass *pass = material->getTechnique(0)->getPass(0);
+      Ogre::TextureUnitState *tex_unit = NULL;
+      if (pass->getNumTextureUnitStates() > 0) {
+        tex_unit = pass->getTextureUnitState(0);
+      } else {
+        tex_unit = pass->createTextureUnitState();
+      }
+      
+      //  only add if we have a texture for it
+      tex = textureFromImage(tile.image(), "texture_" + name_suffix);
+      
+      ROS_INFO("Rendering with texture: %s", tex->getName().c_str());
+      tex_unit->setTextureName(tex->getName());
+      tex_unit->setTextureFiltering(Ogre::TFO_BILINEAR);
+      
+      //  create an object
+      const std::string obj_name = "object_" + name_suffix;
+      Ogre::ManualObject * obj = scene_manager_->createManualObject(obj_name);
+      scene_node_->attachObject(obj);
+      
+      //  create a quad for this tile
+      obj->begin(material->getName(),
+                 Ogre::RenderOperation::OT_TRIANGLE_LIST);
+      
+      //  bottom left
+      obj->position(x, y, 0.0f);
+      obj->textureCoord(0.0f, 0.0f);
+      obj->normal(0.0f, 0.0f, 1.0f);
 
+      // top right
+      obj->position(x + tileW, y + tileH, 0.0f);
+      obj->textureCoord(1.0f, 1.0f);
+      obj->normal(0.0f, 0.0f, 1.0f);
+
+      // top left
+      obj->position(x, y + tileH, 0.0f);
+      obj->textureCoord(0.0f, 1.0f);
+      obj->normal(0.0f, 0.0f, 1.0f);
+      
+      //  bottom left
+      obj->position(x, y, 0.0f);
+      obj->textureCoord(0.0f, 0.0f);
+      obj->normal(0.0f, 0.0f, 1.0f);
+
+      // bottom right
+      obj->position(x + tileW, y, 0.0f);
+      obj->textureCoord(1.0f, 0.0f);
+      obj->normal(0.0f, 0.0f, 1.0f);
+
+      // top right
+      obj->position(x + tileW, y + tileH, 0.0f);
+      obj->textureCoord(1.0f, 1.0f);
+      obj->normal(0.0f, 0.0f, 1.0f);
+      
+      obj->end();
+      
+      if (draw_under_property_->getValue().toBool()) {
+        //  render under everything else
+        obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_4);
+      }
+      
+      MapObject object;
+      object.object = obj;
+      object.texture = tex;
+      object.material = material;
+      objects_.push_back(object);
+    }
+  }
+  loaded_ = true;
+}
+
+void AerialMapDisplay::initiatedRequest(QNetworkRequest request) {
+  ROS_INFO("Requesting %s", qPrintable(request.url().toString()));
+}
+
+void AerialMapDisplay::receivedImage(QNetworkRequest request) {
+  ROS_INFO("Loaded tile %s", qPrintable(request.url().toString()));
+}
+
+void AerialMapDisplay::finishedLoading() {
+  ROS_INFO("Finished loading all tiles.");
+  new_coords_ = true;
+  setStatus(StatusProperty::Ok, "Message", "Loaded all tiles.");
+}
+
+void AerialMapDisplay::errorOcurred(QString description) {
+  ROS_ERROR("Error: %s", qPrintable(description));
+  setStatus(StatusProperty::Error, "Message", description);
+}
+
+void AerialMapDisplay::transformAerialMap() {
   Ogre::Vector3 position;
   Ogre::Quaternion orientation;
-  
+
   geometry_msgs::Pose pose;
   pose.orientation.w = 1;
   pose.orientation.x = 0;
@@ -676,31 +498,26 @@ void AerialMapDisplay::transformAerialMap()
   pose.position.x = 0;
   pose.position.y = 0;
   pose.position.z = 0;
-  
-  if (!context_->getFrameManager()->transform(frame_, ros::Time(), pose, position, orientation))
-  {
-    ROS_DEBUG( "Error transforming map '%s' from frame '%s' to frame '%s'",
-               qPrintable( getName() ), frame_.c_str(), qPrintable( fixed_frame_ ));
 
-    setStatus( StatusProperty::Error, "Transform",
-               "No transform from [" + QString::fromStdString( frame_ ) + "] to [" + fixed_frame_ + "]" );
-  }
-  else
-  {
+  if (!context_->getFrameManager()->transform(frame_, ros::Time(), pose,
+                                              position, orientation)) {
+    ROS_DEBUG("Error transforming map '%s' from frame '%s' to frame '%s'",
+              qPrintable(getName()), frame_.c_str(), qPrintable(fixed_frame_));
+
+    setStatus(StatusProperty::Error, "Transform",
+              "No transform from [" + QString::fromStdString(frame_) +
+                  "] to [" + fixed_frame_ + "]");
+  } else {
     setStatus(StatusProperty::Ok, "Transform", "Transform OK");
   }
 
-  scene_node_->setPosition( position );
-  scene_node_->setOrientation( orientation );
+  scene_node_->setPosition(position);
+  scene_node_->setOrientation(orientation);
 }
 
-void AerialMapDisplay::fixedFrameChanged()
-{
-  transformAerialMap();
-}
+void AerialMapDisplay::fixedFrameChanged() { transformAerialMap(); }
 
-void AerialMapDisplay::reset()
-{
+void AerialMapDisplay::reset() {
   Display::reset();
 
   clear();
@@ -708,22 +525,7 @@ void AerialMapDisplay::reset()
   updateTopic();
 }
 
-void AerialMapDisplay::latLonToTileCoords(double lat, double lon, 
-                                          unsigned int zoom, 
-                                          double&x, double& y) {
-  assert(zoom <= 18); /// @todo: Make this limit variable
-  assert(lat > -85.0511 && lat < 85.0511);
-  assert(lon > -180 && lon < 180);
-  
-  const double rho = M_PI / 180;
-  const double lat_rad = lat * rho;
-  
-  unsigned int n = (1 << zoom);
-  x = n * ((lon + 180) / 360.0);
-  y = n * (1 - (std::log(std::tan(lat_rad) + 1/std::cos(lat_rad)) / M_PI)) / 2;
-}
-
 } // namespace rviz
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS( rviz::AerialMapDisplay, rviz::Display )
+PLUGINLIB_EXPORT_CLASS(rviz::AerialMapDisplay, rviz::Display)

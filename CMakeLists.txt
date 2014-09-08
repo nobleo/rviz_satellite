@@ -19,10 +19,12 @@ catkin_package()
 
 set(${PROJECT_NAME}_SOURCES
   src/aerialmap_display.cpp
+  src/tileloader.cpp
 )
 
 set(${PROJECT_NAME}_HEADERS
   src/aerialmap_display.h
+  src/tileloader.h
 )
 
 # invoke MOC and UI

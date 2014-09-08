@@ -43,10 +43,11 @@
 #include <QObject>
 #include <QtConcurrentRun>
 #include <QFuture>
-#include <QHttp>
-#include <QUrl>
 #include <QByteArray>
 #include <QFile>
+#include <QNetworkRequest>
+
+#include <tileloader.h>
 
 namespace Ogre {
 class ManualObject;
@@ -76,7 +77,7 @@ public:
   virtual void onInitialize();
   virtual void fixedFrameChanged();
   virtual void reset();
-  virtual void update( float wall_dt, float ros_dt );
+  virtual void update(float, float);
 
   float getResolution() { return resolution_; }
   int getWidth() { return width_; }
@@ -88,8 +89,12 @@ protected Q_SLOTS:
   void updateAlpha();
   void updateTopic();
   void updateDrawUnder();
-  void requestFinished(int id, bool error);
 
+  void initiatedRequest(QNetworkRequest request);
+  void receivedImage(QNetworkRequest request);
+  void finishedLoading();
+  void errorOcurred(QString description);
+  
 protected:
   // overrides from Display
   virtual void onEnable();
@@ -102,12 +107,21 @@ protected:
 
   void loadImagery();
   
+  void assembleScene();
+  
   void clear();
 
   void transformAerialMap();
-
-  static void latLonToTileCoords(double lat, double lon, unsigned int zoom, 
-                                 double&x, double& y);
+  
+  unsigned int map_id_;
+  
+  /// Instance of a tile w/ associated ogre data
+  struct MapObject {
+    Ogre::ManualObject * object;
+    Ogre::TexturePtr texture;
+    Ogre::MaterialPtr material;
+  };
+  std::vector<MapObject> objects_;
   
   //  scene graph objects
   Ogre::ManualObject* manual_object_;
@@ -140,8 +154,7 @@ protected:
   double ref_lon_;
   
   //  networking objects
-  QHttp * http_;
-  int request_id_;
+  TileLoader * loader_;
 };
 
 } // namespace rviz
