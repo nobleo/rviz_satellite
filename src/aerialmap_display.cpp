@@ -141,11 +141,11 @@ namespace rviz {
 
 AerialMapDisplay::AerialMapDisplay()
     : Display(), map_id_(0), scene_id_(0),
-      loaded_(false), new_coords_(false), loader_(0) {
+      loaded_(false), new_coords_(false), received_msg_(false), loader_(0) {
   
   static unsigned int map_ids=0;
   map_id_ = map_ids++;  //  global counter of map ids
-  
+ 
   topic_property_ = new RosTopicProperty(
       "Topic", "", QString::fromStdString(
                        ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
@@ -331,6 +331,7 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
     setStatus(StatusProperty::Warn, "Message", "Loading map tiles.");
 
     //  re-load imagery
+    received_msg_ = true;
     loadImagery();
   }
 }
@@ -339,6 +340,9 @@ void AerialMapDisplay::loadImagery() {
   if (loader_) {
     loader_->abort();
     delete loader_;
+  }
+  if (!received_msg_) {
+    return;
   }
   if (object_uri_.empty()) {
     setStatus(StatusProperty::Error,"Message",

@@ -145,6 +145,7 @@ protected:
   //  tile management
   boost::mutex mutex_;
   bool new_coords_;
+  bool received_msg_;
   double ref_lat_;
   double ref_lon_;
   TileLoader * loader_;
