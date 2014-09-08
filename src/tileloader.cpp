@@ -99,9 +99,18 @@ double TileLoader::resolution() const {
 /// For explanation of these calculations.
 void TileLoader::latLonToTileCoords(double lat, double lon, unsigned int zoom,
                                     double &x, double &y) {
-  assert(zoom <= 19); /// @todo: Make this limit variable
-  assert(lat > -85.0511 && lat < 85.0511);
-  assert(lon > -180 && lon < 180);
+  if (zoom > 19) {
+    throw std::invalid_argument("Zoom level " + std::to_string(zoom)
+                                + " too high");
+  }
+  else if (lat < -85.0511 || lat > 85.0511) {
+    throw std::invalid_argument("Latitude " + std::to_string(lat)
+                                + " invalid");
+  }
+  else if (lon < -180 && lon > 180) {
+    throw std::invalid_argument("Longitude " + std::to_string(lon)
+                                + " invalid");
+  }
 
   const double rho = M_PI / 180;
   const double lat_rad = lat * rho;

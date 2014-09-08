@@ -157,17 +157,39 @@ AerialMapDisplay::AerialMapDisplay()
   alpha_ = alpha_property_->getValue().toFloat();
   alpha_property_->setMin(0);
   alpha_property_->setMax(1);
-
+  alpha_property_->setShouldBeSaved(true);
+  
   draw_under_property_ =
       new Property("Draw Behind", false,
                    "Rendering option, controls whether or not the map is always"
                    " drawn behind everything else.",
                    this, SLOT(updateDrawUnder()));
+  draw_under_property_->setShouldBeSaved(true);
   draw_under_ = draw_under_property_->getValue().toBool();
-
+  
+  //  output, resolution of the map in meters/pixel
   resolution_property_ = new FloatProperty(
-      "Resolution", 0, "Resolution of the map.", this);
+      "Resolution", 0, "Resolution of the map. (Read only)", this);
   resolution_property_->setReadOnly(true);
+  
+  //  properties for map
+  object_uri_property_ = new StringProperty(
+        "Object URI", "http://otile1.mqcdn.com/tiles/1.0.0/sat/{z}/{x}/{y}.jpg",
+        "URL from which to retrieve map tiles.", this, SLOT(updateObjectURI()));
+  object_uri_property_->setShouldBeSaved(true);
+  object_uri_ = object_uri_property_->getStdString();
+  
+  zoom_property_ = new IntProperty("Zoom", 16, "Zoom level (0 - 19 usually)", 
+                                   this, SLOT(updateZoom()));
+  zoom_property_->setShouldBeSaved(true);
+  zoom_ = zoom_property_->getInt();
+  
+  blocks_property_ = new IntProperty("Blocks", 3, "Number of adjacent blocks (6 max)",
+                                     this, SLOT(updateBlocks()));
+  blocks_property_->setShouldBeSaved(true);
+  
+  //  updating one triggers reload
+  updateBlocks();
 }
 
 AerialMapDisplay::~AerialMapDisplay() {
@@ -217,6 +239,26 @@ void AerialMapDisplay::updateDrawUnder() {
   draw_under_ = draw_under_property_->getValue().toBool();
   new_coords_ = true; //  force update
   ROS_INFO("Changing draw_under to %s", ((draw_under_) ? "true" : "false"));
+}
+
+void AerialMapDisplay::updateObjectURI() {
+  object_uri_ = object_uri_property_->getStdString();
+  loadImagery();  //  reload all imagery
+}
+
+void AerialMapDisplay::updateZoom() {
+  int zoom = zoom_property_->getInt();
+  //  validate
+  zoom = std::max(0, std::min(19, zoom));
+  zoom_ = zoom;
+  loadImagery();  //  reload
+}
+
+void AerialMapDisplay::updateBlocks() {
+  int blocks = blocks_property_->getInt();
+  blocks = std::max(0, std::min(6, blocks));  //  arbitrary limit for now
+  blocks_ = blocks;
+  loadImagery();
 }
 
 void AerialMapDisplay::updateTopic() {
@@ -286,7 +328,6 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
     ref_lat_ = msg->latitude;
     ref_lon_ = msg->longitude;
     ROS_INFO("Reference point set to: %f, %f", ref_lat_, ref_lon_);
-
     setStatus(StatusProperty::Warn, "Message", "Loading map tiles.");
 
     //  re-load imagery
@@ -299,10 +340,20 @@ void AerialMapDisplay::loadImagery() {
     loader_->abort();
     delete loader_;
   }
-  const std::string service = "http://api.tiles.mapbox.com/v4/gcross.jeke6dl6/{z}/{x}/{y}.png?access_token=sk.eyJ1IjoiZ2Nyb3NzIiwiYSI6ImlUZzhUSHMifQ.oYgC6isvxMGoxy9ogjDBVw";
-  loader_ =
-      new TileLoader(service,//"http://otile1.mqcdn.com/tiles/1.0.0/sat/{z}/{x}/{y}.jpg",
-                     ref_lat_, ref_lon_, 19, 1, this);
+  if (object_uri_.empty()) {
+    setStatus(StatusProperty::Error,"Message",
+              "Received message but object URI is not set");
+  }
+  const std::string service = object_uri_;
+  try {
+    loader_ =
+      new TileLoader(service,
+                     ref_lat_, ref_lon_, zoom_, blocks_, this);
+  } catch (std::exception& e) {
+    setStatus(StatusProperty::Error, "Message",
+              QString(e.what()));
+    return;
+  }
 
   QObject::connect(loader_, SIGNAL(errorOcurred(QString)), this,
                    SLOT(errorOcurred(QString)));

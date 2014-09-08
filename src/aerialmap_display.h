@@ -58,13 +58,12 @@ namespace rviz {
 class FloatProperty;
 class IntProperty;
 class Property;
-class QuaternionProperty;
 class RosTopicProperty;
-class VectorProperty;
+class StringProperty;
 
 /**
  * \class AerialMapDisplay
- * \brief Displays a map along the XY plane.
+ * \brief Displays a satellite map along the XY plane.
  */
 class AerialMapDisplay: public Display
 {
@@ -83,6 +82,9 @@ protected Q_SLOTS:
   void updateAlpha();
   void updateTopic();
   void updateDrawUnder();
+  void updateObjectURI();
+  void updateZoom();
+  void updateBlocks();
 
   //  slots for TileLoader messages
   void initiatedRequest(QNetworkRequest request);
@@ -127,12 +129,18 @@ protected:
   
   //  properties
   RosTopicProperty* topic_property_;
+  StringProperty* object_uri_property_;
+  IntProperty* zoom_property_;
+  IntProperty* blocks_property_;
   FloatProperty* resolution_property_;
   FloatProperty* alpha_property_;
   Property* draw_under_property_;
   
   float alpha_;
   bool draw_under_;
+  std::string object_uri_;
+  unsigned int zoom_;
+  unsigned int blocks_;
   
   //  tile management
   boost::mutex mutex_;
