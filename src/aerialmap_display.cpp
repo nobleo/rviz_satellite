@@ -228,8 +228,8 @@ void AerialMapDisplay::subscribe() {
   }
 }
 
-void AerialMapDisplay::unsubscribe() { 
-  coord_sub_.shutdown(); 
+void AerialMapDisplay::unsubscribe() {
+  coord_sub_.shutdown();
   ROS_INFO("Unsubscribing.");
 }
 
@@ -274,7 +274,6 @@ void AerialMapDisplay::updateTopic() {
 
 void AerialMapDisplay::clear() {
   setStatus(StatusProperty::Warn, "Message", "No map received");
-
   ref_lat_ = 0;
   ref_lon_ = 0;
   if (!loaded_) {
