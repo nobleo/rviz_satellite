@@ -275,6 +275,8 @@ void AerialMapDisplay::updateTopic() {
 void AerialMapDisplay::clear() {
   setStatus(StatusProperty::Warn, "Message", "No map received");
 
+  ref_lat_ = 0;
+  ref_lon_ = 0;
   if (!loaded_) {
     return;
   }
