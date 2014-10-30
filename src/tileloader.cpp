@@ -1,12 +1,11 @@
 /*
  * TileLoader.cpp
  *
- *  Copyright (c) 2014 Gaeth Cross. All rights reserved.
+ *  Copyright (c) 2014 Gaeth Cross. Apache 2 License.
  *
  *  This file is part of rviz_satellite.
  *
  *	Created on: 07/09/2014
- *		  Author: gareth
  */
 
 #include "tileloader.h"
@@ -32,19 +31,6 @@ static size_t replaceRegex(const boost::regex &ex, std::string &str,
   }
   return count;
 }
-
-// static std::vector<boost::match_results<std::string::const_iterator>>
-// extractRegex(const boost::regex &ex, const std::string &str) {
-//  std::string::const_iterator start = str.begin(), end = str.end();
-//  boost::match_results<std::string::const_iterator> what;
-//  boost::match_flag_type flags = boost::match_default;
-//  std::vector<boost::match_results<std::string::const_iterator>> matches;
-//  while (boost::regex_search(start, end, what, ex, flags)) {
-//    matches.push_back(what);
-//    start = what[0].second;
-//  }
-//  return matches;
-//}
 
 void TileLoader::MapTile::abortLoading() {
   if (reply_) {
@@ -125,6 +111,7 @@ void TileLoader::latLonToTileCoords(double lat, double lon, unsigned int zoom,
   x = n * ((lon + 180) / 360.0);
   y = n * (1 - (std::log(std::tan(lat_rad) + 1 / std::cos(lat_rad)) / M_PI)) /
       2;
+  std::cout << "Center tile coords: " << x << ", " << y << std::endl;
 }
 
 double TileLoader::zoomToResolution(double lat, unsigned int zoom) {
@@ -178,36 +165,6 @@ void TileLoader::finishedRequest(QNetworkReply *reply) {
     emit finishedLoading();
   }
 }
-
-//  unused at the moment
-// void TileLoader::parseServiceURL(std::string service) {
-
-//  if (service.empty()) {
-//    throw std::invalid_argument("Service URL cannot be empty");
-//  }
-//  //  strip out the HTTP
-//  replaceRegex(boost::regex("(http){1}s?://", boost::regex::icase),
-//               service, "");
-//  //  find something that looks like base domain
-//  std::vector<boost::match_results<std::string::const_iterator>> url_parts =
-//      extractRegex(boost::regex("[\\d\\w0-9.]+", boost::regex::icase),
-//                   service);
-
-//  if (url_parts.empty()) {
-//    throw std::invalid_argument("Failed to extract domain name");
-//  }
-//  boost::match_results<std::string::const_iterator> match = url_parts.front();
-
-//  //  extract the host name
-//  std::string hostname;
-//  hostname.resize(match.length());
-//  std::copy(match[0].first, match[0].second, hostname.begin());
-//  service.erase(match.position(), match.length());
-
-//  //  remainder of the path should be the resource URI
-//  hostname_ = hostname;
-//  object_uri_ = service;
-//}
 
 QUrl TileLoader::uriForTile(int x, int y) const {
   std::string object = object_uri_;

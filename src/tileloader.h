@@ -1,12 +1,11 @@
 /*
  * TileLoader.h
  *
- *  Copyright (c) 2014 Gaeth Cross. All rights reserved.
+ *  Copyright (c) 2014 Gaeth Cross. Apache 2 License.
  *
  *  This file is part of rviz_satellite.
  *
  *	Created on: 07/09/2014
- *		  Author: gareth
  */
 
 #ifndef TILELOADER_H
@@ -109,7 +108,6 @@ private slots:
   void finishedRequest(QNetworkReply *reply);
 
 private:
-  // void parseServiceURL(std::string service);
 
   /// URI for tile [x,y]
   QUrl uriForTile(int x, int y) const;

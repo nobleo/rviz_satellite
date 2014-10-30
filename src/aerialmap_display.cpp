@@ -1,30 +1,11 @@
 /*
- * Copyright (c) 2008, Willow Garage, Inc.
- * All rights reserved.
+ * AerialMapDisplay.cpp
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ *  Copyright (c) 2014 Gaeth Cross. Apache 2 License.
  *
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the Willow Garage, Inc. nor the names of its
- *       contributors may be used to endorse or promote products derived from
- *       this software without specific prior written permission.
+ *  This file is part of rviz_satellite.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ *	Created on: 07/09/2014
  */
 
 #include <QtGlobal>
@@ -140,7 +121,7 @@ Ogre::TexturePtr textureFromImage(const QImage &image,
 namespace rviz {
 
 AerialMapDisplay::AerialMapDisplay()
-    : Display(), map_id_(0), scene_id_(0), loaded_(false), new_coords_(false),
+    : Display(), map_id_(0), scene_id_(0), dirty_(false),
       received_msg_(false), loader_(0) {
 
   static unsigned int map_ids = 0;
@@ -235,14 +216,14 @@ void AerialMapDisplay::unsubscribe() {
 
 void AerialMapDisplay::updateAlpha() {
   alpha_ = alpha_property_->getFloat();
-  new_coords_ = true;
+  dirty_ = true;
   ROS_INFO("Changing alpha to %f", alpha_);
 }
 
 void AerialMapDisplay::updateDrawUnder() {
   /// @todo: figure out why this property only applies to some objects
   draw_under_ = draw_under_property_->getValue().toBool();
-  new_coords_ = true; //  force update
+  dirty_ = true; //  force update
   ROS_INFO("Changing draw_under to %s", ((draw_under_) ? "true" : "false"));
 }
 
@@ -255,15 +236,20 @@ void AerialMapDisplay::updateZoom() {
   int zoom = zoom_property_->getInt();
   //  validate
   zoom = std::max(0, std::min(19, zoom));
-  zoom_ = zoom;
-  loadImagery(); //  reload
+  if (zoom != static_cast<int>(zoom_)) {
+    zoom_ = zoom;
+    ROS_INFO("Zoom changed to %i, will reload imagery", zoom_);
+    loadImagery(); //  reload
+  }
 }
 
 void AerialMapDisplay::updateBlocks() {
   int blocks = blocks_property_->getInt();
   blocks = std::max(0, std::min(6, blocks)); //  arbitrary limit for now
-  blocks_ = blocks;
-  loadImagery();
+  if (blocks != static_cast<int>(blocks_)) {
+    blocks_ = blocks;
+    loadImagery();
+  }
 }
 
 void AerialMapDisplay::updateTopic() {
@@ -274,63 +260,54 @@ void AerialMapDisplay::updateTopic() {
 
 void AerialMapDisplay::clear() {
   setStatus(StatusProperty::Warn, "Message", "No map received");
-  ref_lat_ = 0;
-  ref_lon_ = 0;
-  if (!loaded_) {
-    return;
+  clearGeometry();
+  //  the user has cleared here
+  received_msg_ = false;
+  //  stop any loading...
+  if (loader_) {
+    ROS_INFO("Clearing loaded imagery.");
+    //  cancel current imagery, if any
+    loader_->abort();
+    delete loader_;
+    loader_ = 0;
   }
-  //  there is a scene in existence, clean it up
+}
 
+void AerialMapDisplay::clearGeometry() {
   for (MapObject &obj : objects_) {
     //  destroy object
     scene_manager_->destroyManualObject(obj.object);
     //  destory texture
-    const std::string tex_name = obj.texture->getName();
-    obj.texture.setNull();
-    Ogre::TextureManager::getSingleton().unload(tex_name);
+    if (!obj.texture.isNull()) {
+      const std::string tex_name = obj.texture->getName();
+      obj.texture.setNull();
+      Ogre::TextureManager::getSingleton().unload(tex_name);
+    }
     //  destroy material
-    const std::string mat_name = obj.material->getName();
-    obj.material.setNull();
-    Ogre::MaterialManager::getSingleton().unload(mat_name);
+    if (!obj.material.isNull()) {
+      const std::string mat_name = obj.material->getName();
+      obj.material.setNull();
+      Ogre::MaterialManager::getSingleton().unload(mat_name);
+    }
   }
   objects_.clear();
-
-  //  done cleaning up
-  loaded_ = false;
 }
 
 void AerialMapDisplay::update(float, float) {
   boost::mutex::scoped_lock lock(mutex_);
-  if (!new_coords_) {
-    //  only update when new data is available
-    return;
-  }
-  new_coords_ = false;
-
-  clear(); //  clear if already loaded
-  setStatus(StatusProperty::Ok, "Message", "Rendering new AerialMap");
-
-  if (frame_.empty()) {
-    frame_ = "world";
-  }
-  //  creates all geometry
+  //  creates all geometry, if necessary
   assembleScene();
-
-  /// @todo: why do this here?
-  if (loader_) {
-    resolution_property_->setValue(loader_->resolution());
-  }
-
+  //  apply transformation
   transformAerialMap();
-
-  loaded_ = true;
+  //  draw
   context_->queueRender();
 }
 
 void
 AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
   //  only re-load if coordinates changed, in case the topic is not latched
-  if (msg->latitude != ref_lat_ && msg->longitude != ref_lon_) {
+  if (msg->latitude != ref_lat_ || msg->longitude != ref_lon_ ||
+      !received_msg_) {
     ref_lat_ = msg->latitude;
     ref_lon_ = msg->longitude;
     ROS_INFO("Reference point set to: %f, %f", ref_lat_, ref_lon_);
@@ -344,10 +321,13 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
 
 void AerialMapDisplay::loadImagery() {
   if (loader_) {
+    //  cancel current imagery, if any
     loader_->abort();
     delete loader_;
+    loader_ = 0;
   }
   if (!received_msg_) {
+    //  no message received from publisher
     return;
   }
   if (object_uri_.empty()) {
@@ -376,9 +356,18 @@ void AerialMapDisplay::loadImagery() {
 }
 
 void AerialMapDisplay::assembleScene() {
-  if (!loader_) {
-    return; //  don't add to scene
+  if (!dirty_) {
+    return; //  nothing to update
   }
+  dirty_ = false;
+  
+  if (!loader_) {
+    return; //  no tiles loaded, don't do anything
+  }
+  
+  //  get rid of old geometry, we will re-build this
+  clearGeometry();
+  
   //  iterate over all tiles and create an object for each of them
   const double resolution = loader_->resolution();
   const std::vector<TileLoader::MapTile> &tiles = loader_->tiles();
@@ -499,7 +488,6 @@ void AerialMapDisplay::assembleScene() {
     }
   }
   scene_id_++;
-  loaded_ = true;
 }
 
 void AerialMapDisplay::initiatedRequest(QNetworkRequest request) {
@@ -512,8 +500,12 @@ void AerialMapDisplay::receivedImage(QNetworkRequest request) {
 
 void AerialMapDisplay::finishedLoading() {
   ROS_INFO("Finished loading all tiles.");
-  new_coords_ = true;
+  dirty_ = true;
   setStatus(StatusProperty::Ok, "Message", "Loaded all tiles.");
+  //  set property for resolution display
+  if (loader_) {
+    resolution_property_->setValue(loader_->resolution());
+  }
 }
 
 void AerialMapDisplay::errorOcurred(QString description) {
@@ -535,7 +527,11 @@ void AerialMapDisplay::transformAerialMap() {
   pose.position.x = 0;
   pose.position.y = 0;
   pose.position.z = 0;
-
+  
+  if (frame_.empty()) {
+    frame_ = "world";
+  }
+  
   if (!context_->getFrameManager()->transform(frame_, ros::Time(), pose,
                                               position, orientation)) {
     ROS_DEBUG("Error transforming map '%s' from frame '%s' to frame '%s'",
@@ -556,9 +552,7 @@ void AerialMapDisplay::fixedFrameChanged() { transformAerialMap(); }
 
 void AerialMapDisplay::reset() {
   Display::reset();
-
-  clear();
-  // Force resubscription so that the map will be re-sent
+  //  unsub,clear,resub
   updateTopic();
 }
 
