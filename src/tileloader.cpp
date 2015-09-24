@@ -52,9 +52,14 @@ TileLoader::TileLoader(const std::string &service, double latitude,
     : QObject(parent), latitude_(latitude), longitude_(longitude), zoom_(zoom),
       blocks_(blocks), qnam_(0), object_uri_(service) {
   assert(blocks_ >= 0);
+          
     QString packagePath = QString::fromStdString(ros::package::getPath("rviz_satellite"));
     QString folderName("mapscache");
     cachePath_ = QDir::cleanPath(packagePath + QDir::separator() + folderName);
+    QDir dir(cachePath_);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
           
   /// @todo: some kind of error checking of the URL
 
@@ -89,17 +94,13 @@ void TileLoader::start() {
         //QString fileName("48.196920_11.786863_13_hybrid_640_640.jpg");
         QString fileName = "x_" + QString::number(x)+ "y_" +QString::number(y) +"z_" +QString::number(zoom_)+ ".jpg";
         QString fullPath = QDir::cleanPath(cachePath_ + QDir::separator() + fileName);
-        std::cout << "Requesting: " << fullPath.toStdString() << std::endl;
 
         // Check if tile is already in the cache
-
         QFile tile(fullPath);
         if (tile.exists()) {
-            std::cout << "Tile already cached"<< std::endl;
             QImage image(fullPath);
             tiles_.push_back(MapTile(x, y, zoom_, image));
         } else {
-            std::cout << "Tile not yet cached cached, queuing for download"<< std::endl;
             const QUrl uri = uriForTile(x, y);
             //  send request
             const QNetworkRequest request = QNetworkRequest(uri);
