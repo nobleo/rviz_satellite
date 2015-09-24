@@ -90,8 +90,8 @@ void TileLoader::start() {
   //  initiate requests
   for (int y = min_y; y <= max_y; y++) {
     for (int x = min_x; x <= max_x; x++) {
+        
         // Generate filename
-        //QString fileName("48.196920_11.786863_13_hybrid_640_640.jpg");
         QString fileName = "x_" + QString::number(x)+ "y_" +QString::number(y) +"z_" +QString::number(zoom_)+ ".jpg";
         QString fullPath = QDir::cleanPath(cachePath_ + QDir::separator() + fileName);
 
