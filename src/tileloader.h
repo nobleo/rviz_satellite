@@ -24,14 +24,20 @@ class TileLoader : public QObject {
 public:
   class MapTile {
   public:
-    MapTile(int x, int y, QNetworkReply *reply = 0)
-        : x_(x), y_(y), reply_(reply) {}
+    MapTile(int x, int y, int z, QNetworkReply *reply = 0)
+        : x_(x), y_(y), z_(z), reply_(reply) {}
+      
+    MapTile(int x, int y, int z, QImage & image)
+      : x_(x), y_(y), image_(image) {}
 
     /// X tile coordinate.
     const int &x() const { return x_; }
 
     /// Y tile coordinate.
     const int &y() const { return y_; }
+      
+    /// Z tile zoom value.
+    const int &z() const { return z_; }
 
     /// Network reply.
     QNetworkReply *reply() { return reply_; }
@@ -49,6 +55,7 @@ public:
   private:
     int x_;
     int y_;
+    int z_;
     QNetworkReply *reply_;
     QImage image_;
   };
@@ -125,6 +132,8 @@ private:
   double origin_y_;
 
   QNetworkAccessManager *qnam_;
+  QString cachePath_;
+
   std::string object_uri_;
 
   std::vector<MapTile> tiles_;

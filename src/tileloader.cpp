@@ -13,10 +13,15 @@
 #include <QUrl>
 #include <QNetworkRequest>
 #include <QVariant>
+#include <QDir>
+#include <QFile>
+#include <QImage>
 #include <QImageReader>
 #include <stdexcept>
-#include <iostream>
 #include <boost/regex.hpp>
+#include <ros/ros.h>
+#include <ros/package.h>
+
 
 static size_t replaceRegex(const boost::regex &ex, std::string &str,
                            const std::string &replace) {
@@ -47,6 +52,15 @@ TileLoader::TileLoader(const std::string &service, double latitude,
     : QObject(parent), latitude_(latitude), longitude_(longitude), zoom_(zoom),
       blocks_(blocks), qnam_(0), object_uri_(service) {
   assert(blocks_ >= 0);
+          
+    QString packagePath = QString::fromStdString(ros::package::getPath("rviz_satellite"));
+    QString folderName("mapscache");
+    cachePath_ = QDir::cleanPath(packagePath + QDir::separator() + folderName);
+    QDir dir(cachePath_);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+          
   /// @todo: some kind of error checking of the URL
 
   //  calculate center tile coordinates
@@ -76,14 +90,38 @@ void TileLoader::start() {
   //  initiate requests
   for (int y = min_y; y <= max_y; y++) {
     for (int x = min_x; x <= max_x; x++) {
-      const QUrl uri = uriForTile(x, y);
-      //  send request
-      const QNetworkRequest request = QNetworkRequest(uri);
-      QNetworkReply *rep = qnam_->get(request);
-      emit initiatedRequest(request);
-      tiles_.push_back(MapTile(x, y, rep));
+        
+        // Generate filename
+        QString fileName = "x_" + QString::number(x)+ "y_" +QString::number(y) +"z_" +QString::number(zoom_)+ ".jpg";
+        QString fullPath = QDir::cleanPath(cachePath_ + QDir::separator() + fileName);
+
+        // Check if tile is already in the cache
+        QFile tile(fullPath);
+        if (tile.exists()) {
+            QImage image(fullPath);
+            tiles_.push_back(MapTile(x, y, zoom_, image));
+        } else {
+            const QUrl uri = uriForTile(x, y);
+            //  send request
+            const QNetworkRequest request = QNetworkRequest(uri);
+            QNetworkReply *rep = qnam_->get(request);
+            emit initiatedRequest(request);
+            tiles_.push_back(MapTile(x, y, zoom_, rep));
+        }
     }
   }
+
+    // check if we are finished already
+    bool loaded = true;
+    for (MapTile &tile : tiles_) {
+        if (!tile.hasImage()) {
+            loaded = false;
+            std::cout << "Tile x: " << tile.x() << " y: "<< tile.y() << " has no image new version"<< std::endl;
+        }
+    }
+    if (loaded) {
+        emit finishedLoading();
+    }
 }
 
 double TileLoader::resolution() const {
@@ -140,6 +178,9 @@ void TileLoader::finishedRequest(QNetworkReply *reply) {
     if (reader.canRead()) {
       QImage image = reader.read();
       tile->setImage(image);
+      QString fileName = "x_" + QString::number(tile->x())+ "y_" +QString::number(tile->y()) +"z_" +QString::number(tile->z())+ ".jpg";
+      QString fullPath = QDir::cleanPath(cachePath_ + QDir::separator() + fileName);
+      image.save(fullPath,"JPEG");
       emit receivedImage(request);
     } else {
       //  probably not an image
