@@ -8,7 +8,7 @@ Plugin for rviz for displaying satellite maps loaded from the internet.
 
 In order to use rviz_satellite, add this package to your catkin workspace. Then add an instance of `AerialMapDisplay` to your rviz config.
 
-The `Topic` field must point to a latched publisher of `sensor_msgs/NavSatFix`. Note that rviz_satellite will not repeatedly reload the same GPS coordinates twice (unless you modify something in the GUI options).
+The `Topic` field must point to a publisher of `sensor_msgs/NavSatFix`. Note that rviz_satellite will not repeatedly reload the same GPS coordinates twice (unless you modify something in the GUI options).
 
 You must provide an `Object URI` (or URL) from which the satellite images are loaded. rviz_satellite presently only supports the [OpenStreetMap](http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames) convention for tile names.
 
