@@ -18,6 +18,8 @@ The URI should have the form:
 
 This is the default URI, which will load data from MapQuest. The tiles are free, and go up to zoom level 18. For higher zoom levels, consider using [MapBox](https://www.mapbox.com).
 
+Map tiles will be cached to the `mapscache` directory in the `rviz_satellite` package directory. At present the cache does not expire automatically - you should delete the files in the folder if you want the images to be reloaded.
+
 ### Options
 
 - `Alpha` is simply the display transparency.
