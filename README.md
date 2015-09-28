@@ -2,7 +2,7 @@
 
 Plugin for rviz for displaying satellite maps loaded from the internet.
 
-![Alt text](.screenshot.png?raw=true "Fucking Awesome Dude")
+![Alt text](.screenshot.png?raw=true "Example Image")
 
 ### Usage
 
