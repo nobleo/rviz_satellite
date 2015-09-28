@@ -258,6 +258,7 @@ void AerialMapDisplay::updateTopic() {
 }
 
 void AerialMapDisplay::clear() {
+  ROS_INFO("clear()");
   setStatus(StatusProperty::Warn, "Message", "No map received");
   clearGeometry();
   //  the user has cleared here
@@ -305,11 +306,13 @@ void AerialMapDisplay::update(float, float) {
 void
 AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
   //  only re-load if coordinates changed, in case the topic is not latched
-  if (msg->latitude != ref_lat_ || msg->longitude != ref_lon_ ||
-      !received_msg_) {
+  const double difflat = std::abs(msg->latitude - ref_lat_);
+  const double difflon = std::abs(msg->longitude - ref_lon_);
+  if (difflat > 1.0e-5 || difflon > 1.0e-5 || !received_msg_) {
     ref_lat_ = msg->latitude;
     ref_lon_ = msg->longitude;
-    ROS_INFO("Reference point set to: %f, %f", ref_lat_, ref_lon_);
+    ROS_INFO("Reference point set to: %.12f, %.12f", ref_lat_, ref_lon_);
+    ROS_INFO("Received msg: %s", (received_msg_) ? "true" : "false");
     setStatus(StatusProperty::Warn, "Message", "Loading map tiles.");
 
     //  re-load imagery
