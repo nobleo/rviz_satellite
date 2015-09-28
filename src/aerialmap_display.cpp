@@ -11,9 +11,11 @@
 #include <QtGlobal>
 #include <QImage>
 
+#include <ros/ros.h>
+#include <tf/transform_listener.h>
+
 #include <boost/bind.hpp>
 #include <boost/regex.hpp>
-
 #include <FreeImage.h>
 
 #include <OGRE/OgreManualObject.h>
@@ -22,9 +24,6 @@
 #include <OGRE/OgreSceneNode.h>
 #include <OGRE/OgreTextureManager.h>
 #include <OGRE/OgreImageCodec.h>
-
-#include <ros/ros.h>
-#include <tf/transform_listener.h>
 
 #include "rviz/frame_manager.h"
 #include "rviz/ogre_helpers/grid.h"

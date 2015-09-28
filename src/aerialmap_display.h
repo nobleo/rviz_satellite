@@ -11,15 +11,17 @@
 #ifndef AERIAL_MAP_DISPLAY_H
 #define AERIAL_MAP_DISPLAY_H
 
+// NOTE: workaround for issue: https://bugreports.qt.io/browse/QTBUG-22829
+#ifndef Q_MOC_RUN
 #include <ros/ros.h>
 #include <ros/time.h>
 #include <rviz/display.h>
+#include <sensor_msgs/NavSatFix.h>
 
 #include <OGRE/OgreTexture.h>
 #include <OGRE/OgreMaterial.h>
 #include <OGRE/OgreVector3.h>
-
-#include <sensor_msgs/NavSatFix.h>
+#endif  //  Q_MOC_RUN
 
 #include <QObject>
 #include <QtConcurrentRun>

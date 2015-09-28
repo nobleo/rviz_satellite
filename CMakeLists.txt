@@ -7,6 +7,16 @@ find_package(Qt4 COMPONENTS QtCore QtGui QtNetwork REQUIRED)
 include(${QT_USE_FILE})
 find_package(OpenCV REQUIRED)
 find_package(FreeImage REQUIRED)
+find_package(PkgConfig REQUIRED)
+
+pkg_check_modules(OGRE_OV OGRE OGRE-Overlay)
+
+# Old versions of OGRE (pre 1.9) included OGRE-Overlay in the main package
+# (i.e. there was no OGRE-Overlay component).  So if the above
+# pkg_check_modules() failed, try looking for just OGRE.
+if(NOT OGRE_OV_FOUND)
+  pkg_check_modules(OGRE_OV REQUIRED OGRE)
+endif(NOT OGRE_OV_FOUND)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -37,7 +47,7 @@ include_directories(
   ${OpenCV_INCLUDE_DIR}
   ${Qt4_INCLUDE_DIR}
   ${FreeImage_INCLUDE_DIRS}
-  /usr/include/OGRE
+  ${OGRE_OV_INCLUDE_DIRS}
   src
 )
 

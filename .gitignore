@@ -92,3 +92,6 @@ gen/*
 *.exe
 *.out
 *.app
+
+# Map cache items
+mapscache/
