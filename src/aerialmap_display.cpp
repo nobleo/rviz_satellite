@@ -30,6 +30,7 @@
 #include "rviz/properties/float_property.h"
 #include "rviz/properties/int_property.h"
 #include "rviz/properties/property.h"
+#include "rviz/properties/tf_frame_property.h"
 #include "rviz/properties/quaternion_property.h"
 #include "rviz/properties/ros_topic_property.h"
 #include "rviz/properties/vector_property.h"
@@ -130,6 +131,10 @@ AerialMapDisplay::AerialMapDisplay()
       "Topic", "", QString::fromStdString(
                        ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
       "nav_msgs::Odometry topic to subscribe to.", this, SLOT(updateTopic()));
+ 	
+  frame_property_ = new TfFrameProperty( "Robot frame", "",
+                                         "TF frame for the moving robot.",
+                                         this, 0, false, SLOT(updateFrame()), this );
 
   alpha_property_ = new FloatProperty(
       "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
@@ -178,7 +183,9 @@ AerialMapDisplay::~AerialMapDisplay() {
   clear();
 }
 
-void AerialMapDisplay::onInitialize() {}
+void AerialMapDisplay::onInitialize() {
+  frame_property_->setFrameManager( context_->getFrameManager() );
+}
 
 void AerialMapDisplay::onEnable() { subscribe(); }
 
@@ -217,6 +224,12 @@ void AerialMapDisplay::updateAlpha() {
   alpha_ = alpha_property_->getFloat();
   dirty_ = true;
   ROS_INFO("Changing alpha to %f", alpha_);
+}
+
+void AerialMapDisplay::updateFrame() {
+  frame_ = frame_property_->getFrameStd();
+  ROS_INFO_STREAM("Changing robot frame to " << frame_ );
+  transformAerialMap();
 }
 
 void AerialMapDisplay::updateDrawUnder() {
@@ -297,8 +310,6 @@ void AerialMapDisplay::update(float, float) {
   boost::mutex::scoped_lock lock(mutex_);
   //  creates all geometry, if necessary
   assembleScene();
-  //  apply transformation
-  transformAerialMap();
   //  draw
   context_->queueRender();
 }
@@ -308,7 +319,7 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
   //  only re-load if coordinates changed, in case the topic is not latched
   const double difflat = std::abs(msg->latitude - ref_lat_);
   const double difflon = std::abs(msg->longitude - ref_lon_);
-  if (difflat > 1.0e-5 || difflon > 1.0e-5 || !received_msg_) {
+  if (difflat > 1.0e-3 || difflon > 1.0e-3 || !received_msg_) {
     ref_lat_ = msg->latitude;
     ref_lon_ = msg->longitude;
     ROS_INFO("Reference point set to: %.12f, %.12f", ref_lat_, ref_lon_);
@@ -318,6 +329,7 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
     //  re-load imagery
     received_msg_ = true;
     loadImagery();
+    transformAerialMap();
   }
 }
 
@@ -530,10 +542,6 @@ void AerialMapDisplay::transformAerialMap() {
   pose.position.y = 0;
   pose.position.z = 0;
   
-  if (frame_.empty()) {
-    frame_ = "world";
-  }
-  
   if (!context_->getFrameManager()->transform(frame_, ros::Time(), pose,
                                               position, orientation)) {
     ROS_DEBUG("Error transforming map '%s' from frame '%s' to frame '%s'",
@@ -546,8 +554,14 @@ void AerialMapDisplay::transformAerialMap() {
     setStatus(StatusProperty::Ok, "Transform", "Transform OK");
   }
 
+  // Here we assume that the fixed/world frame is at altitude=0
+  position.z = 0; // force aerial imagery on ground
   scene_node_->setPosition(position);
-  scene_node_->setOrientation(orientation);
+  
+  // Apply 90deg rotation to convert from map to ROS coordinate frames
+  // http://wiki.ros.org/geometry/CoordinateFrameConventions
+  static Ogre::Quaternion MAP_TO_ROS( Ogre::Degree(-90), Ogre::Vector3::UNIT_Z );
+  scene_node_->setOrientation(MAP_TO_ROS);
 }
 
 void AerialMapDisplay::fixedFrameChanged() { transformAerialMap(); }

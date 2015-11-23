@@ -43,6 +43,7 @@ class IntProperty;
 class Property;
 class RosTopicProperty;
 class StringProperty;
+class TfFrameProperty;
 
 /**
  * @class AerialMapDisplay
@@ -63,6 +64,7 @@ public:
 protected Q_SLOTS:
   void updateAlpha();
   void updateTopic();
+  void updateFrame();
   void updateDrawUnder();
   void updateObjectURI();
   void updateZoom();
@@ -112,6 +114,7 @@ protected:
 
   //  properties
   RosTopicProperty *topic_property_;
+  TfFrameProperty *frame_property_;
   StringProperty *object_uri_property_;
   IntProperty *zoom_property_;
   IntProperty *blocks_property_;
