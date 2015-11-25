@@ -79,7 +79,7 @@ public:
   /// Fraction of a tile to offset the origin (X).
   double originX() const { return origin_x_; }
 
-  /// Fractio of a tile to offset the origin (Y).
+  /// Fraction of a tile to offset the origin (Y).
   double originY() const { return origin_y_; }
 
   /// Convert lat/lon to a tile index with mercator projection.

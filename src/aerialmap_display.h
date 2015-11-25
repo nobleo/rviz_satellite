@@ -20,7 +20,6 @@
 
 #include <OGRE/OgreTexture.h>
 #include <OGRE/OgreMaterial.h>
-#include <OGRE/OgreVector3.h>
 #endif  //  Q_MOC_RUN
 
 #include <QObject>
@@ -44,6 +43,7 @@ class Property;
 class RosTopicProperty;
 class StringProperty;
 class TfFrameProperty;
+class EnumProperty;
 
 /**
  * @class AerialMapDisplay
@@ -69,6 +69,7 @@ protected Q_SLOTS:
   void updateObjectURI();
   void updateZoom();
   void updateBlocks();
+  void updateFrameConvention();
 
   //  slots for TileLoader messages
   void initiatedRequest(QNetworkRequest request);
@@ -121,6 +122,7 @@ protected:
   FloatProperty *resolution_property_;
   FloatProperty *alpha_property_;
   Property *draw_under_property_;
+  EnumProperty * frame_convention_property_;
 
   float alpha_;
   bool draw_under_;
