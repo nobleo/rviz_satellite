@@ -223,6 +223,7 @@ QUrl TileLoader::uriForTile(int x, int y) const {
 
 int TileLoader::maxTiles() const { return (1 << zoom_) - 1; }
 
+// TODO(gareth): Change to smart pointer, also add a destructor to this class.
 void TileLoader::abort() {
   tiles_.clear();
 
