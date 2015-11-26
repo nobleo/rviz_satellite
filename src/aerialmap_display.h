@@ -108,9 +108,6 @@ protected:
   };
   std::vector<MapObject> objects_;
 
-  std::string topic_;
-  std::string frame_;
-
   ros::Subscriber coord_sub_;
 
   //  properties
@@ -131,7 +128,7 @@ protected:
   unsigned int blocks_;
 
   //  tile management
-  boost::mutex mutex_;
+  boost::mutex mutex_;  // TODO(gareth): Mutex seems unecessary, remove this.
   bool dirty_;
   bool received_msg_;
   double ref_lat_;

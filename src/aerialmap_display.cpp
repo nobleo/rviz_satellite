@@ -136,10 +136,10 @@ AerialMapDisplay::AerialMapDisplay()
       "Topic", "", QString::fromStdString(
                        ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
       "nav_msgs::Odometry topic to subscribe to.", this, SLOT(updateTopic()));
- 	
-  frame_property_ = new TfFrameProperty( "Robot frame", "",
-                                         "TF frame for the moving robot.",
-                                         this, 0, false, SLOT(updateFrame()), this );
+
+  frame_property_ = new TfFrameProperty("Robot frame", "world",
+                                        "TF frame for the moving robot.", this,
+                                        0, false, SLOT(updateFrame()), this);
 
   alpha_property_ = new FloatProperty(
       "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
@@ -183,7 +183,8 @@ AerialMapDisplay::AerialMapDisplay()
       "Frame Convention", "ROS", "Convention for mapping frame to the compass",
       this, SLOT(updateFrameConvention()));
   frame_convention_property_->addOptionStd("ROS", FRAME_CONVENTION_ROS);
-  frame_convention_property_->addOptionStd("libGeographic", FRAME_CONVENTION_GEO);
+  frame_convention_property_->addOptionStd("libGeographic",
+                                           FRAME_CONVENTION_GEO);
 
   //  updating one triggers reload
   updateBlocks();
@@ -238,8 +239,7 @@ void AerialMapDisplay::updateAlpha() {
 }
 
 void AerialMapDisplay::updateFrame() {
-  frame_ = frame_property_->getFrameStd();
-  ROS_INFO_STREAM("Changing robot frame to " << frame_);
+  ROS_INFO_STREAM("Changing robot frame to " << frame_property_->getFrameStd());
   transformAerialMap();
 }
 
@@ -561,13 +561,14 @@ void AerialMapDisplay::transformAerialMap() {
   pose.position.y = 0;
   pose.position.z = 0;
   
-  if (!context_->getFrameManager()->transform(frame_, ros::Time(), pose,
+  const std::string frame = frame_property_->getFrameStd();
+  if (!context_->getFrameManager()->transform(frame, ros::Time(), pose,
                                               position, orientation)) {
     ROS_DEBUG("Error transforming map '%s' from frame '%s' to frame '%s'",
-              qPrintable(getName()), frame_.c_str(), qPrintable(fixed_frame_));
+              qPrintable(getName()), frame.c_str(), qPrintable(fixed_frame_));
 
     setStatus(StatusProperty::Error, "Transform",
-              "No transform from [" + QString::fromStdString(frame_) +
+              "No transform from [" + QString::fromStdString(frame) +
                   "] to [" + fixed_frame_ + "]");
   } else {
     setStatus(StatusProperty::Ok, "Transform", "Transform OK");
