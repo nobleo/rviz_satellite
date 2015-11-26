@@ -8,7 +8,7 @@ Plugin for rviz for displaying satellite maps loaded from the internet.
 
 In order to use rviz_satellite, add this package to your catkin workspace. Then add an instance of `AerialMapDisplay` to your rviz config.
 
-The `Topic` field must point to a publisher of `sensor_msgs/NavSatFix`. Note that rviz_satellite will not repeatedly reload the same GPS coordinates twice (unless you modify something in the GUI options).
+The `Topic` field must point to a publisher of `sensor_msgs/NavSatFix`. Note that rviz_satellite will not reload tiles until the robot moves more than a fixed threshold (presently about ~100 meters).
 
 You must provide an `Object URI` (or URL) from which the satellite images are loaded. rviz_satellite presently only supports the [OpenStreetMap](http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames) convention for tile names.
 
@@ -26,6 +26,8 @@ Map tiles will be cached to the `mapscache` directory in the `rviz_satellite` pa
 - `Draw Under` will cause the map to be displayed below all other geometry.
 - `Zoom` is the zoom level of the map. Recommended values are 16-19, as anything smaller is _very_ low resolution. 19 is the current max.
 - `Blocks` number of adjacent blocks to load. rviz_satellite will load the central block, and this many blocks around the center. 6 is the current max.
+- `Frame Convention` is the convention for X/Y axes of the map. In `ROS` mode it uses the mapping
+(X: North, Y: West). In `libGeographic` mode it uses (X: East, Y:North).
 
 ### Questions, Bugs
 

@@ -24,12 +24,15 @@
 #include <OGRE/OgreSceneNode.h>
 #include <OGRE/OgreTextureManager.h>
 #include <OGRE/OgreImageCodec.h>
+#include <OGRE/OgreVector3.h>
 
 #include "rviz/frame_manager.h"
 #include "rviz/ogre_helpers/grid.h"
+#include "rviz/properties/enum_property.h"
 #include "rviz/properties/float_property.h"
 #include "rviz/properties/int_property.h"
 #include "rviz/properties/property.h"
+#include "rviz/properties/tf_frame_property.h"
 #include "rviz/properties/quaternion_property.h"
 #include "rviz/properties/ros_topic_property.h"
 #include "rviz/properties/vector_property.h"
@@ -37,6 +40,9 @@
 #include "rviz/display_context.h"
 
 #include "aerialmap_display.h"
+
+#define FRAME_CONVENTION_ROS (0)  //  X -> North, Y -> West
+#define FRAME_CONVENTION_GEO (1)  //  X -> East, Y -> North
 
 Ogre::TexturePtr textureFromBytes(const QByteArray &ba,
                                   const std::string &name) {
@@ -131,6 +137,10 @@ AerialMapDisplay::AerialMapDisplay()
                        ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
       "nav_msgs::Odometry topic to subscribe to.", this, SLOT(updateTopic()));
 
+  frame_property_ = new TfFrameProperty("Robot frame", "world",
+                                        "TF frame for the moving robot.", this,
+                                        0, false, SLOT(updateFrame()), this);
+
   alpha_property_ = new FloatProperty(
       "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
       SLOT(updateAlpha()));
@@ -169,6 +179,13 @@ AerialMapDisplay::AerialMapDisplay()
                       SLOT(updateBlocks()));
   blocks_property_->setShouldBeSaved(true);
 
+  frame_convention_property_ = new EnumProperty(
+      "Frame Convention", "ROS", "Convention for mapping frame to the compass",
+      this, SLOT(updateFrameConvention()));
+  frame_convention_property_->addOptionStd("ROS", FRAME_CONVENTION_ROS);
+  frame_convention_property_->addOptionStd("libGeographic",
+                                           FRAME_CONVENTION_GEO);
+
   //  updating one triggers reload
   updateBlocks();
 }
@@ -178,7 +195,9 @@ AerialMapDisplay::~AerialMapDisplay() {
   clear();
 }
 
-void AerialMapDisplay::onInitialize() {}
+void AerialMapDisplay::onInitialize() {
+  frame_property_->setFrameManager( context_->getFrameManager() );
+}
 
 void AerialMapDisplay::onEnable() { subscribe(); }
 
@@ -219,6 +238,11 @@ void AerialMapDisplay::updateAlpha() {
   ROS_INFO("Changing alpha to %f", alpha_);
 }
 
+void AerialMapDisplay::updateFrame() {
+  ROS_INFO_STREAM("Changing robot frame to " << frame_property_->getFrameStd());
+  transformAerialMap();
+}
+
 void AerialMapDisplay::updateDrawUnder() {
   /// @todo: figure out why this property only applies to some objects
   draw_under_ = draw_under_property_->getValue().toBool();
@@ -251,6 +275,10 @@ void AerialMapDisplay::updateBlocks() {
   }
 }
 
+void AerialMapDisplay::updateFrameConvention() {
+  transformAerialMap();
+}
+
 void AerialMapDisplay::updateTopic() {
   unsubscribe();
   clear();
@@ -267,6 +295,7 @@ void AerialMapDisplay::clear() {
   if (loader_) {
     ROS_INFO("Clearing loaded imagery.");
     //  cancel current imagery, if any
+    // TODO(gareth): Modify to use a shared pointer instead of manual deletion.
     loader_->abort();
     delete loader_;
     loader_ = 0;
@@ -297,8 +326,6 @@ void AerialMapDisplay::update(float, float) {
   boost::mutex::scoped_lock lock(mutex_);
   //  creates all geometry, if necessary
   assembleScene();
-  //  apply transformation
-  transformAerialMap();
   //  draw
   context_->queueRender();
 }
@@ -308,7 +335,9 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
   //  only re-load if coordinates changed, in case the topic is not latched
   const double difflat = std::abs(msg->latitude - ref_lat_);
   const double difflon = std::abs(msg->longitude - ref_lon_);
-  if (difflat > 1.0e-5 || difflon > 1.0e-5 || !received_msg_) {
+  // TODO(gareth): 1e-3 corresponds to ~110 meters. In future, calculate this
+  // value from the tile size.
+  if (difflat > 1.0e-3 || difflon > 1.0e-3 || !received_msg_) {
     ref_lat_ = msg->latitude;
     ref_lon_ = msg->longitude;
     ROS_INFO("Reference point set to: %.12f, %.12f", ref_lat_, ref_lon_);
@@ -318,6 +347,7 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
     //  re-load imagery
     received_msg_ = true;
     loadImagery();
+    transformAerialMap();
   }
 }
 
@@ -382,7 +412,9 @@ void AerialMapDisplay::assembleScene() {
     const double origin_x = -loader_->originX() * tileW;
     const double origin_y = -(1 - loader_->originY()) * tileH;
 
-    //  determine location of this tile
+    // determine location of this tile
+    // NOTE(gareth): We invert the y-axis here so that positive y corresponds
+    // to north.
     const double x = (tile.x() - loader_->tileX()) * tileW + origin_x;
     const double y = -(tile.y() - loader_->tileY()) * tileH + origin_y;
     //  don't re-use any ids
@@ -398,8 +430,7 @@ void AerialMapDisplay::assembleScene() {
           matName, Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
       material->setReceiveShadows(false);
       material->getTechnique(0)->setLightingEnabled(false);
-      material->setDepthBias(-16.0f,
-                             0.0f); /// @todo: what the fuck does this do?
+      material->setDepthBias(-16.0f, 0.0f);
       material->setCullingMode(Ogre::CULL_NONE);
       material->setDepthWriteEnabled(false);
 
@@ -530,24 +561,37 @@ void AerialMapDisplay::transformAerialMap() {
   pose.position.y = 0;
   pose.position.z = 0;
   
-  if (frame_.empty()) {
-    frame_ = "world";
-  }
-  
-  if (!context_->getFrameManager()->transform(frame_, ros::Time(), pose,
+  const std::string frame = frame_property_->getFrameStd();
+  if (!context_->getFrameManager()->transform(frame, ros::Time(), pose,
                                               position, orientation)) {
     ROS_DEBUG("Error transforming map '%s' from frame '%s' to frame '%s'",
-              qPrintable(getName()), frame_.c_str(), qPrintable(fixed_frame_));
+              qPrintable(getName()), frame.c_str(), qPrintable(fixed_frame_));
 
     setStatus(StatusProperty::Error, "Transform",
-              "No transform from [" + QString::fromStdString(frame_) +
+              "No transform from [" + QString::fromStdString(frame) +
                   "] to [" + fixed_frame_ + "]");
   } else {
     setStatus(StatusProperty::Ok, "Transform", "Transform OK");
   }
 
+  // Here we assume that the fixed/world frame is at altitude=0
+  position.z = 0; // force aerial imagery on ground
   scene_node_->setPosition(position);
-  scene_node_->setOrientation(orientation);
+  
+  const int convention = frame_convention_property_->getOptionInt();
+  if (convention == FRAME_CONVENTION_ROS) {
+    // Apply 90deg rotation to convert from map to ROS coordinate frames
+    // http://wiki.ros.org/geometry/CoordinateFrameConventions
+    static const Ogre::Quaternion MAP_TO_ROS(Ogre::Degree(-90),
+                                             Ogre::Vector3::UNIT_Z);
+    scene_node_->setOrientation(MAP_TO_ROS);
+  } else if (convention == FRAME_CONVENTION_GEO) {
+    // TODO(gareth): We are technically ignoring the orientation from the
+    // frame manager here - does this make sense?
+    scene_node_->setOrientation(Ogre::Quaternion::IDENTITY);
+  } else {
+    ROS_ERROR_STREAM("Invalid convention selected: " << convention);
+  }
 }
 
 void AerialMapDisplay::fixedFrameChanged() { transformAerialMap(); }
