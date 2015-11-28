@@ -14,10 +14,6 @@
 #include <ros/ros.h>
 #include <tf/transform_listener.h>
 
-#include <boost/bind.hpp>
-#include <boost/regex.hpp>
-#include <FreeImage.h>
-
 #include <OGRE/OgreManualObject.h>
 #include <OGRE/OgreMaterialManager.h>
 #include <OGRE/OgreSceneManager.h>
@@ -43,63 +39,6 @@
 
 #define FRAME_CONVENTION_ROS (0)  //  X -> North, Y -> West
 #define FRAME_CONVENTION_GEO (1)  //  X -> East, Y -> North
-
-Ogre::TexturePtr textureFromBytes(const QByteArray &ba,
-                                  const std::string &name) {
-
-  static bool fi_init = false;
-  if (!fi_init) {
-    FreeImage_Initialise();
-  }
-
-  void *data = const_cast<char *>(ba.data());
-  FIMEMORY *mem =
-      FreeImage_OpenMemory(reinterpret_cast<BYTE *>(data), ba.size());
-  FREE_IMAGE_FORMAT fif = FreeImage_GetFileTypeFromMemory(mem, 0);
-  if (fif == FIF_UNKNOWN) {
-    FreeImage_CloseMemory(mem);
-    throw std::runtime_error("Image format is not supported for loading");
-  }
-  FIBITMAP *bmp = FreeImage_LoadFromMemory(fif, mem, 0);
-  FreeImage_CloseMemory(mem);
-  if (!bmp) {
-    throw std::runtime_error("Failed to decode image");
-  }
-  FIBITMAP *converted = FreeImage_ConvertTo24Bits(bmp);
-  FreeImage_Unload(bmp);
-  if (!converted) {
-    throw std::runtime_error("Failed to convert image to 24 bit");
-  }
-
-  const unsigned w = FreeImage_GetWidth(converted);
-  const unsigned h = FreeImage_GetHeight(converted);
-  const unsigned data_size = w * h * 3;
-  BYTE *image_data = FreeImage_GetBits(converted);
-
-  ROS_INFO("Loading a %u x %u texture", w, h);
-
-  //  create texture
-  Ogre::TexturePtr texture;
-  try {
-    Ogre::DataStreamPtr data_stream;
-    data_stream.bind(new Ogre::MemoryDataStream(image_data, data_size));
-
-    const Ogre::String res_group =
-        Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME;
-    Ogre::TextureManager &texture_manager =
-        Ogre::TextureManager::getSingleton();
-    texture =
-        texture_manager.loadRawData(name, res_group, data_stream, w, h,
-                                    Ogre::PF_R8G8B8, Ogre::TEX_TYPE_2D, 0);
-  }
-  catch (...) {
-    //  clean up FreeImage before re-throwing
-    FreeImage_Unload(converted);
-    throw;
-  }
-
-  return texture;
-}
 
 Ogre::TexturePtr textureFromImage(const QImage &image,
                                   const std::string &name) {
