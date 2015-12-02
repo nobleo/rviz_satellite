@@ -29,6 +29,7 @@
 #include <QFile>
 #include <QNetworkRequest>
 
+#include <memory>
 #include <tileloader.h>
 
 namespace Ogre {
@@ -133,7 +134,7 @@ protected:
   bool received_msg_;
   double ref_lat_;
   double ref_lon_;
-  TileLoader *loader_;
+  std::shared_ptr<TileLoader> loader_;
 };
 
 } // namespace rviz

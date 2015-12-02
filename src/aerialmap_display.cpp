@@ -76,7 +76,7 @@ Ogre::TexturePtr textureFromBytes(const QByteArray &ba,
   const unsigned data_size = w * h * 3;
   BYTE *image_data = FreeImage_GetBits(converted);
 
-  ROS_INFO("Loading a %u x %u texture", w, h);
+  ROS_DEBUG("Loading a %u x %u texture", w, h);
 
   //  create texture
   Ogre::TexturePtr texture;
@@ -103,7 +103,7 @@ Ogre::TexturePtr textureFromBytes(const QByteArray &ba,
 
 Ogre::TexturePtr textureFromImage(const QImage &image,
                                   const std::string &name) {
-  ROS_INFO("Loading a %i x %i texture", image.width(), image.height());
+  ROS_DEBUG("Loading a %i x %i texture", image.width(), image.height());
   //  convert to 24bit rgb
   QImage converted = image.convertToFormat(QImage::Format_RGB888).mirrored();
 
@@ -127,7 +127,7 @@ namespace rviz {
 
 AerialMapDisplay::AerialMapDisplay()
     : Display(), map_id_(0), scene_id_(0), dirty_(false),
-      received_msg_(false), loader_(0) {
+      received_msg_(false) {
 
   static unsigned int map_ids = 0;
   map_id_ = map_ids++; //  global counter of map ids
@@ -292,14 +292,9 @@ void AerialMapDisplay::clear() {
   //  the user has cleared here
   received_msg_ = false;
   //  stop any loading...
-  if (loader_) {
-    ROS_INFO("Clearing loaded imagery.");
-    //  cancel current imagery, if any
-    // TODO(gareth): Modify to use a shared pointer instead of manual deletion.
-    loader_->abort();
-    delete loader_;
-    loader_ = 0;
-  }
+  ROS_INFO("Clearing loaded imagery.");
+  //  cancel current imagery, if any
+  loader_.reset();
 }
 
 void AerialMapDisplay::clearGeometry() {
@@ -332,12 +327,8 @@ void AerialMapDisplay::update(float, float) {
 
 void
 AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
-  //  only re-load if coordinates changed, in case the topic is not latched
-  const double difflat = std::abs(msg->latitude - ref_lat_);
-  const double difflon = std::abs(msg->longitude - ref_lon_);
-  // TODO(gareth): 1e-3 corresponds to ~110 meters. In future, calculate this
-  // value from the tile size.
-  if (difflat > 1.0e-3 || difflon > 1.0e-3 || !received_msg_) {
+  // If the new (lat,lon) falls into a different tile then we have some reloading to do.
+  if ( !received_msg_ || ( loader_ && loader_->insideCentreTile(msg->latitude,msg->longitude) ) ) {
     ref_lat_ = msg->latitude;
     ref_lon_ = msg->longitude;
     ROS_INFO("Reference point set to: %.12f, %.12f", ref_lat_, ref_lon_);
@@ -352,12 +343,9 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
 }
 
 void AerialMapDisplay::loadImagery() {
-  if (loader_) {
-    //  cancel current imagery, if any
-    loader_->abort();
-    delete loader_;
-    loader_ = 0;
-  }
+  //  cancel current imagery, if any
+  loader_.reset();
+  
   if (!received_msg_) {
     //  no message received from publisher
     return;
@@ -368,20 +356,20 @@ void AerialMapDisplay::loadImagery() {
   }
   const std::string service = object_uri_;
   try {
-    loader_ = new TileLoader(service, ref_lat_, ref_lon_, zoom_, blocks_, this);
+    loader_.reset( new TileLoader(service, ref_lat_, ref_lon_, zoom_, blocks_, this) );
   }
   catch (std::exception &e) {
     setStatus(StatusProperty::Error, "Message", QString(e.what()));
     return;
   }
 
-  QObject::connect(loader_, SIGNAL(errorOcurred(QString)), this,
+  QObject::connect(loader_.get(), SIGNAL(errorOcurred(QString)), this,
                    SLOT(errorOcurred(QString)));
-  QObject::connect(loader_, SIGNAL(finishedLoading()), this,
+  QObject::connect(loader_.get(), SIGNAL(finishedLoading()), this,
                    SLOT(finishedLoading()));
-  QObject::connect(loader_, SIGNAL(initiatedRequest(QNetworkRequest)), this,
+  QObject::connect(loader_.get(), SIGNAL(initiatedRequest(QNetworkRequest)), this,
                    SLOT(initiatedRequest(QNetworkRequest)));
-  QObject::connect(loader_, SIGNAL(receivedImage(QNetworkRequest)), this,
+  QObject::connect(loader_.get(), SIGNAL(receivedImage(QNetworkRequest)), this,
                    SLOT(receivedImage(QNetworkRequest)));
   //  start loading images
   loader_->start();
@@ -446,7 +434,7 @@ void AerialMapDisplay::assembleScene() {
       //  only add if we have a texture for it
       tex = textureFromImage(tile.image(), "texture_" + name_suffix);
 
-      ROS_INFO("Rendering with texture: %s", tex->getName().c_str());
+      ROS_DEBUG("Rendering with texture: %s", tex->getName().c_str());
       tex_unit->setTextureName(tex->getName());
       tex_unit->setTextureFiltering(Ogre::TFO_BILINEAR);
 
@@ -524,11 +512,11 @@ void AerialMapDisplay::assembleScene() {
 }
 
 void AerialMapDisplay::initiatedRequest(QNetworkRequest request) {
-  ROS_INFO("Requesting %s", qPrintable(request.url().toString()));
+  ROS_DEBUG("Requesting %s", qPrintable(request.url().toString()));
 }
 
 void AerialMapDisplay::receivedImage(QNetworkRequest request) {
-  ROS_INFO("Loaded tile %s", qPrintable(request.url().toString()));
+  ROS_DEBUG("Loaded tile %s", qPrintable(request.url().toString()));
 }
 
 void AerialMapDisplay::finishedLoading() {
