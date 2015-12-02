@@ -21,7 +21,7 @@
 #include <boost/regex.hpp>
 #include <ros/ros.h>
 #include <ros/package.h>
-
+#include <functional> // for std::hash
 
 static size_t replaceRegex(const boost::regex &ex, std::string &str,
                            const std::string &replace) {
@@ -56,11 +56,14 @@ TileLoader::TileLoader(const std::string &service, double latitude,
     std::string packagePath = ros::package::getPath("rviz_satellite");
     if ( packagePath.empty() ) throw std::runtime_error("package 'rviz_satellite' not found");
     
-    cachePath_ = QDir::cleanPath( QString::fromStdString(packagePath) + QDir::separator() + QString("mapscache"));
+    std::hash<std::string> hash_fn;
+        
+    cachePath_ = QDir::cleanPath( QString::fromStdString(packagePath) 
+        + QDir::separator() + QString("mapscache")
+        + QDir::separator() + QString::number( hash_fn(object_uri_) ) );
+        
     QDir dir(cachePath_);
-    if (!dir.exists()) {
-        dir.mkpath(".");
-    }
+    if (!dir.exists() && !dir.mkpath(".")) throw std::runtime_error("failed to create cache folder");
           
   /// @todo: some kind of error checking of the URL
 
