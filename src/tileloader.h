@@ -17,7 +17,7 @@
 #include <QString>
 #include <QNetworkReply>
 #include <vector>
-#include <tuple>
+#include <memory>
 
 class TileLoader : public QObject {
   Q_OBJECT
@@ -28,7 +28,7 @@ public:
         : x_(x), y_(y), z_(z), reply_(reply) {}
       
     MapTile(int x, int y, int z, QImage & image)
-      : x_(x), y_(y), image_(image) {}
+      : x_(x), y_(y), z_(z), image_(image) {}
 
     /// X tile coordinate.
     const int &x() const { return x_; }
@@ -82,6 +82,9 @@ public:
   /// Fraction of a tile to offset the origin (Y).
   double originY() const { return origin_y_; }
 
+  /// Test if (lat,lon) falls inside centre tile.
+  bool insideCentreTile( double lat, double lon ) const;
+  
   /// Convert lat/lon to a tile index with mercator projection.
   static void latLonToTileCoords(double lat, double lon, unsigned int zoom,
                                  double &x, double &y);
@@ -131,7 +134,7 @@ private:
   double origin_x_;
   double origin_y_;
 
-  QNetworkAccessManager *qnam_;
+  std::shared_ptr<QNetworkAccessManager> qnam_;
   QString cachePath_;
 
   std::string object_uri_;
