@@ -267,7 +267,8 @@ void AerialMapDisplay::update(float, float) {
 void
 AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
   // If the new (lat,lon) falls into a different tile then we have some reloading to do.
-  if ( !received_msg_ || ( loader_ && loader_->insideCentreTile(msg->latitude,msg->longitude) ) ) {
+  if (!received_msg_ ||
+      (loader_ && !loader_->insideCentreTile(msg->latitude, msg->longitude))) {
     ref_lat_ = msg->latitude;
     ref_lon_ = msg->longitude;
     ROS_INFO("Reference point set to: %.12f, %.12f", ref_lat_, ref_lon_);

@@ -74,10 +74,10 @@ TileLoader::TileLoader(const std::string &service, double latitude,
   origin_y_ = y - tile_y_;
 }
 
-bool TileLoader::insideCentreTile( double lat, double lon ) const {
+bool TileLoader::insideCentreTile(double lat, double lon) const {
   double x, y;
   latLonToTileCoords(lat, lon, zoom_, x, y);
-  return ( std::floor(x) != tile_x_ or std::floor(y) != tile_y_ );
+  return (std::floor(x) == tile_x_ && std::floor(y) == tile_y_);
 }
 
 void TileLoader::start() {
