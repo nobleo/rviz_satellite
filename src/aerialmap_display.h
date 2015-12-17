@@ -63,6 +63,7 @@ public:
   virtual void update(float, float);
 
 protected Q_SLOTS:
+  void updateDynamicReload();
   void updateAlpha();
   void updateTopic();
   void updateFrame();
@@ -114,6 +115,7 @@ protected:
   //  properties
   RosTopicProperty *topic_property_;
   TfFrameProperty *frame_property_;
+  Property *dynamic_reload_property_;
   StringProperty *object_uri_property_;
   IntProperty *zoom_property_;
   IntProperty *blocks_property_;
