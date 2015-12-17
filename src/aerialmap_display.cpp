@@ -85,9 +85,9 @@ AerialMapDisplay::AerialMapDisplay()
                    "Reload as robot moves. Frame option must be set.",
                    this, SLOT(updateDynamicReload()));
 
-          alpha_property_ = new FloatProperty(
-              "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
-              SLOT(updateAlpha()));
+  alpha_property_ = new FloatProperty(
+      "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
+      SLOT(updateAlpha()));
   alpha_ = alpha_property_->getValue().toFloat();
   alpha_property_->setMin(0);
   alpha_property_->setMax(1);
