@@ -42,7 +42,7 @@
 
 Ogre::TexturePtr textureFromImage(const QImage &image,
                                   const std::string &name) {
-  ROS_INFO("Loading a %i x %i texture", image.width(), image.height());
+  ROS_DEBUG("Loading a %i x %i texture", image.width(), image.height());
   //  convert to 24bit rgb
   QImage converted = image.convertToFormat(QImage::Format_RGB888).mirrored();
 
@@ -66,7 +66,7 @@ namespace rviz {
 
 AerialMapDisplay::AerialMapDisplay()
     : Display(), map_id_(0), scene_id_(0), dirty_(false),
-      received_msg_(false), loader_(0) {
+      received_msg_(false) {
 
   static unsigned int map_ids = 0;
   map_id_ = map_ids++; //  global counter of map ids
@@ -79,6 +79,11 @@ AerialMapDisplay::AerialMapDisplay()
   frame_property_ = new TfFrameProperty("Robot frame", "world",
                                         "TF frame for the moving robot.", this,
                                         0, false, SLOT(updateFrame()), this);
+
+  dynamic_reload_property_ =
+      new Property("Dynamically reload", true,
+                   "Reload as robot moves. Frame option must be set.",
+                   this, SLOT(updateDynamicReload()));
 
   alpha_property_ = new FloatProperty(
       "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
@@ -171,6 +176,11 @@ void AerialMapDisplay::unsubscribe() {
   ROS_INFO("Unsubscribing.");
 }
 
+
+void AerialMapDisplay::updateDynamicReload() {
+  // nothing to do here, when robot GPS updates the tiles will reload
+}
+
 void AerialMapDisplay::updateAlpha() {
   alpha_ = alpha_property_->getFloat();
   dirty_ = true;
@@ -231,14 +241,9 @@ void AerialMapDisplay::clear() {
   //  the user has cleared here
   received_msg_ = false;
   //  stop any loading...
-  if (loader_) {
-    ROS_INFO("Clearing loaded imagery.");
-    //  cancel current imagery, if any
-    // TODO(gareth): Modify to use a shared pointer instead of manual deletion.
-    loader_->abort();
-    delete loader_;
-    loader_ = 0;
-  }
+  ROS_INFO("Clearing loaded imagery.");
+  //  cancel current imagery, if any
+  loader_.reset();
 }
 
 void AerialMapDisplay::clearGeometry() {
@@ -271,12 +276,11 @@ void AerialMapDisplay::update(float, float) {
 
 void
 AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
-  //  only re-load if coordinates changed, in case the topic is not latched
-  const double difflat = std::abs(msg->latitude - ref_lat_);
-  const double difflon = std::abs(msg->longitude - ref_lon_);
-  // TODO(gareth): 1e-3 corresponds to ~110 meters. In future, calculate this
-  // value from the tile size.
-  if (difflat > 1.0e-3 || difflon > 1.0e-3 || !received_msg_) {
+  // If the new (lat,lon) falls into a different tile then we have some
+  // reloading to do.
+  if (!received_msg_ ||
+      (loader_ && !loader_->insideCentreTile(msg->latitude, msg->longitude) &&
+       dynamic_reload_property_->getValue().toBool())) {
     ref_lat_ = msg->latitude;
     ref_lon_ = msg->longitude;
     ROS_INFO("Reference point set to: %.12f, %.12f", ref_lat_, ref_lon_);
@@ -291,12 +295,9 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
 }
 
 void AerialMapDisplay::loadImagery() {
-  if (loader_) {
-    //  cancel current imagery, if any
-    loader_->abort();
-    delete loader_;
-    loader_ = 0;
-  }
+  //  cancel current imagery, if any
+  loader_.reset();
+  
   if (!received_msg_) {
     //  no message received from publisher
     return;
@@ -307,20 +308,20 @@ void AerialMapDisplay::loadImagery() {
   }
   const std::string service = object_uri_;
   try {
-    loader_ = new TileLoader(service, ref_lat_, ref_lon_, zoom_, blocks_, this);
-  }
-  catch (std::exception &e) {
+    loader_.reset(
+        new TileLoader(service, ref_lat_, ref_lon_, zoom_, blocks_, this));
+  } catch (std::exception &e) {
     setStatus(StatusProperty::Error, "Message", QString(e.what()));
     return;
   }
 
-  QObject::connect(loader_, SIGNAL(errorOcurred(QString)), this,
+  QObject::connect(loader_.get(), SIGNAL(errorOcurred(QString)), this,
                    SLOT(errorOcurred(QString)));
-  QObject::connect(loader_, SIGNAL(finishedLoading()), this,
+  QObject::connect(loader_.get(), SIGNAL(finishedLoading()), this,
                    SLOT(finishedLoading()));
-  QObject::connect(loader_, SIGNAL(initiatedRequest(QNetworkRequest)), this,
+  QObject::connect(loader_.get(), SIGNAL(initiatedRequest(QNetworkRequest)), this,
                    SLOT(initiatedRequest(QNetworkRequest)));
-  QObject::connect(loader_, SIGNAL(receivedImage(QNetworkRequest)), this,
+  QObject::connect(loader_.get(), SIGNAL(receivedImage(QNetworkRequest)), this,
                    SLOT(receivedImage(QNetworkRequest)));
   //  start loading images
   loader_->start();
@@ -385,7 +386,7 @@ void AerialMapDisplay::assembleScene() {
       //  only add if we have a texture for it
       tex = textureFromImage(tile.image(), "texture_" + name_suffix);
 
-      ROS_INFO("Rendering with texture: %s", tex->getName().c_str());
+      ROS_DEBUG("Rendering with texture: %s", tex->getName().c_str());
       tex_unit->setTextureName(tex->getName());
       tex_unit->setTextureFiltering(Ogre::TFO_BILINEAR);
 
@@ -463,11 +464,11 @@ void AerialMapDisplay::assembleScene() {
 }
 
 void AerialMapDisplay::initiatedRequest(QNetworkRequest request) {
-  ROS_INFO("Requesting %s", qPrintable(request.url().toString()));
+  ROS_DEBUG("Requesting %s", qPrintable(request.url().toString()));
 }
 
 void AerialMapDisplay::receivedImage(QNetworkRequest request) {
-  ROS_INFO("Loaded tile %s", qPrintable(request.url().toString()));
+  ROS_DEBUG("Loaded tile %s", qPrintable(request.url().toString()));
 }
 
 void AerialMapDisplay::finishedLoading() {
@@ -486,11 +487,8 @@ void AerialMapDisplay::errorOcurred(QString description) {
 }
 
 void AerialMapDisplay::transformAerialMap() {
-  Ogre::Vector3 position;
-  Ogre::Quaternion orientation;
-
-  /// @todo: For now just use the null transform
-  /// Add an option for this later
+  // pass in identity to get pose of robot wrt to the fixed frame
+  // the map will be shifted so as to compensate for the center tile shifting
   geometry_msgs::Pose pose;
   pose.orientation.w = 1;
   pose.orientation.x = 0;
@@ -501,20 +499,35 @@ void AerialMapDisplay::transformAerialMap() {
   pose.position.z = 0;
   
   const std::string frame = frame_property_->getFrameStd();
+  Ogre::Vector3 position{0, 0, 0};
+  Ogre::Quaternion orientation{1, 0, 0, 0};
+
   if (!context_->getFrameManager()->transform(frame, ros::Time(), pose,
                                               position, orientation)) {
     ROS_DEBUG("Error transforming map '%s' from frame '%s' to frame '%s'",
               qPrintable(getName()), frame.c_str(), qPrintable(fixed_frame_));
 
     setStatus(StatusProperty::Error, "Transform",
-              "No transform from [" + QString::fromStdString(frame) +
-                  "] to [" + fixed_frame_ + "]");
+              "No transform from [" + QString::fromStdString(frame) + "] to [" +
+                  fixed_frame_ + "]");
+
+    // set the transform to identity on failure
+    position = Ogre::Vector3::ZERO;
+    orientation = Ogre::Quaternion::IDENTITY;
   } else {
     setStatus(StatusProperty::Ok, "Transform", "Transform OK");
   }
+  if (position.isNaN() || orientation.isNaN()) {
+    // this can occur if an invalid TF is published. Set to identiy so OGRE does
+    // not throw an assertion
+    position = Ogre::Vector3::ZERO;
+    orientation = Ogre::Quaternion::IDENTITY;
+    ROS_ERROR("rviz_satellite received invalid transform, setting to identity");
+  }
 
   // Here we assume that the fixed/world frame is at altitude=0
-  position.z = 0; // force aerial imagery on ground
+  // force aerial imagery on ground
+  position.z = 0;
   scene_node_->setPosition(position);
   
   const int convention = frame_convention_property_->getOptionInt();

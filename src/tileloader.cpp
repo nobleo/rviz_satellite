@@ -50,12 +50,13 @@ TileLoader::TileLoader(const std::string &service, double latitude,
                        double longitude, unsigned int zoom, unsigned int blocks,
                        QObject *parent)
     : QObject(parent), latitude_(latitude), longitude_(longitude), zoom_(zoom),
-      blocks_(blocks), qnam_(0), object_uri_(service) {
+      blocks_(blocks), object_uri_(service) {
   assert(blocks_ >= 0);
           
-    QString packagePath = QString::fromStdString(ros::package::getPath("rviz_satellite"));
-    QString folderName("mapscache");
-    cachePath_ = QDir::cleanPath(packagePath + QDir::separator() + folderName);
+    std::string packagePath = ros::package::getPath("rviz_satellite");
+    if ( packagePath.empty() ) throw std::runtime_error("package 'rviz_satellite' not found");
+    
+    cachePath_ = QDir::cleanPath( QString::fromStdString(packagePath) + QDir::separator() + QString("mapscache"));
     QDir dir(cachePath_);
     if (!dir.exists()) {
         dir.mkpath(".");
@@ -73,12 +74,20 @@ TileLoader::TileLoader(const std::string &service, double latitude,
   origin_y_ = y - tile_y_;
 }
 
+bool TileLoader::insideCentreTile(double lat, double lon) const {
+  double x, y;
+  latLonToTileCoords(lat, lon, zoom_, x, y);
+  return (std::floor(x) == tile_x_ && std::floor(y) == tile_y_);
+}
+
 void TileLoader::start() {
   //  discard previous set of tiles and all pending requests
   abort();
 
-  qnam_ = new QNetworkAccessManager(this);
-  QObject::connect(qnam_, SIGNAL(finished(QNetworkReply *)), this,
+  ROS_INFO("loading %d blocks around tile=(%d,%d)", blocks_, tile_x_, tile_y_ );
+
+  qnam_.reset( new QNetworkAccessManager(this) );
+  QObject::connect(qnam_.get(), SIGNAL(finished(QNetworkReply *)), this,
                    SLOT(finishedRequest(QNetworkReply *)));
 
   //  determine what range of tiles we can load
@@ -116,7 +125,7 @@ void TileLoader::start() {
     for (MapTile &tile : tiles_) {
         if (!tile.hasImage()) {
             loaded = false;
-            std::cout << "Tile x: " << tile.x() << " y: "<< tile.y() << " has no image new version"<< std::endl;
+            ROS_DEBUG_STREAM( "Tile x: " << tile.x() << " y: "<< tile.y() << " has no image new version" );
         }
     }
     if (loaded) {
@@ -149,7 +158,7 @@ void TileLoader::latLonToTileCoords(double lat, double lon, unsigned int zoom,
   x = n * ((lon + 180) / 360.0);
   y = n * (1 - (std::log(std::tan(lat_rad) + 1 / std::cos(lat_rad)) / M_PI)) /
       2;
-  std::cout << "Center tile coords: " << x << ", " << y << std::endl;
+  ROS_DEBUG_STREAM( "Center tile coords: " << x << ", " << y );
 }
 
 double TileLoader::zoomToResolution(double lat, unsigned int zoom) {
@@ -223,13 +232,8 @@ QUrl TileLoader::uriForTile(int x, int y) const {
 
 int TileLoader::maxTiles() const { return (1 << zoom_) - 1; }
 
-// TODO(gareth): Change to smart pointer, also add a destructor to this class.
 void TileLoader::abort() {
   tiles_.clear();
-
   //  destroy network access manager
-  if (qnam_) {
-    delete qnam_;
-    qnam_ = 0;
-  }
+  qnam_.reset();
 }
