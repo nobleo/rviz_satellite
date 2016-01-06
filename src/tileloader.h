@@ -40,7 +40,7 @@ public:
     const int &z() const { return z_; }
 
     /// Network reply.
-    QNetworkReply *reply() { return reply_; }
+    const QNetworkReply *reply() const { return reply_; }
 
     /// Abort the network request for this tile, if applicable.
     void abortLoading();
@@ -122,6 +122,12 @@ private:
   /// URI for tile [x,y]
   QUrl uriForTile(int x, int y) const;
 
+  /// Get name for cached tile [x,y,z]
+  QString cachedNameForTile(int x, int y, int z) const;
+
+  /// Get file path for cached tile [x,y,z].
+  QString cachedPathForTile(int x, int y, int z) const;
+
   /// Maximum number of tiles for the zoom level
   int maxTiles() const;
 
@@ -135,7 +141,7 @@ private:
   double origin_y_;
 
   std::shared_ptr<QNetworkAccessManager> qnam_;
-  QString cachePath_;
+  QString cache_path_;
 
   std::string object_uri_;
 
