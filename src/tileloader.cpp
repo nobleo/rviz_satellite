@@ -141,7 +141,7 @@ double TileLoader::resolution() const {
 /// For explanation of these calculations.
 void TileLoader::latLonToTileCoords(double lat, double lon, unsigned int zoom,
                                     double &x, double &y) {
-  if (zoom > 19) {
+  if (zoom > 22) {
     throw std::invalid_argument("Zoom level " + std::to_string(zoom) +
                                 " too high");
   } else if (lat < -85.0511 || lat > 85.0511) {

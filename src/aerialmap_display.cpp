@@ -113,7 +113,7 @@ AerialMapDisplay::AerialMapDisplay()
   object_uri_property_->setShouldBeSaved(true);
   object_uri_ = object_uri_property_->getStdString();
 
-  zoom_property_ = new IntProperty("Zoom", 16, "Zoom level (0 - 19 usually)",
+  zoom_property_ = new IntProperty("Zoom", 16, "Zoom level (0 - 22 usually)",
                                    this, SLOT(updateZoom()));
   zoom_property_->setShouldBeSaved(true);
   zoom_ = zoom_property_->getInt();
@@ -207,7 +207,7 @@ void AerialMapDisplay::updateObjectURI() {
 void AerialMapDisplay::updateZoom() {
   int zoom = zoom_property_->getInt();
   //  validate
-  zoom = std::max(0, std::min(19, zoom));
+  zoom = std::max(0, std::min(22, zoom));
   if (zoom != static_cast<int>(zoom_)) {
     zoom_ = zoom;
     ROS_INFO("Zoom changed to %i, will reload imagery", zoom_);
