@@ -126,18 +126,7 @@ void TileLoader::start() {
     }
   }
 
-  // check if we are finished already
-  bool loaded = true;
-  for (MapTile &tile : tiles_) {
-    if (!tile.hasImage()) {
-      loaded = false;
-      ROS_DEBUG_STREAM("Tile x: " << tile.x() << " y: " << tile.y()
-                                  << " has no image new version");
-    }
-  }
-  if (loaded) {
-    emit finishedLoading();
-  }
+  checkIfLoadingComplete();
 }
 
 double TileLoader::resolution() const {
@@ -206,13 +195,17 @@ void TileLoader::finishedRequest(QNetworkReply *reply) {
     emit errorOcurred(err);
   }
 
-  //  check if all tiles have images
+  checkIfLoadingComplete();
+}
+
+bool TileLoader::checkIfLoadingComplete() {
   const bool loaded =
       std::all_of(tiles_.begin(), tiles_.end(),
                   [](const MapTile &tile) { return tile.hasImage(); });
   if (loaded) {
     emit finishedLoading();
   }
+  return loaded;
 }
 
 QUrl TileLoader::uriForTile(int x, int y) const {

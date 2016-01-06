@@ -119,6 +119,9 @@ private slots:
 
 private:
 
+  /// Check if loading is complete. Emit signal if appropriate.
+  bool checkIfLoadingComplete();
+
   /// URI for tile [x,y]
   QUrl uriForTile(int x, int y) const;
 
