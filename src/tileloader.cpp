@@ -77,10 +77,10 @@ TileLoader::TileLoader(const std::string &service, double latitude,
   origin_y_ = y - tile_y_;
 }
 
-bool TileLoader::insideCentreTile( double lat, double lon ) const {
+bool TileLoader::insideCentreTile(double lat, double lon) const {
   double x, y;
   latLonToTileCoords(lat, lon, zoom_, x, y);
-  return ( std::floor(x) != tile_x_ or std::floor(y) != tile_y_ );
+  return (std::floor(x) == tile_x_ && std::floor(y) == tile_y_);
 }
 
 void TileLoader::start() {
@@ -144,7 +144,7 @@ double TileLoader::resolution() const {
 /// For explanation of these calculations.
 void TileLoader::latLonToTileCoords(double lat, double lon, unsigned int zoom,
                                     double &x, double &y) {
-  if (zoom > 19) {
+  if (zoom > 22) {
     throw std::invalid_argument("Zoom level " + std::to_string(zoom) +
                                 " too high");
   } else if (lat < -85.0511 || lat > 85.0511) {
@@ -235,10 +235,8 @@ QUrl TileLoader::uriForTile(int x, int y) const {
 
 int TileLoader::maxTiles() const { return (1 << zoom_) - 1; }
 
-// TODO(gareth): Change to smart pointer, also add a destructor to this class.
 void TileLoader::abort() {
   tiles_.clear();
-
   //  destroy network access manager
   qnam_.reset();
 }

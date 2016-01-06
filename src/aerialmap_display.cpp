@@ -80,6 +80,11 @@ AerialMapDisplay::AerialMapDisplay()
                                         "TF frame for the moving robot.", this,
                                         0, false, SLOT(updateFrame()), this);
 
+  dynamic_reload_property_ =
+      new Property("Dynamically reload", true,
+                   "Reload as robot moves. Frame option must be set.",
+                   this, SLOT(updateDynamicReload()));
+
   alpha_property_ = new FloatProperty(
       "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
       SLOT(updateAlpha()));
@@ -108,7 +113,7 @@ AerialMapDisplay::AerialMapDisplay()
   object_uri_property_->setShouldBeSaved(true);
   object_uri_ = object_uri_property_->getStdString();
 
-  zoom_property_ = new IntProperty("Zoom", 16, "Zoom level (0 - 19 usually)",
+  zoom_property_ = new IntProperty("Zoom", 16, "Zoom level (0 - 22 usually)",
                                    this, SLOT(updateZoom()));
   zoom_property_->setShouldBeSaved(true);
   zoom_ = zoom_property_->getInt();
@@ -171,6 +176,11 @@ void AerialMapDisplay::unsubscribe() {
   ROS_INFO("Unsubscribing.");
 }
 
+
+void AerialMapDisplay::updateDynamicReload() {
+  // nothing to do here, when robot GPS updates the tiles will reload
+}
+
 void AerialMapDisplay::updateAlpha() {
   alpha_ = alpha_property_->getFloat();
   dirty_ = true;
@@ -197,7 +207,7 @@ void AerialMapDisplay::updateObjectURI() {
 void AerialMapDisplay::updateZoom() {
   int zoom = zoom_property_->getInt();
   //  validate
-  zoom = std::max(0, std::min(19, zoom));
+  zoom = std::max(0, std::min(22, zoom));
   if (zoom != static_cast<int>(zoom_)) {
     zoom_ = zoom;
     ROS_INFO("Zoom changed to %i, will reload imagery", zoom_);
@@ -266,8 +276,11 @@ void AerialMapDisplay::update(float, float) {
 
 void
 AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
-  // If the new (lat,lon) falls into a different tile then we have some reloading to do.
-  if ( !received_msg_ || ( loader_ && loader_->insideCentreTile(msg->latitude,msg->longitude) ) ) {
+  // If the new (lat,lon) falls into a different tile then we have some
+  // reloading to do.
+  if (!received_msg_ ||
+      (loader_ && !loader_->insideCentreTile(msg->latitude, msg->longitude) &&
+       dynamic_reload_property_->getValue().toBool())) {
     ref_lat_ = msg->latitude;
     ref_lon_ = msg->longitude;
     ROS_INFO("Reference point set to: %.12f, %.12f", ref_lat_, ref_lon_);
@@ -295,9 +308,9 @@ void AerialMapDisplay::loadImagery() {
   }
   const std::string service = object_uri_;
   try {
-    loader_.reset( new TileLoader(service, ref_lat_, ref_lon_, zoom_, blocks_, this) );
-  }
-  catch (std::exception &e) {
+    loader_.reset(
+        new TileLoader(service, ref_lat_, ref_lon_, zoom_, blocks_, this));
+  } catch (std::exception &e) {
     setStatus(StatusProperty::Error, "Message", QString(e.what()));
     return;
   }
@@ -474,11 +487,8 @@ void AerialMapDisplay::errorOcurred(QString description) {
 }
 
 void AerialMapDisplay::transformAerialMap() {
-  Ogre::Vector3 position;
-  Ogre::Quaternion orientation;
-
-  /// @todo: For now just use the null transform
-  /// Add an option for this later
+  // pass in identity to get pose of robot wrt to the fixed frame
+  // the map will be shifted so as to compensate for the center tile shifting
   geometry_msgs::Pose pose;
   pose.orientation.w = 1;
   pose.orientation.x = 0;
@@ -489,20 +499,35 @@ void AerialMapDisplay::transformAerialMap() {
   pose.position.z = 0;
   
   const std::string frame = frame_property_->getFrameStd();
+  Ogre::Vector3 position{0, 0, 0};
+  Ogre::Quaternion orientation{1, 0, 0, 0};
+
   if (!context_->getFrameManager()->transform(frame, ros::Time(), pose,
                                               position, orientation)) {
     ROS_DEBUG("Error transforming map '%s' from frame '%s' to frame '%s'",
               qPrintable(getName()), frame.c_str(), qPrintable(fixed_frame_));
 
     setStatus(StatusProperty::Error, "Transform",
-              "No transform from [" + QString::fromStdString(frame) +
-                  "] to [" + fixed_frame_ + "]");
+              "No transform from [" + QString::fromStdString(frame) + "] to [" +
+                  fixed_frame_ + "]");
+
+    // set the transform to identity on failure
+    position = Ogre::Vector3::ZERO;
+    orientation = Ogre::Quaternion::IDENTITY;
   } else {
     setStatus(StatusProperty::Ok, "Transform", "Transform OK");
   }
+  if (position.isNaN() || orientation.isNaN()) {
+    // this can occur if an invalid TF is published. Set to identiy so OGRE does
+    // not throw an assertion
+    position = Ogre::Vector3::ZERO;
+    orientation = Ogre::Quaternion::IDENTITY;
+    ROS_ERROR("rviz_satellite received invalid transform, setting to identity");
+  }
 
   // Here we assume that the fixed/world frame is at altitude=0
-  position.z = 0; // force aerial imagery on ground
+  // force aerial imagery on ground
+  position.z = 0;
   scene_node_->setPosition(position);
   
   const int convention = frame_convention_property_->getOptionInt();
