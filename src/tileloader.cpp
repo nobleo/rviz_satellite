@@ -21,7 +21,7 @@
 #include <boost/regex.hpp>
 #include <ros/ros.h>
 #include <ros/package.h>
-
+#include <functional> // for std::hash
 
 static size_t replaceRegex(const boost::regex &ex, std::string &str,
                            const std::string &replace) {
@@ -52,16 +52,24 @@ TileLoader::TileLoader(const std::string &service, double latitude,
     : QObject(parent), latitude_(latitude), longitude_(longitude), zoom_(zoom),
       blocks_(blocks), object_uri_(service) {
   assert(blocks_ >= 0);
-          
-    std::string packagePath = ros::package::getPath("rviz_satellite");
-    if ( packagePath.empty() ) throw std::runtime_error("package 'rviz_satellite' not found");
-    
-    cachePath_ = QDir::cleanPath( QString::fromStdString(packagePath) + QDir::separator() + QString("mapscache"));
-    QDir dir(cachePath_);
-    if (!dir.exists()) {
-        dir.mkpath(".");
-    }
-          
+
+  const std::string package_path = ros::package::getPath("rviz_satellite");
+  if (package_path.empty()) {
+    throw std::runtime_error("package 'rviz_satellite' not found");
+  }
+
+  std::hash<std::string> hash_fn;
+  cache_path_ =
+      QDir::cleanPath(QString::fromStdString(package_path) + QDir::separator() +
+                      QString("mapscache") + QDir::separator() +
+                      QString::number(hash_fn(object_uri_)));
+
+  QDir dir(cache_path_);
+  if (!dir.exists() && !dir.mkpath(".")) {
+    throw std::runtime_error("Failed to create cache folder: " +
+                             cache_path_.toStdString());
+  }
+
   /// @todo: some kind of error checking of the URL
 
   //  calculate center tile coordinates
@@ -99,38 +107,26 @@ void TileLoader::start() {
   //  initiate requests
   for (int y = min_y; y <= max_y; y++) {
     for (int x = min_x; x <= max_x; x++) {
-        
-        // Generate filename
-        QString fileName = "x_" + QString::number(x)+ "y_" +QString::number(y) +"z_" +QString::number(zoom_)+ ".jpg";
-        QString fullPath = QDir::cleanPath(cachePath_ + QDir::separator() + fileName);
+      // Generate filename
+      const QString full_path = cachedPathForTile(x, y, zoom_);
 
-        // Check if tile is already in the cache
-        QFile tile(fullPath);
-        if (tile.exists()) {
-            QImage image(fullPath);
-            tiles_.push_back(MapTile(x, y, zoom_, image));
-        } else {
-            const QUrl uri = uriForTile(x, y);
-            //  send request
-            const QNetworkRequest request = QNetworkRequest(uri);
-            QNetworkReply *rep = qnam_->get(request);
-            emit initiatedRequest(request);
-            tiles_.push_back(MapTile(x, y, zoom_, rep));
-        }
+      // Check if tile is already in the cache
+      QFile tile(full_path);
+      if (tile.exists()) {
+        QImage image(full_path);
+        tiles_.push_back(MapTile(x, y, zoom_, image));
+      } else {
+        const QUrl uri = uriForTile(x, y);
+        //  send request
+        const QNetworkRequest request = QNetworkRequest(uri);
+        QNetworkReply *rep = qnam_->get(request);
+        emit initiatedRequest(request);
+        tiles_.push_back(MapTile(x, y, zoom_, rep));
+      }
     }
   }
 
-    // check if we are finished already
-    bool loaded = true;
-    for (MapTile &tile : tiles_) {
-        if (!tile.hasImage()) {
-            loaded = false;
-            ROS_DEBUG_STREAM( "Tile x: " << tile.x() << " y: "<< tile.y() << " has no image new version" );
-        }
-    }
-    if (loaded) {
-        emit finishedLoading();
-    }
+  checkIfLoadingComplete();
 }
 
 double TileLoader::resolution() const {
@@ -170,26 +166,22 @@ void TileLoader::finishedRequest(QNetworkReply *reply) {
   const QNetworkRequest request = reply->request();
 
   //  find corresponding tile
-  MapTile *tile = 0;
-  for (MapTile &t : tiles_) {
-    if (t.reply() == reply) {
-      tile = &t;
-    }
-  }
-  if (!tile) {
+  const std::vector<MapTile>::iterator it =
+      std::find_if(tiles_.begin(), tiles_.end(),
+                   [&](const MapTile &tile) { return tile.reply() == reply; });
+  if (it == tiles_.end()) {
     //  removed from list already, ignore this reply
     return;
   }
+  MapTile &tile = *it;
 
   if (reply->error() == QNetworkReply::NoError) {
     //  decode an image
     QImageReader reader(reply);
     if (reader.canRead()) {
       QImage image = reader.read();
-      tile->setImage(image);
-      QString fileName = "x_" + QString::number(tile->x())+ "y_" +QString::number(tile->y()) +"z_" +QString::number(tile->z())+ ".jpg";
-      QString fullPath = QDir::cleanPath(cachePath_ + QDir::separator() + fileName);
-      image.save(fullPath,"JPEG");
+      tile.setImage(image);
+      image.save(cachedPathForTile(tile.x(), tile.y(), tile.z()), "JPEG");
       emit receivedImage(request);
     } else {
       //  probably not an image
@@ -198,22 +190,22 @@ void TileLoader::finishedRequest(QNetworkReply *reply) {
       emit errorOcurred(err);
     }
   } else {
-    QString err;
-    err = "Failed loading " + request.url().toString();
-    err += " with code " + QString::number(reply->error());
+    const QString err = "Failed loading " + request.url().toString() +
+                        " with code " + QString::number(reply->error());
     emit errorOcurred(err);
   }
 
-  //  check if all tiles have images
-  bool loaded = true;
-  for (MapTile &tile : tiles_) {
-    if (!tile.hasImage()) {
-      loaded = false;
-    }
-  }
+  checkIfLoadingComplete();
+}
+
+bool TileLoader::checkIfLoadingComplete() {
+  const bool loaded =
+      std::all_of(tiles_.begin(), tiles_.end(),
+                  [](const MapTile &tile) { return tile.hasImage(); });
   if (loaded) {
     emit finishedLoading();
   }
+  return loaded;
 }
 
 QUrl TileLoader::uriForTile(int x, int y) const {
@@ -228,6 +220,16 @@ QUrl TileLoader::uriForTile(int x, int y) const {
 
   const QString qstr = QString::fromStdString(object);
   return QUrl(qstr);
+}
+
+QString TileLoader::cachedNameForTile(int x, int y, int z) const {
+  return "x" + QString::number(x) + "_y" + QString::number(y) + "_z" +
+         QString::number(z) + ".jpg";
+}
+
+QString TileLoader::cachedPathForTile(int x, int y, int z) const {
+  return QDir::cleanPath(cache_path_ + QDir::separator() +
+                         cachedNameForTile(x, y, z));
 }
 
 int TileLoader::maxTiles() const { return (1 << zoom_) - 1; }
