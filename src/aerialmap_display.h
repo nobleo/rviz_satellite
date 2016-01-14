@@ -131,7 +131,6 @@ protected:
   unsigned int blocks_;
 
   //  tile management
-  boost::mutex mutex_;  // TODO(gareth): Mutex seems unecessary, remove this.
   bool dirty_;
   bool received_msg_;
   double ref_lat_;

@@ -267,7 +267,6 @@ void AerialMapDisplay::clearGeometry() {
 }
 
 void AerialMapDisplay::update(float, float) {
-  boost::mutex::scoped_lock lock(mutex_);
   //  creates all geometry, if necessary
   assembleScene();
   //  draw
