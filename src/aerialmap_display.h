@@ -127,8 +127,8 @@ protected:
   float alpha_;
   bool draw_under_;
   std::string object_uri_;
-  unsigned int zoom_;
-  unsigned int blocks_;
+  int zoom_;
+  int blocks_;
 
   //  tile management
   boost::mutex mutex_;  // TODO(gareth): Mutex seems unecessary, remove this.

@@ -37,12 +37,21 @@
 
 #include "aerialmap_display.h"
 
-#define FRAME_CONVENTION_ROS (0)  //  X -> North, Y -> West
-#define FRAME_CONVENTION_GEO (1)  //  X -> East, Y -> North
+#define FRAME_CONVENTION_XYZ_ENU (0)  //  X -> East, Y -> North
+#define FRAME_CONVENTION_XYZ_NED (1)  //  X -> North, Y -> East
+#define FRAME_CONVENTION_XYZ_NWU (2)  //  X -> North, Y -> West
+
+// Max number of adjacent blocks to support.
+static constexpr int kMaxBlocks = 6;
+// Max zoom level to support.
+static constexpr int kMaxZoom = 22;
+
+// TODO(gareth): If higher zooms are ever supported, change calculations from
+// int to long wherever applicable.
+static_assert((1 << kMaxZoom) < std::numeric_limits<unsigned int>::max(), "");
 
 Ogre::TexturePtr textureFromImage(const QImage &image,
                                   const std::string &name) {
-  ROS_DEBUG("Loading a %i x %i texture", image.width(), image.height());
   //  convert to 24bit rgb
   QImage converted = image.convertToFormat(QImage::Format_RGB888).mirrored();
 
@@ -113,22 +122,33 @@ AerialMapDisplay::AerialMapDisplay()
   object_uri_property_->setShouldBeSaved(true);
   object_uri_ = object_uri_property_->getStdString();
 
-  zoom_property_ = new IntProperty("Zoom", 16, "Zoom level (0 - 22 usually)",
-                                   this, SLOT(updateZoom()));
+  const QString zoom_desc = QString::fromStdString(
+      "Zoom level (0 - " + std::to_string(kMaxZoom) + ")");
+  zoom_property_ =
+      new IntProperty("Zoom", 16, zoom_desc, this, SLOT(updateZoom()));
   zoom_property_->setShouldBeSaved(true);
+  zoom_property_->setMin(0);
+  zoom_property_->setMax(kMaxZoom);
   zoom_ = zoom_property_->getInt();
 
+  const QString blocks_desc = QString::fromStdString(
+      "Adjacent blocks (0 - " + std::to_string(kMaxBlocks) + ")");
   blocks_property_ =
-      new IntProperty("Blocks", 3, "Number of adjacent blocks (6 max)", this,
-                      SLOT(updateBlocks()));
+      new IntProperty("Blocks", 3, blocks_desc, this, SLOT(updateBlocks()));
   blocks_property_->setShouldBeSaved(true);
+  blocks_property_->setMin(0);
+  blocks_property_->setMax(kMaxBlocks);
 
-  frame_convention_property_ = new EnumProperty(
-      "Frame Convention", "ROS", "Convention for mapping frame to the compass",
-      this, SLOT(updateFrameConvention()));
-  frame_convention_property_->addOptionStd("ROS", FRAME_CONVENTION_ROS);
-  frame_convention_property_->addOptionStd("libGeographic",
-                                           FRAME_CONVENTION_GEO);
+  frame_convention_property_ =
+      new EnumProperty("Frame Convention", "XYZ -> ENU",
+                       "Convention for mapping cartesian frame to the compass",
+                       this, SLOT(updateFrameConvention()));
+  frame_convention_property_->addOptionStd("XYZ -> ENU",
+                                           FRAME_CONVENTION_XYZ_ENU);
+  frame_convention_property_->addOptionStd("XYZ -> NED",
+                                           FRAME_CONVENTION_XYZ_NED);
+  frame_convention_property_->addOptionStd("XYZ -> NWU",
+                                           FRAME_CONVENTION_XYZ_NWU);
 
   //  updating one triggers reload
   updateBlocks();
@@ -140,7 +160,7 @@ AerialMapDisplay::~AerialMapDisplay() {
 }
 
 void AerialMapDisplay::onInitialize() {
-  frame_property_->setFrameManager( context_->getFrameManager() );
+  frame_property_->setFrameManager(context_->getFrameManager());
 }
 
 void AerialMapDisplay::onEnable() { subscribe(); }
@@ -205,20 +225,17 @@ void AerialMapDisplay::updateObjectURI() {
 }
 
 void AerialMapDisplay::updateZoom() {
-  int zoom = zoom_property_->getInt();
-  //  validate
-  zoom = std::max(0, std::min(22, zoom));
-  if (zoom != static_cast<int>(zoom_)) {
+  const int zoom = std::max(0, std::min(kMaxZoom, zoom_property_->getInt()));
+  if (zoom != zoom_) {
     zoom_ = zoom;
-    ROS_INFO("Zoom changed to %i, will reload imagery", zoom_);
-    loadImagery(); //  reload
+    loadImagery();
   }
 }
 
 void AerialMapDisplay::updateBlocks() {
-  int blocks = blocks_property_->getInt();
-  blocks = std::max(0, std::min(6, blocks)); //  arbitrary limit for now
-  if (blocks != static_cast<int>(blocks_)) {
+  const int blocks =
+      std::max(0, std::min(kMaxBlocks, blocks_property_->getInt()));
+  if (blocks != blocks_) {
     blocks_ = blocks;
     loadImagery();
   }
@@ -284,7 +301,6 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
     ref_lat_ = msg->latitude;
     ref_lon_ = msg->longitude;
     ROS_INFO("Reference point set to: %.12f, %.12f", ref_lat_, ref_lon_);
-    ROS_INFO("Received msg: %s", (received_msg_) ? "true" : "false");
     setStatus(StatusProperty::Warn, "Message", "Loading map tiles.");
 
     //  re-load imagery
@@ -341,22 +357,23 @@ void AerialMapDisplay::assembleScene() {
   clearGeometry();
   
   //  iterate over all tiles and create an object for each of them
-  const double resolution = loader_->resolution();
-  const std::vector<TileLoader::MapTile> &tiles = loader_->tiles();
-  for (const TileLoader::MapTile &tile : tiles) {
+  for (const TileLoader::MapTile &tile : loader_->tiles()) {
+    // NOTE(gareth): We invert the y-axis so that positive y corresponds
+    // to north. We are in XYZ->ENU convention here.
     const int w = tile.image().width();
     const int h = tile.image().height();
-    //  we here assume that the tiles are uniformly sized...
-    const double tileW = w * resolution;
-    const double tileH = h * resolution;
-    const double origin_x = -loader_->originX() * tileW;
-    const double origin_y = -(1 - loader_->originY()) * tileH;
+    const double tile_w = w * loader_->resolution();
+    const double tile_h = h * loader_->resolution();
 
-    // determine location of this tile
-    // NOTE(gareth): We invert the y-axis here so that positive y corresponds
-    // to north.
-    const double x = (tile.x() - loader_->tileX()) * tileW + origin_x;
-    const double y = -(tile.y() - loader_->tileY()) * tileH + origin_y;
+    // Shift back such that (0, 0) corresponds to the exact latitude and
+    // longitude the tile loader requested.
+    // This is the local origin, in the frame of the map node.
+    const double origin_x = -loader_->originOffsetX() * tile_w;
+    const double origin_y = -(1 - loader_->originOffsetY()) * tile_h;
+
+    // determine location of this tile, flipping y in the process
+    const double x = (tile.x() - loader_->centerTileX()) * tile_w + origin_x;
+    const double y = -(tile.y() - loader_->centerTileY()) * tile_h + origin_y;
     //  don't re-use any ids
     const std::string name_suffix =
         std::to_string(tile.x()) + "_" + std::to_string(tile.y()) + "_" +
@@ -422,12 +439,12 @@ void AerialMapDisplay::assembleScene() {
       obj->normal(0.0f, 0.0f, 1.0f);
 
       // top right
-      obj->position(x + tileW, y + tileH, 0.0f);
+      obj->position(x + tile_w, y + tile_h, 0.0f);
       obj->textureCoord(1.0f, 1.0f);
       obj->normal(0.0f, 0.0f, 1.0f);
 
       // top left
-      obj->position(x, y + tileH, 0.0f);
+      obj->position(x, y + tile_h, 0.0f);
       obj->textureCoord(0.0f, 1.0f);
       obj->normal(0.0f, 0.0f, 1.0f);
 
@@ -437,12 +454,12 @@ void AerialMapDisplay::assembleScene() {
       obj->normal(0.0f, 0.0f, 1.0f);
 
       // bottom right
-      obj->position(x + tileW, y, 0.0f);
+      obj->position(x + tile_w, y, 0.0f);
       obj->textureCoord(1.0f, 0.0f);
       obj->normal(0.0f, 0.0f, 1.0f);
 
       // top right
-      obj->position(x + tileW, y + tileH, 0.0f);
+      obj->position(x + tile_w, y + tile_h, 0.0f);
       obj->textureCoord(1.0f, 1.0f);
       obj->normal(0.0f, 0.0f, 1.0f);
 
@@ -486,6 +503,8 @@ void AerialMapDisplay::errorOcurred(QString description) {
   setStatus(StatusProperty::Error, "Message", description);
 }
 
+// TODO(gareth): We are technically ignoring the orientation from the
+// frame manager here - does this make sense?
 void AerialMapDisplay::transformAerialMap() {
   // pass in identity to get pose of robot wrt to the fixed frame
   // the map will be shifted so as to compensate for the center tile shifting
@@ -531,18 +550,27 @@ void AerialMapDisplay::transformAerialMap() {
   scene_node_->setPosition(position);
   
   const int convention = frame_convention_property_->getOptionInt();
-  if (convention == FRAME_CONVENTION_ROS) {
-    // Apply 90deg rotation to convert from map to ROS coordinate frames
-    // http://wiki.ros.org/geometry/CoordinateFrameConventions
-    static const Ogre::Quaternion MAP_TO_ROS(Ogre::Degree(-90),
-                                             Ogre::Vector3::UNIT_Z);
-    scene_node_->setOrientation(MAP_TO_ROS);
-  } else if (convention == FRAME_CONVENTION_GEO) {
-    // TODO(gareth): We are technically ignoring the orientation from the
-    // frame manager here - does this make sense?
+  if (convention == FRAME_CONVENTION_XYZ_ENU) {
+    // ENU corresponds to our default drawing method
     scene_node_->setOrientation(Ogre::Quaternion::IDENTITY);
+  } else if (convention == FRAME_CONVENTION_XYZ_NED) {
+    // NOTE(gareth): XYZ->NED will cause the map to appear reversed when viewed
+    // from above (from +z).
+    // clang-format off
+    const Ogre::Matrix3 xyz_R_ned(0, 1, 0,
+                                  1, 0, 0,
+                                  0, 0,-1);
+    // clang-format on
+    scene_node_->setOrientation(xyz_R_ned.Transpose());
+  } else if (convention == FRAME_CONVENTION_XYZ_NWU) {
+    // clang-format off
+    const Ogre::Matrix3 xyz_R_nwu(0,-1, 0,
+                                  1, 0, 0,
+                                  0, 0, 1);
+    // clang-format on
+    scene_node_->setOrientation(xyz_R_nwu.Transpose());
   } else {
-    ROS_ERROR_STREAM("Invalid convention selected: " << convention);
+    ROS_ERROR_STREAM("Invalid convention code: " << convention);
   }
 }
 
