@@ -42,7 +42,7 @@
 #define FRAME_CONVENTION_XYZ_NWU (2)  //  X -> North, Y -> West
 
 // Max number of adjacent blocks to support.
-static constexpr int kMaxBlocks = 6;
+static constexpr int kMaxBlocks = 8;
 // Max zoom level to support.
 static constexpr int kMaxZoom = 22;
 
@@ -284,7 +284,6 @@ void AerialMapDisplay::clearGeometry() {
 }
 
 void AerialMapDisplay::update(float, float) {
-  boost::mutex::scoped_lock lock(mutex_);
   //  creates all geometry, if necessary
   assembleScene();
   //  draw
@@ -298,9 +297,9 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
   if (!received_msg_ ||
       (loader_ && !loader_->insideCentreTile(msg->latitude, msg->longitude) &&
        dynamic_reload_property_->getValue().toBool())) {
-    ref_lat_ = msg->latitude;
-    ref_lon_ = msg->longitude;
-    ROS_INFO("Reference point set to: %.12f, %.12f", ref_lat_, ref_lon_);
+    ref_fix_ = *msg;
+    ROS_INFO("Reference point set to: %.12f, %.12f", ref_fix_.latitude,
+             ref_fix_.longitude);
     setStatus(StatusProperty::Warn, "Message", "Loading map tiles.");
 
     //  re-load imagery
@@ -324,8 +323,8 @@ void AerialMapDisplay::loadImagery() {
   }
   const std::string service = object_uri_;
   try {
-    loader_.reset(
-        new TileLoader(service, ref_lat_, ref_lon_, zoom_, blocks_, this));
+    loader_.reset(new TileLoader(service, ref_fix_.latitude, ref_fix_.longitude,
+                                 zoom_, blocks_, this));
   } catch (std::exception &e) {
     setStatus(StatusProperty::Error, "Message", QString(e.what()));
     return;
@@ -521,7 +520,8 @@ void AerialMapDisplay::transformAerialMap() {
   Ogre::Vector3 position{0, 0, 0};
   Ogre::Quaternion orientation{1, 0, 0, 0};
 
-  if (!context_->getFrameManager()->transform(frame, ros::Time(), pose,
+  // get the transform at the time we received the reference lat and lon
+  if (!context_->getFrameManager()->transform(frame, ref_fix_.header.stamp, pose,
                                               position, orientation)) {
     ROS_DEBUG("Error transforming map '%s' from frame '%s' to frame '%s'",
               qPrintable(getName()), frame.c_str(), qPrintable(fixed_frame_));

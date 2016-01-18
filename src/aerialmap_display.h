@@ -131,11 +131,9 @@ protected:
   int blocks_;
 
   //  tile management
-  boost::mutex mutex_;  // TODO(gareth): Mutex seems unecessary, remove this.
   bool dirty_;
   bool received_msg_;
-  double ref_lat_;
-  double ref_lon_;
+  sensor_msgs::NavSatFix ref_fix_;
   std::shared_ptr<TileLoader> loader_;
 };
 
