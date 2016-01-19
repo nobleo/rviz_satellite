@@ -176,7 +176,6 @@ void AerialMapDisplay::unsubscribe() {
   ROS_INFO("Unsubscribing.");
 }
 
-
 void AerialMapDisplay::updateDynamicReload() {
   // nothing to do here, when robot GPS updates the tiles will reload
 }
@@ -235,13 +234,10 @@ void AerialMapDisplay::updateTopic() {
 }
 
 void AerialMapDisplay::clear() {
-  ROS_INFO("clear()");
   setStatus(StatusProperty::Warn, "Message", "No map received");
   clearGeometry();
   //  the user has cleared here
   received_msg_ = false;
-  //  stop any loading...
-  ROS_INFO("Clearing loaded imagery.");
   //  cancel current imagery, if any
   loader_.reset();
 }
@@ -249,25 +245,21 @@ void AerialMapDisplay::clear() {
 void AerialMapDisplay::clearGeometry() {
   for (MapObject &obj : objects_) {
     //  destroy object
+    scene_node_->detachObject(obj.object);
     scene_manager_->destroyManualObject(obj.object);
-    //  destory texture
+    //  destroy texture
     if (!obj.texture.isNull()) {
-      const std::string tex_name = obj.texture->getName();
-      obj.texture.setNull();
-      Ogre::TextureManager::getSingleton().unload(tex_name);
+      Ogre::TextureManager::getSingleton().remove(obj.texture->getName());
     }
     //  destroy material
     if (!obj.material.isNull()) {
-      const std::string mat_name = obj.material->getName();
-      obj.material.setNull();
-      Ogre::MaterialManager::getSingleton().unload(mat_name);
+      Ogre::MaterialManager::getSingleton().remove(obj.material->getName());
     }
   }
   objects_.clear();
 }
 
 void AerialMapDisplay::update(float, float) {
-  boost::mutex::scoped_lock lock(mutex_);
   //  creates all geometry, if necessary
   assembleScene();
   //  draw
@@ -306,10 +298,10 @@ void AerialMapDisplay::loadImagery() {
     setStatus(StatusProperty::Error, "Message",
               "Received message but object URI is not set");
   }
-  const std::string service = object_uri_;
+
   try {
     loader_.reset(
-        new TileLoader(service, ref_lat_, ref_lon_, zoom_, blocks_, this));
+        new TileLoader(object_uri_, ref_lat_, ref_lon_, zoom_, blocks_, this));
   } catch (std::exception &e) {
     setStatus(StatusProperty::Error, "Message", QString(e.what()));
     return;
@@ -362,12 +354,11 @@ void AerialMapDisplay::assembleScene() {
         std::to_string(tile.x()) + "_" + std::to_string(tile.y()) + "_" +
         std::to_string(map_id_) + "_" + std::to_string(scene_id_);
 
-    Ogre::TexturePtr tex;
     if (tile.hasImage()) {
       //  one material per texture
-      std::string matName = "material_" + name_suffix;
       Ogre::MaterialPtr material = Ogre::MaterialManager::getSingleton().create(
-          matName, Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+          "material_" + name_suffix,
+          Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
       material->setReceiveShadows(false);
       material->getTechnique(0)->setLightingEnabled(false);
       material->setDepthBias(-16.0f, 0.0f);
@@ -384,10 +375,10 @@ void AerialMapDisplay::assembleScene() {
       }
 
       //  only add if we have a texture for it
-      tex = textureFromImage(tile.image(), "texture_" + name_suffix);
+      Ogre::TexturePtr texture =
+          textureFromImage(tile.image(), "texture_" + name_suffix);
 
-      ROS_DEBUG("Rendering with texture: %s", tex->getName().c_str());
-      tex_unit->setTextureName(tex->getName());
+      tex_unit->setTextureName(texture->getName());
       tex_unit->setTextureFiltering(Ogre::TFO_BILINEAR);
 
       //  create an object
@@ -455,7 +446,7 @@ void AerialMapDisplay::assembleScene() {
 
       MapObject object;
       object.object = obj;
-      object.texture = tex;
+      object.texture = texture;
       object.material = material;
       objects_.push_back(object);
     }
