@@ -316,8 +316,8 @@ void AerialMapDisplay::loadImagery() {
   }
 
   try {
-    loader_.reset(
-        new TileLoader(object_uri_, ref_lat_, ref_lon_, zoom_, blocks_, this));
+    loader_.reset(new TileLoader(object_uri_, ref_fix_.latitude,
+                                 ref_fix_.longitude, zoom_, blocks_, this));
   } catch (std::exception &e) {
     setStatus(StatusProperty::Error, "Message", QString(e.what()));
     return;
