@@ -75,34 +75,34 @@ TileLoader::TileLoader(const std::string &service, double latitude,
   //  calculate center tile coordinates
   double x, y;
   latLonToTileCoords(latitude_, longitude_, zoom_, x, y);
-  tile_x_ = std::floor(x);
-  tile_y_ = std::floor(y);
+  center_tile_x_ = std::floor(x);
+  center_tile_y_ = std::floor(y);
   //  fractional component
-  origin_x_ = x - tile_x_;
-  origin_y_ = y - tile_y_;
+  origin_offset_x_ = x - center_tile_x_;
+  origin_offset_y_ = y - center_tile_y_;
 }
 
 bool TileLoader::insideCentreTile(double lat, double lon) const {
   double x, y;
   latLonToTileCoords(lat, lon, zoom_, x, y);
-  return (std::floor(x) == tile_x_ && std::floor(y) == tile_y_);
+  return (std::floor(x) == center_tile_x_ && std::floor(y) == center_tile_y_);
 }
 
 void TileLoader::start() {
   //  discard previous set of tiles and all pending requests
   abort();
 
-  ROS_INFO("loading %d blocks around tile=(%d,%d)", blocks_, tile_x_, tile_y_ );
+  ROS_INFO("loading %d blocks around tile=(%d,%d)", blocks_, center_tile_x_, center_tile_y_ );
 
   qnam_.reset( new QNetworkAccessManager(this) );
   QObject::connect(qnam_.get(), SIGNAL(finished(QNetworkReply *)), this,
                    SLOT(finishedRequest(QNetworkReply *)));
 
   //  determine what range of tiles we can load
-  const int min_x = std::max(0, tile_x_ - blocks_);
-  const int min_y = std::max(0, tile_y_ - blocks_);
-  const int max_x = std::min(maxTiles(), tile_x_ + blocks_);
-  const int max_y = std::min(maxTiles(), tile_y_ + blocks_);
+  const int min_x = std::max(0, center_tile_x_ - blocks_);
+  const int min_y = std::max(0, center_tile_y_ - blocks_);
+  const int max_x = std::min(maxTiles(), center_tile_x_ + blocks_);
+  const int max_y = std::min(maxTiles(), center_tile_y_ + blocks_);
 
   //  initiate requests
   for (int y = min_y; y <= max_y; y++) {
@@ -137,7 +137,7 @@ double TileLoader::resolution() const {
 /// For explanation of these calculations.
 void TileLoader::latLonToTileCoords(double lat, double lon, unsigned int zoom,
                                     double &x, double &y) {
-  if (zoom > 22) {
+  if (zoom > 31) {
     throw std::invalid_argument("Zoom level " + std::to_string(zoom) +
                                 " too high");
   } else if (lat < -85.0511 || lat > 85.0511) {

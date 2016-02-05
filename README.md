@@ -24,13 +24,12 @@ Map tiles will be cached to the `mapscache` directory in the `rviz_satellite` pa
 
 - `Topic` is the topic of the GPS measurements.
 - `Robot frame` should be a TF from the robot position to the fixed frame.
-- `Dynamically reload` will cause imagery to reload as the robot moves out of the center tile. This will only work if the robot frame is specified correctly.
+- `Dynamically reload` will cause imagery to reload as the robot moves out of the center tile. This will only work if the robot frame is specified correctly by TF.
 - `Alpha` is simply the display transparency.
 - `Draw Under` will cause the map to be displayed below all other geometry.
-- `Zoom` is the zoom level of the map. Recommended values are 16-19, as anything smaller is _very_ low resolution. 19 is the current max.
-- `Blocks` number of adjacent blocks to load. rviz_satellite will load the central block, and this many blocks around the center. 6 is the current max.
-- `Frame Convention` is the convention for X/Y axes of the map. In `ROS` mode it uses the mapping
-(X: North, Y: West). In `libGeographic` mode it uses (X: East, Y:North).
+- `Zoom` is the zoom level of the map. Recommended values are 16-19, as anything smaller is _very_ low resolution. 22 is the current max.
+- `Blocks` number of adjacent blocks to load. rviz_satellite will load the central block, and this many blocks around the center. 8 is the current max.
+- `Frame Convention` is the convention for X/Y axes of the map. The default is maps XYZ to ENU, which is the default convention for libGeographic and [ROS](www.ros.org/reps/rep-0103.html).
 
 ### Questions, Bugs
 

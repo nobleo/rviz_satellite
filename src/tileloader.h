@@ -31,13 +31,13 @@ public:
       : x_(x), y_(y), z_(z), image_(image) {}
 
     /// X tile coordinate.
-    const int &x() const { return x_; }
+    int x() const { return x_; }
 
     /// Y tile coordinate.
-    const int &y() const { return y_; }
+    int y() const { return y_; }
       
     /// Z tile zoom value.
-    const int &z() const { return z_; }
+    int z() const { return z_; }
 
     /// Network reply.
     const QNetworkReply *reply() const { return reply_; }
@@ -71,20 +71,20 @@ public:
   double resolution() const;
 
   /// X index of central tile.
-  int tileX() const { return tile_x_; }
+  int centerTileX() const { return center_tile_x_; }
 
   /// Y index of central tile.
-  int tileY() const { return tile_y_; }
+  int centerTileY() const { return center_tile_y_; }
 
   /// Fraction of a tile to offset the origin (X).
-  double originX() const { return origin_x_; }
+  double originOffsetX() const { return origin_offset_x_; }
 
   /// Fraction of a tile to offset the origin (Y).
-  double originY() const { return origin_y_; }
+  double originOffsetY() const { return origin_offset_y_; }
 
   /// Test if (lat,lon) falls inside centre tile.
-  bool insideCentreTile( double lat, double lon ) const;
-  
+  bool insideCentreTile(double lat, double lon) const;
+
   /// Convert lat/lon to a tile index with mercator projection.
   static void latLonToTileCoords(double lat, double lon, unsigned int zoom,
                                  double &x, double &y);
@@ -138,10 +138,10 @@ private:
   double longitude_;
   unsigned int zoom_;
   int blocks_;
-  int tile_x_;
-  int tile_y_;
-  double origin_x_;
-  double origin_y_;
+  int center_tile_x_;
+  int center_tile_y_;
+  double origin_offset_x_;
+  double origin_offset_y_;
 
   std::shared_ptr<QNetworkAccessManager> qnam_;
   QString cache_path_;

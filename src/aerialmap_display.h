@@ -127,14 +127,13 @@ protected:
   float alpha_;
   bool draw_under_;
   std::string object_uri_;
-  unsigned int zoom_;
-  unsigned int blocks_;
+  int zoom_;
+  int blocks_;
 
   //  tile management
   bool dirty_;
   bool received_msg_;
-  double ref_lat_;
-  double ref_lon_;
+  sensor_msgs::NavSatFix ref_fix_;
   std::shared_ptr<TileLoader> loader_;
 };
 
