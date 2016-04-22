@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(rviz_satellite)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
 find_package(Qt4 COMPONENTS QtCore QtGui QtNetwork REQUIRED)
 include(${QT_USE_FILE})
 find_package(OpenCV REQUIRED)
@@ -15,16 +13,16 @@ pkg_check_modules(OGRE_OV OGRE OGRE-Overlay)
 # pkg_check_modules() failed, try looking for just OGRE.
 if(NOT OGRE_OV_FOUND)
   pkg_check_modules(OGRE_OV REQUIRED OGRE)
-endif(NOT OGRE_OV_FOUND)
+endif()
 
 find_package(catkin REQUIRED COMPONENTS
+  nav_msgs
   roscpp
   rviz
-  nav_msgs
   sensor_msgs
 )
 
-catkin_package()
+catkin_package(CATKIN_DEPENDS nav_msgs sensor_msgs)
 
 set(${PROJECT_NAME}_SOURCES
   src/aerialmap_display.cpp
@@ -37,15 +35,15 @@ set(${PROJECT_NAME}_HEADERS
 )
 
 # invoke MOC and UI
-QT4_WRAP_CPP(${PROJECT_NAME}_MOCSrcs ${${PROJECT_NAME}_HEADERS})
+qt4_wrap_cpp(${PROJECT_NAME}_MOCSrcs ${${PROJECT_NAME}_HEADERS})
 
 # QT Declarations
 include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}
   ${OpenCV_INCLUDE_DIR}
   ${Qt4_INCLUDE_DIR}
   ${OGRE_OV_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS}
   src
 )
 
@@ -65,3 +63,13 @@ target_link_libraries(${PROJECT_NAME}
   ${OpenCV_LIBRARIES}
   ${catkin_LIBRARIES}
 )
+
+install(TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+)
+
+install(FILES plugin_description.xml DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+
+
