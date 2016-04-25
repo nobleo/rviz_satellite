@@ -12,6 +12,7 @@
 
 #include <QUrl>
 #include <QNetworkRequest>
+#include <QNetworkProxy>
 #include <QVariant>
 #include <QDir>
 #include <QFile>
@@ -97,6 +98,7 @@ void TileLoader::start() {
   qnam_.reset( new QNetworkAccessManager(this) );
   QObject::connect(qnam_.get(), SIGNAL(finished(QNetworkReply *)), this,
                    SLOT(finishedRequest(QNetworkReply *)));
+  qnam_->proxyFactory()->setUseSystemConfiguration ( true );
 
   //  determine what range of tiles we can load
   const int min_x = std::max(0, center_tile_x_ - blocks_);
