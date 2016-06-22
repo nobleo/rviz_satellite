@@ -10,6 +10,9 @@
 
 #include <QtGlobal>
 #include <QImage>
+#include <QDirIterator>
+#include <QDir>
+
 
 #include <ros/ros.h>
 #include <ros/package.h>
@@ -86,14 +89,15 @@ AerialMapDisplay::AerialMapDisplay()
   }
   update_nh_.param<std::string>("rviz_satellite_cache_path", rviz_satellite_cache_, package_path+"/mapscache");
 
-  if (update_nh_.getParam("rviz_satellite_local_map_names",local_map_names_))
-  {
-  if(local_map_names_.size()>0)
-    {
+  QDir cache_dir(QDir::cleanPath(QString::fromStdString(rviz_satellite_cache_)));
+   cache_dir.setFilter( QDir::Dirs  | QDir::NoDotAndDotDot);
+   foreach(QString map_dir, cache_dir.entryList())
+   {
+     ROS_INFO_STREAM("Local folder map name: "<<map_dir.toStdString());
+     local_map_names_.push_back(map_dir.toStdString());
      have_local_map_names_=true;
-     ROS_INFO_STREAM("rviz_satellite Number local map_names : "<<local_map_names_.size());
-    }
-  }
+   }
+
   ROS_INFO_STREAM("rviz_satellite Cache path : "<<rviz_satellite_cache_);
 
   static unsigned int map_ids = 0;

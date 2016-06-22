@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+
+<launch>
+<!--
+  <rosparam command="load" file="$(find rviz_satellite)/sample_offline_cache/rviz_satellize.yaml" />
+-->
+  <param name="rviz_satellite_cache_path" value="$(find rviz_satellite)/sample_offline_cache" />
+   <!--rviz-->
+   <node pkg="rviz" type="rviz" name="$(anon rviz)" args="-d $(find rviz_satellite)/sample.rviz" output="screen" />
+
+</launch>
