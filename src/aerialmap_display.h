@@ -5,7 +5,7 @@
  *
  *  This file is part of rviz_satellite.
  *
- *	Created on: 07/09/2014
+ *  Created on: 07/09/2014
  */
 
 #ifndef AERIAL_MAP_DISPLAY_H
@@ -68,6 +68,7 @@ protected Q_SLOTS:
   void updateTopic();
   void updateFrame();
   void updateDrawUnder();
+  void updateUseLocalFolder();
   void updateObjectURI();
   void updateZoom();
   void updateBlocks();
@@ -94,7 +95,7 @@ protected:
   void assembleScene();
 
   void clear();
-  
+
   void clearGeometry();
 
   void transformAerialMap();
@@ -111,12 +112,18 @@ protected:
   std::vector<MapObject> objects_;
 
   ros::Subscriber coord_sub_;
+  std::string rviz_satellite_cache_;
+  std::vector<std::string> local_map_names_;
+  bool have_local_map_names_;
+
 
   //  properties
   RosTopicProperty *topic_property_;
   TfFrameProperty *frame_property_;
   Property *dynamic_reload_property_;
+  Property *local_folder_property_;
   StringProperty *object_uri_property_;
+  EnumProperty *object_uri_enum_property_;
   IntProperty *zoom_property_;
   IntProperty *blocks_property_;
   FloatProperty *resolution_property_;
@@ -129,6 +136,8 @@ protected:
   std::string object_uri_;
   int zoom_;
   int blocks_;
+  bool use_local_folder_;
+
 
   //  tile management
   bool dirty_;

@@ -5,13 +5,14 @@
  *
  *  This file is part of rviz_satellite.
  *
- *	Created on: 07/09/2014
+ *  Created on: 07/09/2014
  */
 
 #include <QtGlobal>
 #include <QImage>
 
 #include <ros/ros.h>
+#include <ros/package.h>
 #include <tf/transform_listener.h>
 
 #include <OGRE/OgreManualObject.h>
@@ -42,7 +43,7 @@
 #define FRAME_CONVENTION_XYZ_NWU (2)  //  X -> North, Y -> West
 
 // Max number of adjacent blocks to support.
-static constexpr int kMaxBlocks = 8;
+static constexpr int kMaxBlocks = 16;
 // Max zoom level to support.
 static constexpr int kMaxZoom = 22;
 
@@ -74,8 +75,26 @@ Ogre::TexturePtr textureFromImage(const QImage &image,
 namespace rviz {
 
 AerialMapDisplay::AerialMapDisplay()
-    : Display(), map_id_(0), scene_id_(0), dirty_(false),
-      received_msg_(false) {
+    : Display(), map_id_(0), scene_id_(0),
+    have_local_map_names_(false),use_local_folder_(false),
+    dirty_(false), received_msg_(false) {
+
+
+  const std::string package_path = ros::package::getPath("rviz_satellite");
+  if (package_path.empty()) {
+    throw std::runtime_error("package 'rviz_satellite' not found");
+  }
+  update_nh_.param<std::string>("rviz_satellite_cache_path", rviz_satellite_cache_, package_path+"/mapscache");
+
+  if (update_nh_.getParam("rviz_satellite_local_map_names",local_map_names_))
+  {
+  if(local_map_names_.size()>0)
+    {
+     have_local_map_names_=true;
+     ROS_INFO_STREAM("rviz_satellite Number local map_names : "<<local_map_names_.size());
+    }
+  }
+  ROS_INFO_STREAM("rviz_satellite Cache path : "<<rviz_satellite_cache_);
 
   static unsigned int map_ids = 0;
   map_id_ = map_ids++; //  global counter of map ids
@@ -116,11 +135,43 @@ AerialMapDisplay::AerialMapDisplay()
   resolution_property_->setReadOnly(true);
 
   //  properties for map
+  local_folder_property_ =
+      new Property("Use Lcoal Folder", false,
+                   "Rendering option, controls whether or not the map is always"
+                   " drawn behind everything else.",
+                   this, SLOT(updateUseLocalFolder()));
+  local_folder_property_->setShouldBeSaved(true);
+
+  if(have_local_map_names_)
+  {
+    use_local_folder_ = local_folder_property_->getValue().toBool();
+  }
+  else
+  {
+    local_folder_property_->hide();
+    use_local_folder_=false;
+  }
+
+  std::string default_folder="";
+  if(have_local_map_names_)
+    default_folder=local_map_names_[0];
+  object_uri_enum_property_=  new EnumProperty( "Map Local Path", default_folder.c_str() ,
+                             "Local cache Folder from which to retrieve map tiles.",
+                             this, SLOT( updateObjectURI() ), this);
+  for (size_t index = 0; have_local_map_names_ && index  < local_map_names_.size(); index++)
+  {
+    //ROS_INFO_STREAM("\n name:"<<local_map_names_[index]);
+    object_uri_enum_property_->addOptionStd( local_map_names_[index],  1 );
+  }
+  object_uri_enum_property_->setShouldBeSaved(true);
+  //object_uri_ = object_uri_enum_property_->getStdString();
+
   object_uri_property_ = new StringProperty(
       "Object URI", "http://otile1.mqcdn.com/tiles/1.0.0/sat/{z}/{x}/{y}.jpg",
       "URL from which to retrieve map tiles.", this, SLOT(updateObjectURI()));
   object_uri_property_->setShouldBeSaved(true);
-  object_uri_ = object_uri_property_->getStdString();
+
+  updateUseLocalFolder();
 
   const QString zoom_desc = QString::fromStdString(
       "Zoom level (0 - " + std::to_string(kMaxZoom) + ")");
@@ -217,9 +268,47 @@ void AerialMapDisplay::updateDrawUnder() {
   dirty_ = true; //  force update
   ROS_INFO("Changing draw_under to %s", ((draw_under_) ? "true" : "false"));
 }
+void AerialMapDisplay::updateUseLocalFolder() {
+  /// @todo: figure out why this property only applies to some objects
+  if(have_local_map_names_)
+  {
+    use_local_folder_ = local_folder_property_->getValue().toBool();
+  }
+  else
+  {
+    use_local_folder_=false;
+  }
+
+  ROS_INFO("Changing use_local_folder to %s", ((use_local_folder_) ? "true" : "false"));
+
+   if(use_local_folder_ && have_local_map_names_)
+    {
+      object_uri_enum_property_->show();
+      object_uri_property_->hide();
+      //object_uri_ = object_uri_enum_property_->getStdString();
+    }
+    else
+    {
+      object_uri_property_->show();
+      object_uri_enum_property_->hide();
+      //object_uri_ = object_uri_property_->getStdString();
+    }
+    updateObjectURI();
+}
 
 void AerialMapDisplay::updateObjectURI() {
-  object_uri_ = object_uri_property_->getStdString();
+
+    if(have_local_map_names_ && use_local_folder_)
+    {
+      object_uri_ = object_uri_enum_property_->getStdString();
+    }
+    else
+    {
+       object_uri_ = object_uri_property_->getStdString();
+    }
+  ROS_INFO_STREAM("updateObjectURI to  "<<object_uri_);
+  ROS_INFO_STREAM("have_local_map_names_: "<<have_local_map_names_<<" use_local_folder_: "<<use_local_folder_<<" object_uri_enum_property: " <<object_uri_enum_property_->getStdString()<<"  object_uri_property_: "<< object_uri_property_->getStdString());
+
   loadImagery(); //  reload all imagery
 }
 
@@ -305,7 +394,7 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
 void AerialMapDisplay::loadImagery() {
   //  cancel current imagery, if any
   loader_.reset();
-  
+
   if (!received_msg_) {
     //  no message received from publisher
     return;
@@ -317,7 +406,7 @@ void AerialMapDisplay::loadImagery() {
 
   try {
     loader_.reset(new TileLoader(object_uri_, ref_fix_.latitude,
-                                 ref_fix_.longitude, zoom_, blocks_, this));
+                                 ref_fix_.longitude, zoom_, blocks_, rviz_satellite_cache_, use_local_folder_, this));
   } catch (std::exception &e) {
     setStatus(StatusProperty::Error, "Message", QString(e.what()));
     return;
@@ -340,14 +429,14 @@ void AerialMapDisplay::assembleScene() {
     return; //  nothing to update
   }
   dirty_ = false;
-  
+
   if (!loader_) {
     return; //  no tiles loaded, don't do anything
   }
-  
+
   //  get rid of old geometry, we will re-build this
   clearGeometry();
-  
+
   //  iterate over all tiles and create an object for each of them
   for (const TileLoader::MapTile &tile : loader_->tiles()) {
     // NOTE(gareth): We invert the y-axis so that positive y corresponds
@@ -507,7 +596,7 @@ void AerialMapDisplay::transformAerialMap() {
   pose.position.x = 0;
   pose.position.y = 0;
   pose.position.z = 0;
-  
+
   const std::string frame = frame_property_->getFrameStd();
   Ogre::Vector3 position{0, 0, 0};
   Ogre::Quaternion orientation{1, 0, 0, 0};
@@ -540,7 +629,7 @@ void AerialMapDisplay::transformAerialMap() {
   // force aerial imagery on ground
   position.z = 0;
   scene_node_->setPosition(position);
-  
+
   const int convention = frame_convention_property_->getOptionInt();
   if (convention == FRAME_CONVENTION_XYZ_ENU) {
     // ENU corresponds to our default drawing method

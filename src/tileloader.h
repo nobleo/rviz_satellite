@@ -5,7 +5,7 @@
  *
  *  This file is part of rviz_satellite.
  *
- *	Created on: 07/09/2014
+ *  Created on: 07/09/2014
  */
 
 #ifndef TILELOADER_H
@@ -26,7 +26,7 @@ public:
   public:
     MapTile(int x, int y, int z, QNetworkReply *reply = 0)
         : x_(x), y_(y), z_(z), reply_(reply) {}
-      
+
     MapTile(int x, int y, int z, QImage & image)
       : x_(x), y_(y), z_(z), image_(image) {}
 
@@ -35,7 +35,7 @@ public:
 
     /// Y tile coordinate.
     int y() const { return y_; }
-      
+
     /// Z tile zoom value.
     int z() const { return z_; }
 
@@ -62,6 +62,7 @@ public:
 
   explicit TileLoader(const std::string &service, double latitude,
                       double longitude, unsigned int zoom, unsigned int blocks,
+                      const std::string rviz_satellite_cache, bool use_local_folder,
                       QObject *parent = 0);
 
   /// Start loading tiles asynchronously.

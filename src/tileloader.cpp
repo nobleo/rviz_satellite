@@ -5,7 +5,7 @@
  *
  *  This file is part of rviz_satellite.
  *
- *	Created on: 07/09/2014
+ *  Created on: 07/09/2014
  */
 
 #include "tileloader.h"
@@ -21,7 +21,6 @@
 #include <stdexcept>
 #include <boost/regex.hpp>
 #include <ros/ros.h>
-#include <ros/package.h>
 #include <functional> // for std::hash
 
 static size_t replaceRegex(const boost::regex &ex, std::string &str,
@@ -49,21 +48,25 @@ bool TileLoader::MapTile::hasImage() const { return !image_.isNull(); }
 
 TileLoader::TileLoader(const std::string &service, double latitude,
                        double longitude, unsigned int zoom, unsigned int blocks,
+                       const std::string rviz_satellite_cache, bool use_local_folder,
                        QObject *parent)
     : QObject(parent), latitude_(latitude), longitude_(longitude), zoom_(zoom),
       blocks_(blocks), object_uri_(service) {
   assert(blocks_ >= 0);
 
-  const std::string package_path = ros::package::getPath("rviz_satellite");
-  if (package_path.empty()) {
-    throw std::runtime_error("package 'rviz_satellite' not found");
-  }
-
   std::hash<std::string> hash_fn;
-  cache_path_ =
-      QDir::cleanPath(QString::fromStdString(package_path) + QDir::separator() +
-                      QString("mapscache") + QDir::separator() +
+  if(use_local_folder)
+  {
+     cache_path_ =
+      QDir::cleanPath(QString::fromStdString(rviz_satellite_cache) + QDir::separator() +
+                      QString::fromStdString(object_uri_));
+  }else
+  {
+    cache_path_ =
+      QDir::cleanPath(QString::fromStdString(rviz_satellite_cache) + QDir::separator() +
                       QString::number(hash_fn(object_uri_)));
+  }
+  //ROS_INFO_STREAM("TileLoader: cache_path : "<<cache_path_.toStdString() );
 
   QDir dir(cache_path_);
   if (!dir.exists() && !dir.mkpath(".")) {
@@ -193,7 +196,7 @@ void TileLoader::finishedRequest(QNetworkReply *reply) {
     }
   } else {
     const QString err = "Failed loading " + request.url().toString() +
-                        " with code " + QString::number(reply->error());
+                        " with code " + QString::number(reply->error()) + " Cache path" + cachedPathForTile(tile.x(), tile.y(), tile.z());
     emit errorOcurred(err);
   }
 
