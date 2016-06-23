@@ -108,9 +108,13 @@ AerialMapDisplay::AerialMapDisplay()
                        ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
       "nav_msgs::Odometry topic to subscribe to.", this, SLOT(updateTopic()));
 
-  frame_property_ = new TfFrameProperty("Robot frame", "world",
-                                        "TF frame for the moving robot.", this,
+  position_frame_property_ = new TfFrameProperty("Robot frame", "world",
+                                        "TF frame for the moving robot. This frame is used for position and not orientation", this,
                                         0, false, SLOT(updateFrame()), this);
+  orientation_frame_property_ = new TfFrameProperty("Reference frame", TfFrameProperty::FIXED_FRAME_STRING,
+                                        "TF frame for Map orientation.  This frame is used for orientation so that you can use "
+                                        "any frame in fixed frame which is not of the same orientation of satellite view", this,
+                                        0, true, SLOT(updateFrame()), this);
 
   dynamic_reload_property_ =
       new Property("Dynamically reload", true,
@@ -215,7 +219,8 @@ AerialMapDisplay::~AerialMapDisplay() {
 }
 
 void AerialMapDisplay::onInitialize() {
-  frame_property_->setFrameManager(context_->getFrameManager());
+  position_frame_property_->setFrameManager(context_->getFrameManager());
+  orientation_frame_property_->setFrameManager(context_->getFrameManager());
 }
 
 void AerialMapDisplay::onEnable() { subscribe(); }
@@ -261,8 +266,13 @@ void AerialMapDisplay::updateAlpha() {
   ROS_INFO("Changing alpha to %f", alpha_);
 }
 
-void AerialMapDisplay::updateFrame() {
-  ROS_INFO_STREAM("Changing robot frame to " << frame_property_->getFrameStd());
+void AerialMapDisplay::updatePositionFrame() {
+  ROS_INFO_STREAM("Changing Robot frame to " << position_frame_property_->getFrameStd());
+  transformAerialMap();
+}
+
+void AerialMapDisplay::updateOrientationFrame() {
+  ROS_INFO_STREAM("Changing Reference frame to " << orientation_frame_property_->getFrameStd());
   transformAerialMap();
 }
 
@@ -308,11 +318,10 @@ void AerialMapDisplay::updateObjectURI() {
     }
     else
     {
-       object_uri_ = object_uri_property_->getStdString();
+      object_uri_ = object_uri_property_->getStdString();
     }
   ROS_INFO_STREAM("updateObjectURI to  "<<object_uri_);
   ROS_INFO_STREAM("have_local_map_names_: "<<have_local_map_names_<<" use_local_folder_: "<<use_local_folder_<<" object_uri_enum_property: " <<object_uri_enum_property_->getStdString()<<"  object_uri_property_: "<< object_uri_property_->getStdString());
-
   loadImagery(); //  reload all imagery
 }
 
@@ -587,57 +596,76 @@ void AerialMapDisplay::errorOcurred(QString description) {
   setStatus(StatusProperty::Error, "Message", description);
 }
 
-// TODO(gareth): We are technically ignoring the orientation from the
-// frame manager here - does this make sense?
 void AerialMapDisplay::transformAerialMap() {
-  // pass in identity to get pose of robot wrt to the fixed frame
-  // the map will be shifted so as to compensate for the center tile shifting
-  geometry_msgs::Pose pose;
-  pose.orientation.w = 1;
-  pose.orientation.x = 0;
-  pose.orientation.y = 0;
-  pose.orientation.z = 0;
-  pose.position.x = 0;
-  pose.position.y = 0;
-  pose.position.z = 0;
 
-  const std::string frame = frame_property_->getFrameStd();
-  Ogre::Vector3 position{0, 0, 0};
-  Ogre::Quaternion orientation{1, 0, 0, 0};
+  const std::string position_frame = position_frame_property_->getFrameStd();
+  const std::string orientation_frame = orientation_frame_property_->getFrameStd();
+  Ogre::Vector3 position{0, 0, 0}, temp_position{0, 0, 0};
+  Ogre::Quaternion orientation{1, 0, 0, 0},temp_orientation{1, 0, 0, 0};
 
   // get the transform at the time we received the reference lat and lon
-  if (!context_->getFrameManager()->transform(frame, ref_fix_.header.stamp, pose,
+  if (!context_->getFrameManager()->getTransform(position_frame, ref_fix_.header.stamp,
                                               position, orientation)) {
     ROS_DEBUG("Error transforming map '%s' from frame '%s' to frame '%s'",
-              qPrintable(getName()), frame.c_str(), qPrintable(fixed_frame_));
+              qPrintable(getName()), position_frame.c_str(), qPrintable(fixed_frame_));
 
     setStatus(StatusProperty::Error, "Transform",
-              "No transform from [" + QString::fromStdString(frame) + "] to [" +
+              "No transform from [" + QString::fromStdString(position_frame) + "] to [" +
                   fixed_frame_ + "]");
 
     // set the transform to identity on failure
     position = Ogre::Vector3::ZERO;
     orientation = Ogre::Quaternion::IDENTITY;
   } else {
-    setStatus(StatusProperty::Ok, "Transform", "Transform OK");
+    setStatus(StatusProperty::Ok, "Transform", "Transform Robot OK");
   }
   if (position.isNaN() || orientation.isNaN()) {
-    // this can occur if an invalid TF is published. Set to identiy so OGRE does
+    // this can occur if an invalid TF is published. Set to identity so OGRE does
     // not throw an assertion
     position = Ogre::Vector3::ZERO;
     orientation = Ogre::Quaternion::IDENTITY;
-    ROS_ERROR("rviz_satellite received invalid transform, setting to identity");
+    ROS_ERROR("rviz_satellite received invalid transform for robot position, setting to identity");
   }
 
   // Here we assume that the fixed/world frame is at altitude=0
   // force aerial imagery on ground
   position.z = 0;
   scene_node_->setPosition(position);
+  //Not using orientation information from robot frame and GPS does not contain orientation of robot
+  orientation = Ogre::Quaternion::IDENTITY;
+
+  //getting orientation from Reference frame if it is set
+  if(!orientation_frame.empty())
+  {
+    if (!context_->getFrameManager()->getTransform(orientation_frame, ref_fix_.header.stamp,
+                                                   temp_position, temp_orientation)) {
+        ROS_DEBUG("Error transforming map '%s' from frame '%s' to frame '%s'",
+                  qPrintable(getName()), orientation_frame.c_str(), qPrintable(fixed_frame_));
+
+        setStatus(StatusProperty::Error, "Transform",
+                  "No transform from [" + QString::fromStdString(orientation_frame) + "] to [" +
+                      fixed_frame_ + "]");
+
+        // set the transform to identity on failure
+        temp_position = Ogre::Vector3::ZERO;
+        temp_orientation = Ogre::Quaternion::IDENTITY;
+      } else {
+        setStatus(StatusProperty::Ok, "Transform", "Transform Reference OK");
+      }
+      if (temp_position.isNaN() || temp_orientation.isNaN()) {
+        // this can occur if an invalid TF is published. Set to identity so OGRE does
+        // not throw an assertion
+        temp_position = Ogre::Vector3::ZERO;
+        temp_orientation = Ogre::Quaternion::IDENTITY;
+        ROS_ERROR("rviz_satellite received invalid transform for Reference orientation, setting to identity");
+      }
+      orientation=temp_orientation;
+  }
 
   const int convention = frame_convention_property_->getOptionInt();
   if (convention == FRAME_CONVENTION_XYZ_ENU) {
     // ENU corresponds to our default drawing method
-    scene_node_->setOrientation(Ogre::Quaternion::IDENTITY);
+    scene_node_->setOrientation(orientation);
   } else if (convention == FRAME_CONVENTION_XYZ_NED) {
     // NOTE(gareth): XYZ->NED will cause the map to appear reversed when viewed
     // from above (from +z).
@@ -645,15 +673,16 @@ void AerialMapDisplay::transformAerialMap() {
     const Ogre::Matrix3 xyz_R_ned(0, 1, 0,
                                   1, 0, 0,
                                   0, 0,-1);
+                         
     // clang-format on
-    scene_node_->setOrientation(xyz_R_ned.Transpose());
+    scene_node_->setOrientation(orientation* xyz_R_ned.Transpose());
   } else if (convention == FRAME_CONVENTION_XYZ_NWU) {
     // clang-format off
     const Ogre::Matrix3 xyz_R_nwu(0,-1, 0,
                                   1, 0, 0,
                                   0, 0, 1);
     // clang-format on
-    scene_node_->setOrientation(xyz_R_nwu.Transpose());
+    scene_node_->setOrientation(orientation* xyz_R_nwu.Transpose());
   } else {
     ROS_ERROR_STREAM("Invalid convention code: " << convention);
   }

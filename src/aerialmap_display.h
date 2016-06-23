@@ -66,7 +66,8 @@ protected Q_SLOTS:
   void updateDynamicReload();
   void updateAlpha();
   void updateTopic();
-  void updateFrame();
+  void updatePositionFrame();
+  void updateOrientationFrame();
   void updateDrawUnder();
   void updateUseLocalFolder();
   void updateObjectURI();
@@ -119,7 +120,8 @@ protected:
 
   //  properties
   RosTopicProperty *topic_property_;
-  TfFrameProperty *frame_property_;
+  TfFrameProperty *position_frame_property_;
+  TfFrameProperty *orientation_frame_property_;
   Property *dynamic_reload_property_;
   Property *local_folder_property_;
   StringProperty *object_uri_property_;
