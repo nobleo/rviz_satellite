@@ -380,7 +380,10 @@ void AerialMapDisplay::clearGeometry() {
 
 void AerialMapDisplay::update(float, float) {
   //  creates all geometry, if necessary
+
+  //loadImagery();
   assembleScene();
+  transformAerialMap();
   //  draw
   context_->queueRender();
 }
@@ -389,10 +392,11 @@ void
 AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
   // If the new (lat,lon) falls into a different tile then we have some
   // reloading to do.
+  ref_fix_ = *msg;
   if (!received_msg_ ||
       (loader_ && !loader_->insideCentreTile(msg->latitude, msg->longitude) &&
        dynamic_reload_property_->getValue().toBool())) {
-    ref_fix_ = *msg;
+
     ROS_INFO("Reference point set to: %.12f, %.12f", ref_fix_.latitude,
              ref_fix_.longitude);
     setStatus(StatusProperty::Warn, "Message", "Loading map tiles.");
@@ -661,6 +665,9 @@ void AerialMapDisplay::transformAerialMap() {
       }
       orientation=temp_orientation;
   }
+  ROS_DEBUG_STREAM("rviz_satellite position: "<<position<<" orientation: "<<orientation
+                  <<" fixed Frame "<<qPrintable(fixed_frame_)<<" position_frame "
+                  << position_frame <<" orientation_frame "<<orientation_frame <<" stamp "<<ref_fix_.header.stamp );
 
   const int convention = frame_convention_property_->getOptionInt();
   if (convention == FRAME_CONVENTION_XYZ_ENU) {
