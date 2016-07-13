@@ -1,8 +1,15 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(rviz_satellite)
 
-find_package(Qt4 COMPONENTS QtCore QtGui QtNetwork REQUIRED)
-include(${QT_USE_FILE})
+option(UseQt5 "UseQt5" ON)
+
+if (UseQt5)
+	find_package(Qt5 COMPONENTS Core Gui Network Concurrent REQUIRED)
+else()
+	find_package(Qt4 COMPONENTS QtCore QtGui QtNetwork REQUIRED)
+	include(${QT_USE_FILE})
+endif()
+
 find_package(OpenCV REQUIRED)
 find_package(PkgConfig REQUIRED)
 
@@ -34,17 +41,43 @@ set(${PROJECT_NAME}_HEADERS
   src/tileloader.h
 )
 
-# invoke MOC and UI
-qt4_wrap_cpp(${PROJECT_NAME}_MOCSrcs ${${PROJECT_NAME}_HEADERS})
+# invoke MOC and UI/ include Qt headers/ link Qt libraries
+if (UseQt5)
+	qt5_wrap_cpp(${PROJECT_NAME}_MOCSrcs ${${PROJECT_NAME}_HEADERS})
+	include_directories(
+		${Qt5Core_INCLUDE_DIRS}
+		${Qt5Gui_INCLUDE_DIRS}
+		${Qt5Network_INCLUDE_DIRS}
+		${Qt5Concurrent_INCLUDE_DIRS}
+		)
+	link_libraries(
+		${Qt5Core_LIBRARIES}
+		${Qt5Gui_LIBRARIES}
+		${Qt5Network_LIBRARIES}
+		${Qt5Concurrent_LIBRARIES}
+		)
+else()
+	qt4_wrap_cpp(${PROJECT_NAME}_MOCSrcs ${${PROJECT_NAME}_HEADERS})
+	include_directories(${Qt4_INCLUDE_DIR})
+	link_libraries(
+  		${QT_LIBRARIES}
+		)
+endif()
 
-# QT Declarations
+# Other includes
 include_directories(
   ${CMAKE_CURRENT_BINARY_DIR}
   ${OpenCV_INCLUDE_DIR}
-  ${Qt4_INCLUDE_DIR}
   ${OGRE_OV_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
   src
+)
+
+# Other libraries
+link_libraries(
+  ${QT_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${catkin_LIBRARIES}
 )
 
 add_definitions("-Wall -Wunused -std=c++11")
@@ -56,12 +89,6 @@ set(PROJECT_SOURCE_FILES
 
 add_library(${PROJECT_NAME}
   ${PROJECT_SOURCE_FILES}
-)
-
-target_link_libraries(${PROJECT_NAME}
-  ${QT_LIBRARIES}
-  ${OpenCV_LIBRARIES}
-  ${catkin_LIBRARIES}
 )
 
 install(TARGETS ${PROJECT_NAME}
