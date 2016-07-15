@@ -14,9 +14,15 @@ You must provide an `Object URI` (or URL) from which the satellite images are lo
 
 The URI should have the form:
 
-``http://otile1.mqcdn.com/tiles/1.0.0/sat/{z}/{x}/{y}.jpg``
+``http://server.tld/{z}/{x}/{y}.jpg``
 
-This is the default URI, which will load data from MapQuest. The tiles are free, and go up to zoom level 18. For higher zoom levels, consider using [MapBox](https://www.mapbox.com).
+Where the tokens `{z}`, `{x}`, `{y}` represent the zoom level, x coordinate, and y coordinate respectively. These will automatically be substituted by rviz_satellite when making HTTP requests.
+
+__Update (July 12, 2016):__ MapQuest has discontinued their free distribution of map tiles. You can, however, continue to get tiles from [MapBox](https://www.mapbox.com). The URI for satellite imagery is:
+
+``http://a.tiles.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}.jpg?access_token=<TOKEN>``
+
+Where `<TOKEN>` is your public access token, accessible from the API Access Tokens section of the MapBox account page. The unpaid 'starter plan' can access up to level 18.
 
 Map tiles will be cached to the `mapscache` directory in the `rviz_satellite` package directory. At present the cache does not expire automatically - you should delete the files in the folder if you want the images to be reloaded.
 
