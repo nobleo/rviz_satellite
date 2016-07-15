@@ -1,7 +1,15 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(rviz_satellite)
 
-option(UseQt5 "UseQt5" ON)
+set(DISTRO $ENV{ROS_DISTRO})
+message(STATUS "Distribution: " ${DISTRO})
+
+set(DEFAULT_BUILD_QT5 OFF)
+if(${DISTRO} STREQUAL "kinetic")
+    set(DEFAULT_BUILD_QT5 ON)
+endif()
+
+option(UseQt5 "Build w/ QT version 5" ${DEFAULT_BUILD_QT5})
 
 if (UseQt5)
 	find_package(Qt5 COMPONENTS Core Gui Network Concurrent REQUIRED)
