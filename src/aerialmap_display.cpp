@@ -413,7 +413,7 @@ void AerialMapDisplay::assembleScene() {
       }
 
       if (draw_under_) {
-        obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_4);
+        obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_3);
       } else {
         obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_MAIN);
       }
@@ -458,7 +458,7 @@ void AerialMapDisplay::assembleScene() {
 
       if (draw_under_property_->getValue().toBool()) {
         //  render under everything else
-        obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_4);
+        obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_3);
       }
 
       MapObject object;
