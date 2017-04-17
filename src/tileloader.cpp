@@ -144,7 +144,7 @@ void TileLoader::latLonToTileCoords(double lat, double lon, unsigned int zoom,
                                 " too high");
   } else if (lat < -85.0511 || lat > 85.0511) {
     throw std::invalid_argument("Latitude " + std::to_string(lat) + " invalid");
-  } else if (lon < -180 && lon > 180) {
+  } else if (lon < -180 || lon > 180) {
     throw std::invalid_argument("Longitude " + std::to_string(lon) +
                                 " invalid");
   }
