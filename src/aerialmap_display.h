@@ -54,13 +54,13 @@ class AerialMapDisplay : public Display {
   Q_OBJECT
 public:
   AerialMapDisplay();
-  virtual ~AerialMapDisplay();
+  ~AerialMapDisplay() override;
 
   // Overrides from Display
-  virtual void onInitialize();
-  virtual void fixedFrameChanged();
-  virtual void reset();
-  virtual void update(float, float);
+  void onInitialize() override;
+  void fixedFrameChanged() override;
+  void reset() override;
+  void update(float, float) override;
 
 protected Q_SLOTS:
   void updateDynamicReload();
@@ -81,8 +81,8 @@ protected Q_SLOTS:
 
 protected:
   // overrides from Display
-  virtual void onEnable();
-  virtual void onDisable();
+  void onEnable() override;
+  void onDisable() override;
 
   virtual void subscribe();
   virtual void unsubscribe();
