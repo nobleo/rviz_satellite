@@ -28,7 +28,7 @@ public:
         : x_(x), y_(y), z_(z), reply_(reply) {}
       
     MapTile(int x, int y, int z, QImage & image)
-      : x_(x), y_(y), z_(z), image_(image) {}
+      : x_(x), y_(y), z_(z), reply_(nullptr), image_(image) {}
 
     /// X tile coordinate.
     int x() const { return x_; }
