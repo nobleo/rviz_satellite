@@ -20,7 +20,7 @@ Where the tokens `{z}`, `{x}`, `{y}` represent the zoom level, x coordinate, and
 
 __Update (July 12, 2016):__ MapQuest has discontinued their free distribution of map tiles. You can, however, continue to get tiles from [MapBox](https://www.mapbox.com). The URI for satellite imagery is:
 
-``http://a.tiles.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}.jpg?access_token=<TOKEN>``
+``https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}?access_token=<TOKEN>``
 
 Where `<TOKEN>` is your public access token, accessible from the API Access Tokens section of the MapBox account page. The unpaid 'starter plan' can access up to level 18.
 
