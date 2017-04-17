@@ -87,7 +87,7 @@ AerialMapDisplay::AerialMapDisplay()
 
   frame_property_ = new TfFrameProperty("Robot frame", "world",
                                         "TF frame for the moving robot.", this,
-                                        0, false, SLOT(updateFrame()), this);
+                                        nullptr, false, SLOT(updateFrame()), this);
 
   dynamic_reload_property_ =
       new Property("Dynamically reload", true,
@@ -384,7 +384,7 @@ void AerialMapDisplay::assembleScene() {
 
       //  create textureing unit
       Ogre::Pass *pass = material->getTechnique(0)->getPass(0);
-      Ogre::TextureUnitState *tex_unit = NULL;
+      Ogre::TextureUnitState *tex_unit = nullptr;
       if (pass->getNumTextureUnitStates() > 0) {
         tex_unit = pass->getTextureUnitState(0);
       } else {

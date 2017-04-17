@@ -41,7 +41,7 @@ static size_t replaceRegex(const boost::regex &ex, std::string &str,
 void TileLoader::MapTile::abortLoading() {
   if (reply_) {
     reply_->abort();
-    reply_ = 0;
+    reply_ = nullptr;
   }
 }
 

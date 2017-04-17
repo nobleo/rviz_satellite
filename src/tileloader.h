@@ -24,7 +24,7 @@ class TileLoader : public QObject {
 public:
   class MapTile {
   public:
-    MapTile(int x, int y, int z, QNetworkReply *reply = 0)
+    MapTile(int x, int y, int z, QNetworkReply *reply = nullptr)
         : x_(x), y_(y), z_(z), reply_(reply) {}
       
     MapTile(int x, int y, int z, QImage & image)
@@ -62,7 +62,7 @@ public:
 
   explicit TileLoader(const std::string &service, double latitude,
                       double longitude, unsigned int zoom, unsigned int blocks,
-                      QObject *parent = 0);
+                      QObject *parent = nullptr);
 
   /// Start loading tiles asynchronously.
   void start();
