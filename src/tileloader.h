@@ -21,21 +21,21 @@
 
 class TileLoader : public QObject {
   Q_OBJECT
-public:
+ public:
   class MapTile {
-  public:
+   public:
     MapTile(int x, int y, int z, QNetworkReply *reply = nullptr)
         : x_(x), y_(y), z_(z), reply_(reply) {}
-      
-    MapTile(int x, int y, int z, QImage & image)
-      : x_(x), y_(y), z_(z), reply_(nullptr), image_(image) {}
+
+    MapTile(int x, int y, int z, QImage &image)
+        : x_(x), y_(y), z_(z), reply_(nullptr), image_(image) {}
 
     /// X tile coordinate.
     int x() const { return x_; }
 
     /// Y tile coordinate.
     int y() const { return y_; }
-      
+
     /// Z tile zoom value.
     int z() const { return z_; }
 
@@ -52,7 +52,7 @@ public:
     const QImage &image() const { return image_; }
     void setImage(const QImage &image) { image_ = image; }
 
-  private:
+   private:
     int x_;
     int y_;
     int z_;
@@ -101,7 +101,7 @@ public:
   /// Cancel all current requests.
   void abort();
 
-signals:
+ signals:
 
   void initiatedRequest(QNetworkRequest request);
 
@@ -111,14 +111,13 @@ signals:
 
   void errorOcurred(QString description);
 
-public slots:
+ public slots:
 
-private slots:
+ private slots:
 
   void finishedRequest(QNetworkReply *reply);
 
-private:
-
+ private:
   /// Check if loading is complete. Emit signal if appropriate.
   bool checkIfLoadingComplete();
 
@@ -151,4 +150,4 @@ private:
   std::vector<MapTile> tiles_;
 };
 
-#endif // TILELOADER_H
+#endif  // TILELOADER_H

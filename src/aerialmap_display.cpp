@@ -74,25 +74,23 @@ Ogre::TexturePtr textureFromImage(const QImage &image,
 namespace rviz {
 
 AerialMapDisplay::AerialMapDisplay()
-    : Display(), map_id_(0), scene_id_(0), dirty_(false),
-      received_msg_(false) {
-
+    : Display(), map_id_(0), scene_id_(0), dirty_(false), received_msg_(false) {
   static unsigned int map_ids = 0;
-  map_id_ = map_ids++; //  global counter of map ids
+  map_id_ = map_ids++;  //  global counter of map ids
 
   topic_property_ = new RosTopicProperty(
       "Topic", "", QString::fromStdString(
                        ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
       "nav_msgs::Odometry topic to subscribe to.", this, SLOT(updateTopic()));
 
-  frame_property_ = new TfFrameProperty("Robot frame", "world",
-                                        "TF frame for the moving robot.", this,
-                                        nullptr, false, SLOT(updateFrame()), this);
+  frame_property_ = new TfFrameProperty(
+      "Robot frame", "world", "TF frame for the moving robot.", this, nullptr,
+      false, SLOT(updateFrame()), this);
 
   dynamic_reload_property_ =
       new Property("Dynamically reload", true,
-                   "Reload as robot moves. Frame option must be set.",
-                   this, SLOT(updateDynamicReload()));
+                   "Reload as robot moves. Frame option must be set.", this,
+                   SLOT(updateDynamicReload()));
 
   alpha_property_ = new FloatProperty(
       "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
@@ -183,8 +181,7 @@ void AerialMapDisplay::subscribe() {
                                &AerialMapDisplay::navFixCallback, this);
 
       setStatus(StatusProperty::Ok, "Topic", "OK");
-    }
-    catch (ros::Exception &e) {
+    } catch (ros::Exception &e) {
       setStatus(StatusProperty::Error, "Topic",
                 QString("Error subscribing: ") + e.what());
     }
@@ -214,13 +211,13 @@ void AerialMapDisplay::updateFrame() {
 void AerialMapDisplay::updateDrawUnder() {
   /// @todo: figure out why this property only applies to some objects
   draw_under_ = draw_under_property_->getValue().toBool();
-  dirty_ = true; //  force update
+  dirty_ = true;  //  force update
   ROS_INFO("Changing draw_under to %s", ((draw_under_) ? "true" : "false"));
 }
 
 void AerialMapDisplay::updateObjectURI() {
   object_uri_ = object_uri_property_->getStdString();
-  loadImagery(); //  reload all imagery
+  loadImagery();  //  reload all imagery
 }
 
 void AerialMapDisplay::updateZoom() {
@@ -240,9 +237,7 @@ void AerialMapDisplay::updateBlocks() {
   }
 }
 
-void AerialMapDisplay::updateFrameConvention() {
-  transformAerialMap();
-}
+void AerialMapDisplay::updateFrameConvention() { transformAerialMap(); }
 
 void AerialMapDisplay::updateTopic() {
   unsubscribe();
@@ -283,8 +278,8 @@ void AerialMapDisplay::update(float, float) {
   context_->queueRender();
 }
 
-void
-AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
+void AerialMapDisplay::navFixCallback(
+    const sensor_msgs::NavSatFixConstPtr &msg) {
   // If the new (lat,lon) falls into a different tile then we have some
   // reloading to do.
   if (!received_msg_ ||
@@ -305,7 +300,7 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
 void AerialMapDisplay::loadImagery() {
   //  cancel current imagery, if any
   loader_.reset();
-  
+
   if (!received_msg_) {
     //  no message received from publisher
     return;
@@ -327,8 +322,8 @@ void AerialMapDisplay::loadImagery() {
                    SLOT(errorOcurred(QString)));
   QObject::connect(loader_.get(), SIGNAL(finishedLoading()), this,
                    SLOT(finishedLoading()));
-  QObject::connect(loader_.get(), SIGNAL(initiatedRequest(QNetworkRequest)), this,
-                   SLOT(initiatedRequest(QNetworkRequest)));
+  QObject::connect(loader_.get(), SIGNAL(initiatedRequest(QNetworkRequest)),
+                   this, SLOT(initiatedRequest(QNetworkRequest)));
   QObject::connect(loader_.get(), SIGNAL(receivedImage(QNetworkRequest)), this,
                    SLOT(receivedImage(QNetworkRequest)));
   //  start loading images
@@ -337,17 +332,17 @@ void AerialMapDisplay::loadImagery() {
 
 void AerialMapDisplay::assembleScene() {
   if (!dirty_) {
-    return; //  nothing to update
+    return;  //  nothing to update
   }
   dirty_ = false;
-  
+
   if (!loader_) {
-    return; //  no tiles loaded, don't do anything
+    return;  //  no tiles loaded, don't do anything
   }
-  
+
   //  get rid of old geometry, we will re-build this
   clearGeometry();
-  
+
   //  iterate over all tiles and create an object for each of them
   for (const TileLoader::MapTile &tile : loader_->tiles()) {
     // NOTE(gareth): We invert the y-axis so that positive y corresponds
@@ -507,14 +502,14 @@ void AerialMapDisplay::transformAerialMap() {
   pose.position.x = 0;
   pose.position.y = 0;
   pose.position.z = 0;
-  
+
   const std::string frame = frame_property_->getFrameStd();
   Ogre::Vector3 position{0, 0, 0};
   Ogre::Quaternion orientation{1, 0, 0, 0};
 
   // get the transform at the time we received the reference lat and lon
-  if (!context_->getFrameManager()->transform(frame, ref_fix_.header.stamp, pose,
-                                              position, orientation)) {
+  if (!context_->getFrameManager()->transform(frame, ref_fix_.header.stamp,
+                                              pose, position, orientation)) {
     ROS_DEBUG("Error transforming map '%s' from frame '%s' to frame '%s'",
               qPrintable(getName()), frame.c_str(), qPrintable(fixed_frame_));
 
@@ -540,7 +535,7 @@ void AerialMapDisplay::transformAerialMap() {
   // force aerial imagery on ground
   position.z = 0;
   scene_node_->setPosition(position);
-  
+
   const int convention = frame_convention_property_->getOptionInt();
   if (convention == FRAME_CONVENTION_XYZ_ENU) {
     // ENU corresponds to our default drawing method
@@ -574,7 +569,7 @@ void AerialMapDisplay::reset() {
   updateTopic();
 }
 
-} // namespace rviz
+}  // namespace rviz
 
 #include <pluginlib/class_list_macros.h>
 PLUGINLIB_EXPORT_CLASS(rviz::AerialMapDisplay, rviz::Display)

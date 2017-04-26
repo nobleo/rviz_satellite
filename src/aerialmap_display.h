@@ -52,7 +52,7 @@ class EnumProperty;
  */
 class AerialMapDisplay : public Display {
   Q_OBJECT
-public:
+ public:
   AerialMapDisplay();
   ~AerialMapDisplay() override;
 
@@ -62,7 +62,7 @@ public:
   void reset() override;
   void update(float, float) override;
 
-protected Q_SLOTS:
+ protected Q_SLOTS:
   void updateDynamicReload();
   void updateAlpha();
   void updateTopic();
@@ -79,7 +79,7 @@ protected Q_SLOTS:
   void finishedLoading();
   void errorOcurred(QString description);
 
-protected:
+ protected:
   // overrides from Display
   void onEnable() override;
   void onDisable() override;
@@ -94,7 +94,7 @@ protected:
   void assembleScene();
 
   void clear();
-  
+
   void clearGeometry();
 
   void transformAerialMap();
@@ -122,7 +122,7 @@ protected:
   FloatProperty *resolution_property_;
   FloatProperty *alpha_property_;
   Property *draw_under_property_;
-  EnumProperty * frame_convention_property_;
+  EnumProperty *frame_convention_property_;
 
   float alpha_;
   bool draw_under_;
@@ -137,6 +137,6 @@ protected:
   std::shared_ptr<TileLoader> loader_;
 };
 
-} // namespace rviz
+}  // namespace rviz
 
 #endif

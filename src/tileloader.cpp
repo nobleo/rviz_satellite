@@ -22,7 +22,7 @@
 #include <boost/regex.hpp>
 #include <ros/ros.h>
 #include <ros/package.h>
-#include <functional> // for std::hash
+#include <functional>  // for std::hash
 
 static size_t replaceRegex(const boost::regex &ex, std::string &str,
                            const std::string &replace) {
@@ -50,8 +50,12 @@ bool TileLoader::MapTile::hasImage() const { return !image_.isNull(); }
 TileLoader::TileLoader(const std::string &service, double latitude,
                        double longitude, unsigned int zoom, unsigned int blocks,
                        QObject *parent)
-    : QObject(parent), latitude_(latitude), longitude_(longitude), zoom_(zoom),
-      blocks_(blocks), object_uri_(service) {
+    : QObject(parent),
+      latitude_(latitude),
+      longitude_(longitude),
+      zoom_(zoom),
+      blocks_(blocks),
+      object_uri_(service) {
   assert(blocks_ >= 0);
 
   const std::string package_path = ros::package::getPath("rviz_satellite");
@@ -93,12 +97,13 @@ void TileLoader::start() {
   //  discard previous set of tiles and all pending requests
   abort();
 
-  ROS_INFO("loading %d blocks around tile=(%d,%d)", blocks_, center_tile_x_, center_tile_y_ );
+  ROS_INFO("loading %d blocks around tile=(%d,%d)", blocks_, center_tile_x_,
+           center_tile_y_);
 
-  qnam_.reset( new QNetworkAccessManager(this) );
+  qnam_.reset(new QNetworkAccessManager(this));
   QObject::connect(qnam_.get(), SIGNAL(finished(QNetworkReply *)), this,
                    SLOT(finishedRequest(QNetworkReply *)));
-  qnam_->proxyFactory()->setUseSystemConfiguration ( true );
+  qnam_->proxyFactory()->setUseSystemConfiguration(true);
 
   //  determine what range of tiles we can load
   const int min_x = std::max(0, center_tile_x_ - blocks_);
@@ -121,7 +126,9 @@ void TileLoader::start() {
         const QUrl uri = uriForTile(x, y);
         //  send request
         QNetworkRequest request = QNetworkRequest(uri);
-        auto const userAgent = QByteArray("rviz_satellite/0.0.2 (+https://github.com/gareth-cross/rviz_satellite)");
+        auto const userAgent = QByteArray(
+            "rviz_satellite/0.0.2 "
+            "(+https://github.com/gareth-cross/rviz_satellite)");
         request.setRawHeader(QByteArray("User-Agent"), userAgent);
         QNetworkReply *rep = qnam_->get(request);
         emit initiatedRequest(request);
@@ -158,7 +165,7 @@ void TileLoader::latLonToTileCoords(double lat, double lon, unsigned int zoom,
   x = n * ((lon + 180) / 360.0);
   y = n * (1 - (std::log(std::tan(lat_rad) + 1 / std::cos(lat_rad)) / M_PI)) /
       2;
-  ROS_DEBUG_STREAM( "Center tile coords: " << x << ", " << y );
+  ROS_DEBUG_STREAM("Center tile coords: " << x << ", " << y);
 }
 
 double TileLoader::zoomToResolution(double lat, unsigned int zoom) {
