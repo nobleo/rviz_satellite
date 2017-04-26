@@ -1,0 +1,107 @@
+Panels:
+  - Class: rviz/Displays
+    Help Height: 78
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Status1
+        - /AerialMapDisplay1
+      Splitter Ratio: 0.5
+    Tree Height: 796
+  - Class: rviz/Selection
+    Name: Selection
+  - Class: rviz/Tool Properties
+    Expanded:
+      - /2D Pose Estimate1
+      - /2D Nav Goal1
+      - /Publish Point1
+    Name: Tool Properties
+    Splitter Ratio: 0.588679016
+  - Class: rviz/Views
+    Expanded:
+      - /Current View1
+    Name: Views
+    Splitter Ratio: 0.5
+  - Class: rviz/Time
+    Experimental: false
+    Name: Time
+    SyncMode: 0
+    SyncSource: ""
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.699999988
+      Blocks: 3
+      Class: rviz_plugins/AerialMapDisplay
+      Draw Behind: false
+      Dynamically reload: true
+      Enabled: true
+      Frame Convention: XYZ -> ENU
+      Name: AerialMapDisplay
+      Object URI: https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png
+      Robot frame: map
+      Topic: /gps/fix
+      Value: true
+      Zoom: 18
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: map
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz/Interact
+      Hide Inactive Objects: true
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+    - Class: rviz/FocusCamera
+    - Class: rviz/Measure
+    - Class: rviz/SetInitialPose
+      Topic: /initialpose
+    - Class: rviz/SetGoal
+      Topic: /move_base_simple/goal
+    - Class: rviz/PublishPoint
+      Single click: true
+      Topic: /clicked_point
+  Value: true
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 831.019775
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.0599999987
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: 24.3793087
+        Y: 47.1424103
+        Z: 18.1101055
+      Focal Shape Fixed Size: false
+      Focal Shape Size: 0.0500000007
+      Name: Current View
+      Near Clip Distance: 0.00999999978
+      Pitch: 0.995398164
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz)
+      Yaw: 5.15857887
+    Saved: ~
+Window Geometry:
+  "&Displays":
+    collapsed: false
+  "&Time":
+    collapsed: false
+  "&Views":
+    collapsed: false
+  Height: 1135
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd000000040000000000000191000003b7fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006c01000003fb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000044000003b7000000e301000003fb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c000002610000000100000110000003b7fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730100000044000003b7000000c601000003fb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000004cfc0100000002fb0000000800540069006d00650100000000000007800000025e01000003fb0000000800540069006d00650100000000000004500000000000000000000004dd000003b700000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Selection:
+    collapsed: false
+  Tool Properties:
+    collapsed: false
+  Width: 1920
+  X: 0
+  Y: 36
