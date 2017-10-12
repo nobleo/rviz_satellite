@@ -75,7 +75,7 @@ namespace rviz {
 
 AerialMapDisplay::AerialMapDisplay()
     : Display(), map_id_(0), scene_id_(0), dirty_(false),
-      received_msg_(false) {
+      received_msg_(false), loading_(false) {
 
   static unsigned int map_ids = 0;
   map_id_ = map_ids++; //  global counter of map ids
@@ -288,8 +288,10 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
   // If the new (lat,lon) falls into a different tile then we have some
   // reloading to do.
   if (!received_msg_ ||
-      (loader_ && !loader_->insideCentreTile(msg->latitude, msg->longitude) &&
-       dynamic_reload_property_->getValue().toBool())) {
+      (dynamic_reload_property_->getValue().toBool() &&
+      loader_ &&
+      !loading_ &&
+      !loader_->insideCentreTile(msg->latitude, msg->longitude))) {
     ref_fix_ = *msg;
     ROS_INFO("Reference point set to: %.12f, %.12f", ref_fix_.latitude,
              ref_fix_.longitude);
@@ -298,7 +300,6 @@ AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg) {
     //  re-load imagery
     received_msg_ = true;
     loadImagery();
-    transformAerialMap();
   }
 }
 
@@ -313,6 +314,7 @@ void AerialMapDisplay::loadImagery() {
   if (object_uri_.empty()) {
     setStatus(StatusProperty::Error, "Message",
               "Received message but object URI is not set");
+    return;
   }
 
   try {
@@ -332,6 +334,7 @@ void AerialMapDisplay::loadImagery() {
   QObject::connect(loader_.get(), SIGNAL(receivedImage(QNetworkRequest)), this,
                    SLOT(receivedImage(QNetworkRequest)));
   //  start loading images
+  loading_ = true;
   loader_->start();
 }
 
@@ -412,12 +415,6 @@ void AerialMapDisplay::assembleScene() {
         material->setDepthWriteEnabled(false);
       }
 
-      if (draw_under_) {
-        obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_3);
-      } else {
-        obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_MAIN);
-      }
-
       tex_unit->setAlphaOperation(Ogre::LBX_SOURCE1, Ogre::LBS_MANUAL,
                                   Ogre::LBS_CURRENT, alpha_);
 
@@ -456,9 +453,11 @@ void AerialMapDisplay::assembleScene() {
 
       obj->end();
 
-      if (draw_under_property_->getValue().toBool()) {
-        //  render under everything else
+      // set rendering order
+      if (draw_under_) {
         obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_3);
+      } else {
+        obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_MAIN);
       }
 
       MapObject object;
@@ -469,6 +468,9 @@ void AerialMapDisplay::assembleScene() {
     }
   }
   scene_id_++;
+
+  // finally set the correct position of the map
+  transformAerialMap();
 }
 
 void AerialMapDisplay::initiatedRequest(QNetworkRequest request) {
@@ -487,11 +489,15 @@ void AerialMapDisplay::finishedLoading() {
   if (loader_) {
     resolution_property_->setValue(loader_->resolution());
   }
+
+  assembleScene();
+  loading_ = false;
 }
 
 void AerialMapDisplay::errorOcurred(QString description) {
   ROS_ERROR("Error: %s", qPrintable(description));
   setStatus(StatusProperty::Error, "Message", description);
+  loading_ = false;
 }
 
 // TODO(gareth): We are technically ignoring the orientation from the

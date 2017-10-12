@@ -133,6 +133,7 @@ protected:
   //  tile management
   bool dirty_;
   bool received_msg_;
+  bool loading_;
   sensor_msgs::NavSatFix ref_fix_;
   std::shared_ptr<TileLoader> loader_;
 };
