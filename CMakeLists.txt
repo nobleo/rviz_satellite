@@ -37,7 +37,13 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
 )
 
-catkin_package(CATKIN_DEPENDS nav_msgs sensor_msgs)
+catkin_package(
+  CATKIN_DEPENDS
+    nav_msgs
+    sensor_msgs
+  DEPENDS
+    OpenCV
+)
 
 set(${PROJECT_NAME}_SOURCES
   src/aerialmap_display.cpp
@@ -75,7 +81,7 @@ endif()
 # Other includes
 include_directories(
   ${CMAKE_CURRENT_BINARY_DIR}
-  ${OpenCV_INCLUDE_DIR}
+  ${OpenCV_INCLUDE_DIRS}
   ${OGRE_OV_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
   src
@@ -84,7 +90,6 @@ include_directories(
 # Other libraries
 link_libraries(
   ${QT_LIBRARIES}
-  ${OpenCV_LIBRARIES}
   ${catkin_LIBRARIES}
 )
 
