@@ -25,6 +25,7 @@
 #include "rviz/frame_manager.h"
 #include "rviz/ogre_helpers/grid.h"
 #include "rviz/properties/enum_property.h"
+#include "rviz/properties/editable_enum_property.h"
 #include "rviz/properties/float_property.h"
 #include "rviz/properties/int_property.h"
 #include "rviz/properties/property.h"
@@ -116,10 +117,27 @@ AerialMapDisplay::AerialMapDisplay()
   resolution_property_->setReadOnly(true);
 
   //  properties for map
-  object_uri_property_ = new StringProperty(
-      "Object URI", "http://otile1.mqcdn.com/tiles/1.0.0/sat/{z}/{x}/{y}.jpg",
+  QString default_object_uri = "http://otile1.mqcdn.com/tiles/1.0.0/sat/{z}/{x}/{y}.jpg";
+  object_uri_property_ = new EditableEnumProperty(
+      "Object URI", default_object_uri,
       "URL from which to retrieve map tiles.", this, SLOT(updateObjectURI()));
   object_uri_property_->setShouldBeSaved(true);
+
+  // get optional uris from param
+  ros::NodeHandle nh;
+  XmlRpc::XmlRpcValue object_uris;
+  if(nh.getParam("aerial_map_display/object_uris", object_uris)) {
+      if(object_uris.getType() == XmlRpc::XmlRpcValue::TypeArray) {
+          for(ssize_t i = 0; i < object_uris.size(); ++i){
+              XmlRpc::XmlRpcValue value = object_uris[i];
+              if(value.getType() == XmlRpc::XmlRpcValue::TypeString) {
+                  std::string object_uri = value;
+                  object_uri_property_->addOptionStd(object_uri);
+              }
+          }
+      }
+  }
+
   object_uri_ = object_uri_property_->getStdString();
 
   const QString zoom_desc = QString::fromStdString(

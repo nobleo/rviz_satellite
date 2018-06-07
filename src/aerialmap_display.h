@@ -45,6 +45,7 @@ class RosTopicProperty;
 class StringProperty;
 class TfFrameProperty;
 class EnumProperty;
+class EditableEnumProperty;
 
 /**
  * @class AerialMapDisplay
@@ -116,7 +117,7 @@ protected:
   RosTopicProperty *topic_property_;
   TfFrameProperty *frame_property_;
   Property *dynamic_reload_property_;
-  StringProperty *object_uri_property_;
+  EditableEnumProperty *object_uri_property_;
   IntProperty *zoom_property_;
   IntProperty *blocks_property_;
   FloatProperty *resolution_property_;
