@@ -494,8 +494,6 @@ void AerialMapDisplay::errorOcurred(QString description) {
   setStatus(StatusProperty::Error, "Message", description);
 }
 
-// TODO(gareth): We are technically ignoring the orientation from the
-// frame manager here - does this make sense?
 void AerialMapDisplay::transformAerialMap() {
   // pass in identity to get pose of robot wrt to the fixed frame
   // the map will be shifted so as to compensate for the center tile shifting
@@ -511,6 +509,7 @@ void AerialMapDisplay::transformAerialMap() {
   const std::string frame = frame_property_->getFrameStd();
   Ogre::Vector3 position{0, 0, 0};
   Ogre::Quaternion orientation{1, 0, 0, 0};
+  Ogre::Matrix3 orientation_mat;
 
   // get the transform at the time we received the reference lat and lon
   if (!context_->getFrameManager()->transform(frame, ref_fix_.header.stamp, pose,
@@ -535,6 +534,7 @@ void AerialMapDisplay::transformAerialMap() {
     orientation = Ogre::Quaternion::IDENTITY;
     ROS_ERROR("rviz_satellite received invalid transform, setting to identity");
   }
+  orientation.ToRotationMatrix(orientation_mat);
 
   // Here we assume that the fixed/world frame is at altitude=0
   // force aerial imagery on ground
@@ -544,7 +544,7 @@ void AerialMapDisplay::transformAerialMap() {
   const int convention = frame_convention_property_->getOptionInt();
   if (convention == FRAME_CONVENTION_XYZ_ENU) {
     // ENU corresponds to our default drawing method
-    scene_node_->setOrientation(Ogre::Quaternion::IDENTITY);
+    scene_node_->setOrientation(orientation_mat);
   } else if (convention == FRAME_CONVENTION_XYZ_NED) {
     // NOTE(gareth): XYZ->NED will cause the map to appear reversed when viewed
     // from above (from +z).
@@ -553,14 +553,14 @@ void AerialMapDisplay::transformAerialMap() {
                                   1, 0, 0,
                                   0, 0,-1);
     // clang-format on
-    scene_node_->setOrientation(xyz_R_ned.Transpose());
+    scene_node_->setOrientation(orientation_mat*xyz_R_ned.Transpose());
   } else if (convention == FRAME_CONVENTION_XYZ_NWU) {
     // clang-format off
     const Ogre::Matrix3 xyz_R_nwu(0,-1, 0,
                                   1, 0, 0,
                                   0, 0, 1);
     // clang-format on
-    scene_node_->setOrientation(xyz_R_nwu.Transpose());
+    scene_node_->setOrientation(orientation_mat*xyz_R_nwu.Transpose());
   } else {
     ROS_ERROR_STREAM("Invalid convention code: " << convention);
   }
