@@ -8,6 +8,12 @@ set(DEFAULT_BUILD_QT5 OFF)
 if(${DISTRO} STREQUAL "kinetic")
     set(DEFAULT_BUILD_QT5 ON)
 endif()
+if(${DISTRO} STREQUAL "lunar")
+    set(DEFAULT_BUILD_QT5 ON)
+endif()
+if(${DISTRO} STREQUAL "melodic")
+    set(DEFAULT_BUILD_QT5 ON)
+endif()
 
 option(UseQt5 "Build w/ QT version 5" ${DEFAULT_BUILD_QT5})
 
