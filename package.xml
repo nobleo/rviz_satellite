@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package>
   <name>rviz_satellite</name>
-  <version>0.0.2</version>
+  <version>1.0.0</version>
   <description>Display satellite map tiles in RViz</description>
   <author>Gareth Cross</author>
   <maintainer email="gcross.code@icloud.com">gcross</maintainer>
