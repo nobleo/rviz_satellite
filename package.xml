@@ -14,10 +14,20 @@
   <build_depend>nav_msgs</build_depend>
   <build_depend>sensor_msgs</build_depend>
 
+  <build_depend>libqt_core</build_depend>
+  <build_depend>libqt_gui</build_depend>
+  <build_depend>libqt_network</build_depend>
+  <build_depend>libqt_concurrent</build_depend>
+
   <run_depend>roscpp</run_depend>
   <run_depend>rviz</run_depend>
   <run_depend>nav_msgs</run_depend>
   <run_depend>sensor_msgs</run_depend>
+
+  <run_depend>libqt_core</run_depend>
+  <run_depend>libqt_gui</run_depend>
+  <run_depend>libqt_network</run_depend>
+  <run_depend>libqt_concurrent</run_depend>
 
   <export>
       <rviz plugin="${prefix}/plugin_description.xml"/>
