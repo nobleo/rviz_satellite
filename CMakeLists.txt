@@ -5,7 +5,7 @@ set(DISTRO $ENV{ROS_DISTRO})
 message(STATUS "Distribution: " ${DISTRO})
 
 set(DEFAULT_BUILD_QT5 OFF)
-if(${DISTRO} STREQUAL "kinetic")
+if(${DISTRO} STREQUAL "kinetic" OR ${DISTRO} STREQUAL "melodic")
     set(DEFAULT_BUILD_QT5 ON)
 endif()
 
@@ -103,5 +103,3 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 install(FILES plugin_description.xml DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-
-
