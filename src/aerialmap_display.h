@@ -36,12 +36,13 @@ limitations under the License. */
 #include <memory>
 #include <tileloader.h>
 
-namespace Ogre {
+namespace Ogre
+{
 class ManualObject;
 }
 
-namespace rviz {
-
+namespace rviz
+{
 class FloatProperty;
 class IntProperty;
 class Property;
@@ -54,7 +55,8 @@ class EnumProperty;
  * @class AerialMapDisplay
  * @brief Displays a satellite map along the XY plane.
  */
-class AerialMapDisplay : public Display {
+class AerialMapDisplay : public Display
+{
   Q_OBJECT
 public:
   AerialMapDisplay();
@@ -91,14 +93,14 @@ protected:
   virtual void subscribe();
   virtual void unsubscribe();
 
-  void navFixCallback(const sensor_msgs::NavSatFixConstPtr &msg);
+  void navFixCallback(const sensor_msgs::NavSatFixConstPtr& msg);
 
   void loadImagery();
 
   void assembleScene();
 
   void clear();
-  
+
   void clearGeometry();
 
   void transformAerialMap();
@@ -107,8 +109,9 @@ protected:
   unsigned int scene_id_;
 
   /// Instance of a tile w/ associated ogre data
-  struct MapObject {
-    Ogre::ManualObject *object;
+  struct MapObject
+  {
+    Ogre::ManualObject* object;
     Ogre::TexturePtr texture;
     Ogre::MaterialPtr material;
   };
@@ -117,16 +120,16 @@ protected:
   ros::Subscriber coord_sub_;
 
   //  properties
-  RosTopicProperty *topic_property_;
-  TfFrameProperty *frame_property_;
-  Property *dynamic_reload_property_;
-  StringProperty *object_uri_property_;
-  IntProperty *zoom_property_;
-  IntProperty *blocks_property_;
-  FloatProperty *resolution_property_;
-  FloatProperty *alpha_property_;
-  Property *draw_under_property_;
-  EnumProperty * frame_convention_property_;
+  RosTopicProperty* topic_property_;
+  TfFrameProperty* frame_property_;
+  Property* dynamic_reload_property_;
+  StringProperty* object_uri_property_;
+  IntProperty* zoom_property_;
+  IntProperty* blocks_property_;
+  FloatProperty* resolution_property_;
+  FloatProperty* alpha_property_;
+  Property* draw_under_property_;
+  EnumProperty* frame_convention_property_;
 
   float alpha_;
   bool draw_under_;
@@ -141,6 +144,6 @@ protected:
   std::shared_ptr<TileLoader> loader_;
 };
 
-} // namespace rviz
+}  // namespace rviz
 
 #endif
