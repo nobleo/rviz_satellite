@@ -75,7 +75,8 @@ link_libraries(
   ${catkin_LIBRARIES}
 )
 
-add_definitions("-Wall -Wunused -std=c++11")
+# set compiler options and inject version of software (see tileloader.cpp)
+add_definitions("-Wall -Wunused -std=c++11 -DRVIZ_SATELLITE_VERSION=\"\\\"${rviz_satellite_VERSION}\\\"\"")
 
 set(PROJECT_SOURCE_FILES
   ${${PROJECT_NAME}_SOURCES}

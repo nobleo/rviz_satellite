@@ -125,7 +125,7 @@ void TileLoader::start() {
         const QUrl uri = uriForTile(x, y);
         //  send request
         QNetworkRequest request = QNetworkRequest(uri);
-        auto const userAgent = QByteArray("rviz_satellite/1.0.0 (+https://github.com/gareth-cross/rviz_satellite)");
+        auto const userAgent = QByteArray("rviz_satellite/" RVIZ_SATELLITE_VERSION " (+https://github.com/gareth-cross/rviz_satellite)");
         request.setRawHeader(QByteArray("User-Agent"), userAgent);
         QNetworkReply *rep = qnam_->get(request);
         emit initiatedRequest(request);
