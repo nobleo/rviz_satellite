@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include <unordered_map>
 #include <QtGlobal>
 #include <QImage>
 
@@ -40,55 +41,22 @@ limitations under the License. */
 #include "rviz/display_context.h"
 
 #include "aerialmap_display.h"
+#include "General.h"
 
-#define FRAME_CONVENTION_XYZ_ENU (0)  //  X -> East, Y -> North
-#define FRAME_CONVENTION_XYZ_NED (1)  //  X -> North, Y -> East
-#define FRAME_CONVENTION_XYZ_NWU (2)  //  X -> North, Y -> West
-
-// Max number of adjacent blocks to support.
-static constexpr int kMaxBlocks = 8;
-// Max zoom level to support.
-static constexpr int kMaxZoom = 22;
-
-// TODO(gareth): If higher zooms are ever supported, change calculations from
-// int to long wherever applicable.
-static_assert((1 << kMaxZoom) < std::numeric_limits<unsigned int>::max(), "");
-
-Ogre::TexturePtr textureFromImage(const QImage& image, const std::string& name)
-{
-  //  convert to 24bit rgb
-  QImage converted = image.convertToFormat(QImage::Format_RGB888).mirrored();
-
-  //  create texture
-  Ogre::TexturePtr texture;
-  Ogre::DataStreamPtr data_stream;
-  data_stream.bind(new Ogre::MemoryDataStream((void*)converted.constBits(), converted.byteCount()));
-
-  const Ogre::String res_group = Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME;
-  Ogre::TextureManager& texture_manager = Ogre::TextureManager::getSingleton();
-  //  swap byte order when going from QImage to Ogre
-  texture = texture_manager.loadRawData(name, res_group, data_stream, converted.width(), converted.height(),
-                                        Ogre::PF_B8G8R8, Ogre::TEX_TYPE_2D, 0);
-  return texture;
-}
+int constexpr FRAME_CONVENTION_XYZ_ENU = 0;  //  X -> East, Y -> North
+int constexpr FRAME_CONVENTION_XYZ_NED = 1;  //  X -> North, Y -> East
+int constexpr FRAME_CONVENTION_XYZ_NWU = 2;  //  X -> North, Y -> West
 
 namespace rviz
 {
-AerialMapDisplay::AerialMapDisplay() : Display(), map_id_(0), scene_id_(0), dirty_(false), received_msg_(false)
+AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false), received_msg_(false)
 {
-  static unsigned int map_ids = 0;
-  map_id_ = map_ids++;  //  global counter of map ids
-
   topic_property_ =
       new RosTopicProperty("Topic", "", QString::fromStdString(ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
                            "nav_msgs::Odometry topic to subscribe to.", this, SLOT(updateTopic()));
 
   frame_property_ = new TfFrameProperty("Robot frame", "world", "TF frame for the moving robot.", this, nullptr, false,
                                         SLOT(updateFrame()), this);
-
-  dynamic_reload_property_ =
-      new Property("Dynamically reload", true, "Reload as robot moves. Frame option must be set.", this,
-                   SLOT(updateDynamicReload()));
 
   alpha_property_ =
       new FloatProperty("Alpha", 0.7, "Amount of transparency to apply to the map.", this, SLOT(updateAlpha()));
@@ -104,28 +72,28 @@ AerialMapDisplay::AerialMapDisplay() : Display(), map_id_(0), scene_id_(0), dirt
   draw_under_property_->setShouldBeSaved(true);
   draw_under_ = draw_under_property_->getValue().toBool();
 
-  //  output, resolution of the map in meters/pixel
+  // output, resolution of the map in meters/pixel
   resolution_property_ = new FloatProperty("Resolution", 0, "Resolution of the map. (Read only)", this);
   resolution_property_->setReadOnly(true);
 
-  //  properties for map
-  object_uri_property_ = new StringProperty("Object URI", "http://otile1.mqcdn.com/tiles/1.0.0/sat/{z}/{x}/{y}.jpg",
-                                            "URL from which to retrieve map tiles.", this, SLOT(updateObjectURI()));
-  object_uri_property_->setShouldBeSaved(true);
-  object_uri_ = object_uri_property_->getStdString();
+  // properties for map
+  tile_url_property_ =
+      new StringProperty("Object URI", "", "URL from which to retrieve map tiles.", this, SLOT(updateTileUrl()));
+  tile_url_property_->setShouldBeSaved(true);
+  tile_url_ = tile_url_property_->getStdString();
 
-  const QString zoom_desc = QString::fromStdString("Zoom level (0 - " + std::to_string(kMaxZoom) + ")");
+  QString const zoom_desc = QString::fromStdString("Zoom level (0 - " + std::to_string(maxZoom) + ")");
   zoom_property_ = new IntProperty("Zoom", 16, zoom_desc, this, SLOT(updateZoom()));
   zoom_property_->setShouldBeSaved(true);
   zoom_property_->setMin(0);
-  zoom_property_->setMax(kMaxZoom);
+  zoom_property_->setMax(maxZoom);
   zoom_ = zoom_property_->getInt();
 
-  const QString blocks_desc = QString::fromStdString("Adjacent blocks (0 - " + std::to_string(kMaxBlocks) + ")");
+  QString const blocks_desc = QString::fromStdString("Adjacent blocks (0 - " + std::to_string(maxBlocks) + ")");
   blocks_property_ = new IntProperty("Blocks", 3, blocks_desc, this, SLOT(updateBlocks()));
   blocks_property_->setShouldBeSaved(true);
   blocks_property_->setMin(0);
-  blocks_property_->setMax(kMaxBlocks);
+  blocks_property_->setMax(maxBlocks);
 
   frame_convention_property_ =
       new EnumProperty("Frame Convention", "XYZ -> ENU", "Convention for mapping cartesian frame to the compass", this,
@@ -151,6 +119,7 @@ void AerialMapDisplay::onInitialize()
 
 void AerialMapDisplay::onEnable()
 {
+  lastFixedFrame_ = context_->getFrameManager()->getFixedFrame();
   subscribe();
 }
 
@@ -158,6 +127,7 @@ void AerialMapDisplay::onDisable()
 {
   unsubscribe();
   clear();
+  context_->getFrameManager()->setFixedFrame(lastFixedFrame_);
 }
 
 void AerialMapDisplay::subscribe()
@@ -189,11 +159,6 @@ void AerialMapDisplay::unsubscribe()
   ROS_INFO("Unsubscribing.");
 }
 
-void AerialMapDisplay::updateDynamicReload()
-{
-  // nothing to do here, when robot GPS updates the tiles will reload
-}
-
 void AerialMapDisplay::updateAlpha()
 {
   alpha_ = alpha_property_->getFloat();
@@ -209,35 +174,36 @@ void AerialMapDisplay::updateFrame()
 
 void AerialMapDisplay::updateDrawUnder()
 {
-  /// @todo: figure out why this property only applies to some objects
+  // @todo figure out why this property only applies to some objects
   draw_under_ = draw_under_property_->getValue().toBool();
   dirty_ = true;  //  force update
   ROS_INFO("Changing draw_under to %s", ((draw_under_) ? "true" : "false"));
 }
 
-void AerialMapDisplay::updateObjectURI()
+void AerialMapDisplay::updateTileUrl()
 {
-  object_uri_ = object_uri_property_->getStdString();
-  loadImagery();  //  reload all imagery
+  tile_url_ = tile_url_property_->getStdString();
 }
 
 void AerialMapDisplay::updateZoom()
 {
-  const int zoom = std::max(0, std::min(kMaxZoom, zoom_property_->getInt()));
+  int const zoom = std::max(0, std::min(maxZoom, zoom_property_->getInt()));
   if (zoom != zoom_)
   {
     zoom_ = zoom;
-    loadImagery();
+
+    clear();
   }
 }
 
 void AerialMapDisplay::updateBlocks()
 {
-  const int blocks = std::max(0, std::min(kMaxBlocks, blocks_property_->getInt()));
+  int const blocks = std::max(0, std::min(maxBlocks, blocks_property_->getInt()));
   if (blocks != blocks_)
   {
     blocks_ = blocks;
-    loadImagery();
+
+    clear();
   }
 }
 
@@ -257,167 +223,185 @@ void AerialMapDisplay::clear()
 {
   setStatus(StatusProperty::Warn, "Message", "No map received");
   clearGeometry();
-  //  the user has cleared here
-  received_msg_ = false;
-  //  cancel current imagery, if any
-  loader_.reset();
 }
 
 void AerialMapDisplay::clearGeometry()
 {
   for (MapObject& obj : objects_)
   {
-    //  destroy object
+    // destroy object
     scene_node_->detachObject(obj.object);
     scene_manager_->destroyManualObject(obj.object);
-    //  destroy texture
-    if (!obj.texture.isNull())
-    {
-      Ogre::TextureManager::getSingleton().remove(obj.texture->getName());
-    }
-    //  destroy material
+
+    // destroy material
     if (!obj.material.isNull())
     {
       Ogre::MaterialManager::getSingleton().remove(obj.material->getName());
     }
   }
   objects_.clear();
+  dirty_ = true;
+}
+
+void AerialMapDisplay::createGeometry()
+{
+  for (int block = 0; block < (2 * blocks_ + 1) * (2 * blocks_ + 1); ++block)
+  {
+    // generate an unique name
+    static int count = 0;
+    std::string const name_suffix = std::to_string(count);
+    ++count;
+
+    // one material per texture
+    Ogre::MaterialPtr material = Ogre::MaterialManager::getSingleton().create(
+        "satellite_material_" + name_suffix, Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+    material->setReceiveShadows(false);
+    material->getTechnique(0)->setLightingEnabled(false);
+    material->setDepthBias(-16.0f, 0.0f);
+    material->setCullingMode(Ogre::CULL_NONE);
+    material->setDepthWriteEnabled(false);
+
+    // create texture and initialize it
+    Ogre::TextureUnitState* tex_unit = material->getTechnique(0)->getPass(0)->createTextureUnitState();
+    tex_unit->setTextureFiltering(Ogre::TFO_BILINEAR);
+
+    // create an object
+    Ogre::ManualObject* obj = scene_manager_->createManualObject("satellite_object_" + name_suffix);
+    obj->setVisible(false);
+    scene_node_->attachObject(obj);
+
+    assert(!material.isNull());
+    objects_.emplace_back(obj, material);
+  }
 }
 
 void AerialMapDisplay::update(float, float)
 {
-  //  creates all geometry, if necessary
+  // create all geometry, if necessary
   assembleScene();
-  //  draw
+
+  // draw
   context_->queueRender();
 }
 
-void AerialMapDisplay::navFixCallback(const sensor_msgs::NavSatFixConstPtr& msg)
+void AerialMapDisplay::navFixCallback(sensor_msgs::NavSatFixConstPtr const& msg)
 {
-  // If the new (lat,lon) falls into a different tile then we have some
-  // reloading to do.
-  if (!received_msg_ || (loader_ && !loader_->insideCentreTile(msg->latitude, msg->longitude) &&
-                         dynamic_reload_property_->getValue().toBool()))
-  {
-    ref_fix_ = *msg;
-    ROS_INFO("Reference point set to: %.12f, %.12f", ref_fix_.latitude, ref_fix_.longitude);
-    setStatus(StatusProperty::Warn, "Message", "Loading map tiles.");
+  ref_fix_ = *msg;
 
-    //  re-load imagery
-    received_msg_ = true;
-    loadImagery();
-    transformAerialMap();
-  }
+  // re-load imagery
+  received_msg_ = true;
+  loadImagery();
+  transformAerialMap();
 }
 
 void AerialMapDisplay::loadImagery()
 {
-  //  cancel current imagery, if any
-  loader_.reset();
+  if (!isEnabled())
+  {
+    return;
+  }
 
+  // When the plugin starts, the properties from the config are set.
+  // This will call the callbacks and these will call this function.
+  // By checking if a message was received, we prevent to update the
+  // images when Rviz loads the config.
   if (!received_msg_)
   {
-    //  no message received from publisher
-    return;
-  }
-  if (object_uri_.empty())
-  {
-    setStatus(StatusProperty::Error, "Message", "Received message but object URI is not set");
-  }
-
-  try
-  {
-    loader_.reset(new TileLoader(object_uri_, ref_fix_.latitude, ref_fix_.longitude, zoom_, blocks_, this));
-  }
-  catch (std::exception& e)
-  {
-    setStatus(StatusProperty::Error, "Message", QString(e.what()));
     return;
   }
 
-  QObject::connect(loader_.get(), SIGNAL(errorOcurred(QString)), this, SLOT(errorOcurred(QString)));
-  QObject::connect(loader_.get(), SIGNAL(finishedLoading()), this, SLOT(finishedLoading()));
-  QObject::connect(loader_.get(), SIGNAL(initiatedRequest(QNetworkRequest)), this,
-                   SLOT(initiatedRequest(QNetworkRequest)));
-  QObject::connect(loader_.get(), SIGNAL(receivedImage(QNetworkRequest)), this, SLOT(receivedImage(QNetworkRequest)));
-  //  start loading images
-  loader_->start();
+  if (tile_url_.empty())
+  {
+    setStatus(StatusProperty::Error, "Message", "Tile URL is not set");
+    return;
+  }
+
+  TileId tileId{ tile_url_, fromWGSCoordinate({ ref_fix_.latitude, ref_fix_.longitude }, zoom_), zoom_ };
+  if (!lastTileId_ || !(tileId == *lastTileId_))
+  {
+    lastTileId_ = tileId;
+
+    try
+    {
+      tileCache_.request({ tileId, blocks_ });
+      dirty_ = true;
+    }
+    catch (std::exception& e)
+    {
+      setStatus(StatusProperty::Error, "Message", QString(e.what()));
+      return;
+    }
+  }
+
+  // the following error rate thresholds are randomly chosen
+  float const errorRate = tileCache_.getTileServerErrorRate(tile_url_);
+  if (errorRate > 0.95)
+  {
+    setStatus(StatusProperty::Level::Error, "Message", "Few or no tiles received");
+  }
+  else if (errorRate > 0.3)
+  {
+    setStatus(StatusProperty::Level::Warn, "Message",
+              "Not all requested tiles have been received. Possibly the server is throttling?");
+  }
+  else
+  {
+    setStatus(StatusProperty::Level::Ok, "Message", "OK");
+  }
 }
 
 void AerialMapDisplay::assembleScene()
 {
-  if (!dirty_)
+  if (!isEnabled() || !dirty_ || !lastTileId_)
   {
-    return;  //  nothing to update
+    return;
   }
   dirty_ = false;
 
-  if (!loader_)
+  // was clearGeometry() called?
+  if (objects_.empty())
   {
-    return;  //  no tiles loaded, don't do anything
+    createGeometry();
+
+    // e.g. when the number of blocks got bigger, the new tiles have to be loaded
+    tileCache_.request({ *lastTileId_, blocks_ });
   }
 
-  //  get rid of old geometry, we will re-build this
-  clearGeometry();
+  TileId tileId{ tile_url_, fromWGSCoordinate({ ref_fix_.latitude, ref_fix_.longitude }, zoom_), zoom_ };
+  Area area(tileId, blocks_);
 
-  //  iterate over all tiles and create an object for each of them
-  for (const TileLoader::MapTile& tile : loader_->tiles())
+  TileCacheGuard guard(tileCache_);
+
+  bool loadedAllTiles = true;
+
+  auto it = objects_.begin();
+  for (int xx = area.leftTop.x; xx <= area.rightBottom.x; ++xx)
   {
-    // NOTE(gareth): We invert the y-axis so that positive y corresponds
-    // to north. We are in XYZ->ENU convention here.
-    const int w = tile.image().width();
-    const int h = tile.image().height();
-    const double tile_w = w * loader_->resolution();
-    const double tile_h = h * loader_->resolution();
-
-    // Shift back such that (0, 0) corresponds to the exact latitude and
-    // longitude the tile loader requested.
-    // This is the local origin, in the frame of the map node.
-    const double origin_x = -loader_->originOffsetX() * tile_w;
-    const double origin_y = -(1 - loader_->originOffsetY()) * tile_h;
-
-    // determine location of this tile, flipping y in the process
-    const double x = (tile.x() - loader_->centerTileX()) * tile_w + origin_x;
-    const double y = -(tile.y() - loader_->centerTileY()) * tile_h + origin_y;
-    //  don't re-use any ids
-    const std::string name_suffix = std::to_string(tile.x()) + "_" + std::to_string(tile.y()) + "_" +
-                                    std::to_string(map_id_) + "_" + std::to_string(scene_id_);
-
-    if (tile.hasImage())
+    for (int yy = area.leftTop.y; yy <= area.rightBottom.y; ++yy)
     {
-      //  one material per texture
-      Ogre::MaterialPtr material = Ogre::MaterialManager::getSingleton().create(
-          "material_" + name_suffix, Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
-      material->setReceiveShadows(false);
-      material->getTechnique(0)->setLightingEnabled(false);
-      material->setDepthBias(-16.0f, 0.0f);
-      material->setCullingMode(Ogre::CULL_NONE);
-      material->setDepthWriteEnabled(false);
+      auto obj = it->object;
+      auto& material = it->material;
+      assert(!material.isNull());
+      ++it;
 
-      //  create textureing unit
-      Ogre::Pass* pass = material->getTechnique(0)->getPass(0);
-      Ogre::TextureUnitState* tex_unit = nullptr;
-      if (pass->getNumTextureUnitStates() > 0)
+      TileId const toFind{ tileId.tileServer, { xx, yy }, tileId.zoom };
+
+      OgreTile const* tile = tileCache_.ready(toFind);
+      if (!tile)
       {
-        tex_unit = pass->getTextureUnitState(0);
-      }
-      else
-      {
-        tex_unit = pass->createTextureUnitState();
+        // don't show tiles with old textures
+        obj->setVisible(false);
+        loadedAllTiles = false;
+        continue;
       }
 
-      //  only add if we have a texture for it
-      Ogre::TexturePtr texture = textureFromImage(tile.image(), "texture_" + name_suffix);
+      obj->setVisible(true);
 
-      tex_unit->setTextureName(texture->getName());
-      tex_unit->setTextureFiltering(Ogre::TFO_BILINEAR);
+      // update texture
+      Ogre::TextureUnitState* tex_unit = material->getTechnique(0)->getPass(0)->getTextureUnitState(0);
+      tex_unit->setTextureName(tile->texture->getName());
 
-      //  create an object
-      const std::string obj_name = "object_" + name_suffix;
-      Ogre::ManualObject* obj = scene_manager_->createManualObject(obj_name);
-      scene_node_->attachObject(obj);
-
-      //  configure depth & alpha properties
+      // configure depth & alpha properties
       if (alpha_ >= 0.9998)
       {
         material->setDepthWriteEnabled(!draw_under_);
@@ -431,6 +415,7 @@ void AerialMapDisplay::assembleScene()
 
       if (draw_under_)
       {
+        // render under everything else
         obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_3);
       }
       else
@@ -440,136 +425,134 @@ void AerialMapDisplay::assembleScene()
 
       tex_unit->setAlphaOperation(Ogre::LBX_SOURCE1, Ogre::LBS_MANUAL, Ogre::LBS_CURRENT, alpha_);
 
-      //  create a quad for this tile
+      // tile width/ height in meter
+      double const tile_w_h_m = getTileWH();
+
+      // determine position of this tile relative to the robot's position
+      // note: We invert the y-axis so that positive y corresponds to north. See transformAerialMap().
+      double const x = (xx - lastTileId_->coord.x) * tile_w_h_m;
+      double const y = -(yy - lastTileId_->coord.y) * tile_w_h_m;
+
+      // create a quad for this tile
+      // note: We have to create the vertices everytime and cannot reuse the old vertices: tile_w_h_m depends on the
+      // latitude.
+      obj->clear();
+
       obj->begin(material->getName(), Ogre::RenderOperation::OT_TRIANGLE_LIST);
 
-      //  bottom left
+      // bottom left
       obj->position(x, y, 0.0f);
       obj->textureCoord(0.0f, 0.0f);
       obj->normal(0.0f, 0.0f, 1.0f);
 
       // top right
-      obj->position(x + tile_w, y + tile_h, 0.0f);
+      obj->position(x + tile_w_h_m, y + tile_w_h_m, 0.0f);
       obj->textureCoord(1.0f, 1.0f);
       obj->normal(0.0f, 0.0f, 1.0f);
 
       // top left
-      obj->position(x, y + tile_h, 0.0f);
+      obj->position(x, y + tile_w_h_m, 0.0f);
       obj->textureCoord(0.0f, 1.0f);
       obj->normal(0.0f, 0.0f, 1.0f);
 
-      //  bottom left
+      // bottom left
       obj->position(x, y, 0.0f);
       obj->textureCoord(0.0f, 0.0f);
       obj->normal(0.0f, 0.0f, 1.0f);
 
       // bottom right
-      obj->position(x + tile_w, y, 0.0f);
+      obj->position(x + tile_w_h_m, y, 0.0f);
       obj->textureCoord(1.0f, 0.0f);
       obj->normal(0.0f, 0.0f, 1.0f);
 
       // top right
-      obj->position(x + tile_w, y + tile_h, 0.0f);
+      obj->position(x + tile_w_h_m, y + tile_w_h_m, 0.0f);
       obj->textureCoord(1.0f, 1.0f);
       obj->normal(0.0f, 0.0f, 1.0f);
 
       obj->end();
-
-      if (draw_under_property_->getValue().toBool())
-      {
-        //  render under everything else
-        obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_3);
-      }
-
-      MapObject object;
-      object.object = obj;
-      object.texture = texture;
-      object.material = material;
-      objects_.push_back(object);
     }
   }
-  scene_id_++;
-}
 
-void AerialMapDisplay::initiatedRequest(QNetworkRequest request)
-{
-  ROS_DEBUG("Requesting %s", qPrintable(request.url().toString()));
-}
-
-void AerialMapDisplay::receivedImage(QNetworkRequest request)
-{
-  ROS_DEBUG("Loaded tile %s", qPrintable(request.url().toString()));
-}
-
-void AerialMapDisplay::finishedLoading()
-{
-  ROS_INFO("Finished loading all tiles.");
-  dirty_ = true;
-  setStatus(StatusProperty::Ok, "Message", "Loaded all tiles.");
-  //  set property for resolution display
-  if (loader_)
+  // since not all tiles were loaded, this function has to be called again
+  if (!loadedAllTiles)
   {
-    resolution_property_->setValue(loader_->resolution());
+    dirty_ = true;
   }
+
+  tileCache_.purge({ tileId, blocks_ });
 }
 
-void AerialMapDisplay::errorOcurred(QString description)
-{
-  ROS_ERROR("Error: %s", qPrintable(description));
-  setStatus(StatusProperty::Error, "Message", description);
-}
-
-// TODO(gareth): We are technically ignoring the orientation from the
-// frame manager here - does this make sense?
 void AerialMapDisplay::transformAerialMap()
 {
-  // pass in identity to get pose of robot wrt to the fixed frame
-  // the map will be shifted so as to compensate for the center tile shifting
-  geometry_msgs::Pose pose;
-  pose.orientation.w = 1;
-  pose.orientation.x = 0;
-  pose.orientation.y = 0;
-  pose.orientation.z = 0;
-  pose.position.x = 0;
-  pose.position.y = 0;
-  pose.position.z = 0;
-
-  const std::string frame = frame_property_->getFrameStd();
-  Ogre::Vector3 position{ 0, 0, 0 };
-  Ogre::Quaternion orientation{ 1, 0, 0, 0 };
-
-  // get the transform at the time we received the reference lat and lon
-  if (!context_->getFrameManager()->transform(frame, ref_fix_.header.stamp, pose, position, orientation))
+  if (!isEnabled())
   {
-    ROS_DEBUG("Error transforming map '%s' from frame '%s' to frame '%s'", qPrintable(getName()), frame.c_str(),
-              qPrintable(fixed_frame_));
-
-    setStatus(StatusProperty::Error, "Transform",
-              "No transform from [" + QString::fromStdString(frame) + "] to [" + fixed_frame_ + "]");
-
-    // set the transform to identity on failure
-    position = Ogre::Vector3::ZERO;
-    orientation = Ogre::Quaternion::IDENTITY;
-  }
-  else
-  {
-    setStatus(StatusProperty::Ok, "Transform", "Transform OK");
-  }
-  if (position.isNaN() || orientation.isNaN())
-  {
-    // this can occur if an invalid TF is published. Set to identiy so OGRE does
-    // not throw an assertion
-    position = Ogre::Vector3::ZERO;
-    orientation = Ogre::Quaternion::IDENTITY;
-    ROS_ERROR("rviz_satellite received invalid transform, setting to identity");
+    return;
   }
 
-  // Here we assume that the fixed/world frame is at altitude=0
-  // force aerial imagery on ground
-  position.z = 0;
+  // the parent frame of this scene node
+  static std::string const mapFrame = "map";
+
+  // the robot's frame
+  std::string const frame = frame_property_->getFrameStd();
+
+  // note: the orientation is not used on purpose
+  Ogre::Quaternion orientation;
+  Ogre::Vector3 position;
+
+  // can mapFrame be used as a fixed frame?
+  std::string errMsg;
+  if (context_->getFrameManager()->frameHasProblems(mapFrame, ros::Time{}, errMsg) ||
+      context_->getFrameManager()->transformHasProblems(mapFrame, ros::Time{}, errMsg))
+  {
+    context_->getFrameManager()->setFixedFrame(lastFixedFrame_);
+    setStatus(StatusProperty::Error, "Transform", QString::fromStdString(errMsg));
+    return;
+  }
+
+  // Set the pseudo fixed frame to map so that we can align the tiles to north just by setting identity as the
+  // orientation
+  context_->getFrameManager()->setFixedFrame(mapFrame);
+
+  // Get the latest transform between the robot frame and fixed frame from the FrameManager
+  if (!context_->getFrameManager()->getTransform(frame, ros::Time(), position, orientation))
+  {
+    // display error
+    std::string error;
+    if (context_->getFrameManager()->transformHasProblems(frame, ros::Time(), error))
+    {
+      setStatus(StatusProperty::Error, "Transform", QString::fromStdString(error));
+    }
+    else
+    {
+      setStatus(StatusProperty::Error, "Transform",
+                "Could not transform from [" + QString::fromStdString(frame) + "] to Fixed Frame [" + fixed_frame_ +
+                    "] for an unknown reason");
+    }
+    return;
+  }
+
+  if (position.isNaN())
+  {
+    // This can occur if an invalid TF is published.
+    // Show an error and don't apply anything, so OGRE does not throw an assertion.
+    setStatus(StatusProperty::Error, "Transform", "Received invalid transform");
+    return;
+  }
+
+  setStatus(StatusProperty::Ok, "Transform", "Transform OK");
+
+  // apply transform and add offset from origin
+  // decimal places are needed here to calculate the offset
+  auto const center = fromWGSCoordinate<double>({ ref_fix_.latitude, ref_fix_.longitude }, zoom_);
+  auto const originOffsetX = center.x - std::floor(center.x);
+  auto const originOffsetY = 1 - center.y + std::floor(center.y);  // y coord is flipped
+  double const tile_w_h_m = getTileWH();
+  position.x -= originOffsetX * tile_w_h_m;
+  position.y -= originOffsetY * tile_w_h_m;
   scene_node_->setPosition(position);
 
-  const int convention = frame_convention_property_->getOptionInt();
+  int const convention = frame_convention_property_->getOptionInt();
   if (convention == FRAME_CONVENTION_XYZ_ENU)
   {
     // ENU corresponds to our default drawing method
@@ -577,21 +560,20 @@ void AerialMapDisplay::transformAerialMap()
   }
   else if (convention == FRAME_CONVENTION_XYZ_NED)
   {
-    // NOTE(gareth): XYZ->NED will cause the map to appear reversed when viewed
-    // from above (from +z).
+    // XYZ->NED will cause the map to appear reversed when viewed from above (from +z).
     // clang-format off
-    const Ogre::Matrix3 xyz_R_ned(0, 1, 0,
-                                  1, 0, 0,
-                                  0, 0,-1);
+		Ogre::Matrix3 const xyz_R_ned(0, 1, 0,
+		                              1, 0, 0,
+		                              0, 0, -1);
     // clang-format on
     scene_node_->setOrientation(xyz_R_ned.Transpose());
   }
   else if (convention == FRAME_CONVENTION_XYZ_NWU)
   {
     // clang-format off
-    const Ogre::Matrix3 xyz_R_nwu(0,-1, 0,
-                                  1, 0, 0,
-                                  0, 0, 1);
+		Ogre::Matrix3 const xyz_R_nwu(0, -1, 0,
+		                              1, 0, 0,
+		                              0, 0, 1);
     // clang-format on
     scene_node_->setOrientation(xyz_R_nwu.Transpose());
   }
@@ -609,7 +591,7 @@ void AerialMapDisplay::fixedFrameChanged()
 void AerialMapDisplay::reset()
 {
   Display::reset();
-  //  unsub,clear,resub
+  // unsub,clear,resub
   updateTopic();
 }
 

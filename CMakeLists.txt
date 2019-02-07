@@ -30,12 +30,13 @@ endif()
 
 set(${PROJECT_NAME}_SOURCES
   src/aerialmap_display.cpp
-  src/tileloader.cpp
+  src/OgreTile.cpp
+  src/TileId.cpp
 )
 
 set(${PROJECT_NAME}_HEADERS
   src/aerialmap_display.h
-  src/tileloader.h
+  src/detail/TileDownloader.h
 )
 
 # invoke MOC and UI/ include Qt headers/ link Qt libraries
@@ -94,5 +95,3 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 install(FILES plugin_description.xml DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-
-
