@@ -2,8 +2,8 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.2.0 (2019-03-07)
+------------------
 * Rewrite of the tile loader
 * Display an error if the tile server is invalid
 * Move map towards the robot's z-position
