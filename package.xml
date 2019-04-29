@@ -18,6 +18,7 @@
   <run_depend>rviz</run_depend>
   <run_depend>nav_msgs</run_depend>
   <run_depend>sensor_msgs</run_depend>
+  <run_depend>tf2_ros</run_depend>
 
   <export>
       <rviz plugin="${prefix}/plugin_description.xml"/>

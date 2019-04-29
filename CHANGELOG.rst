@@ -2,6 +2,10 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Fix demo.launch
+
 1.2.0 (2019-03-07)
 ------------------
 * Rewrite of the tile loader
