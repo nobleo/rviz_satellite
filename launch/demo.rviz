@@ -7,8 +7,9 @@ Panels:
         - /Global Options1
         - /Status1
         - /AerialMapDisplay1
+        - /Axes1
       Splitter Ratio: 0.5
-    Tree Height: 796
+    Tree Height: 1113
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -31,19 +32,25 @@ Panels:
 Visualization Manager:
   Class: ""
   Displays:
-    - Alpha: 0.699999988
+    - Alpha: 1
       Blocks: 3
       Class: rviz_plugins/AerialMapDisplay
       Draw Behind: false
-      Dynamically reload: true
       Enabled: true
       Frame Convention: XYZ -> ENU
       Name: AerialMapDisplay
       Object URI: https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png
-      Robot frame: map
+      Robot frame: base_link
       Topic: /gps/fix
       Value: true
       Zoom: 18
+    - Class: rviz/Axes
+      Enabled: true
+      Length: 50
+      Name: Axes
+      Radius: 3
+      Reference Frame: base_link
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48

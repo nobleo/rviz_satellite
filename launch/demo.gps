@@ -3,7 +3,7 @@ header:
   stamp:
     secs: 1435607489
     nsecs: 924811809
-  frame_id: gps
+  frame_id: base_link
 status:
   status: 0
   service: 1
