@@ -290,8 +290,8 @@ void AerialMapDisplay::navFixCallback(sensor_msgs::NavSatFixConstPtr const& msg)
 
   // re-load imagery
   received_msg_ = true;
-  loadImagery();
   transformAerialMap();
+  loadImagery();
 }
 
 void AerialMapDisplay::loadImagery()
@@ -306,6 +306,11 @@ void AerialMapDisplay::loadImagery()
   // By checking if a message was received, we prevent to update the
   // images when Rviz loads the config.
   if (!received_msg_)
+  {
+    return;
+  }
+
+  if (!hasWorkingTransform_)
   {
     return;
   }
@@ -507,6 +512,8 @@ void AerialMapDisplay::transformAerialMap()
   {
     context_->getFrameManager()->setFixedFrame(lastFixedFrame_);
     setStatus(StatusProperty::Error, "Transform", QString::fromStdString(errMsg));
+    hasWorkingTransform_ = false;
+    clear();
     return;
   }
 
@@ -529,6 +536,8 @@ void AerialMapDisplay::transformAerialMap()
                 "Could not transform from [" + QString::fromStdString(frame) + "] to Fixed Frame [" + fixed_frame_ +
                     "] for an unknown reason");
     }
+    hasWorkingTransform_ = false;
+    clear();
     return;
   }
 
@@ -537,9 +546,12 @@ void AerialMapDisplay::transformAerialMap()
     // This can occur if an invalid TF is published.
     // Show an error and don't apply anything, so OGRE does not throw an assertion.
     setStatus(StatusProperty::Error, "Transform", "Received invalid transform");
+    hasWorkingTransform_ = false;
+    clear();
     return;
   }
 
+  hasWorkingTransform_ = true;
   setStatus(StatusProperty::Ok, "Transform", "Transform OK");
 
   // apply transform and add offset from origin

@@ -175,6 +175,8 @@ protected:
   boost::optional<TileId> lastTileId_;
   std::string lastFixedFrame_;
 
+  bool hasWorkingTransform_ = false;
+
   /**
    * Calculate the tile width/ height in meter
    */

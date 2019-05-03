@@ -4,6 +4,7 @@ Changelog for package rviz_satellite
 
 Forthcoming
 -----------
+* Don't show map if transform is missing
 * Fix demo.launch
 
 1.2.0 (2019-03-07)
