@@ -75,7 +75,6 @@ public:
 protected Q_SLOTS:
   void updateAlpha();
   void updateTopic();
-  void updateFrame();
   void updateDrawUnder();
   void updateTileUrl();
   void updateZoom();
@@ -151,7 +150,6 @@ protected:
 
   // properties
   RosTopicProperty* topic_property_;
-  TfFrameProperty* frame_property_;
   StringProperty* tile_url_property_;
   IntProperty* zoom_property_;
   IntProperty* blocks_property_;
