@@ -12,6 +12,7 @@
   <build_depend>roscpp</build_depend>
   <build_depend>rviz</build_depend>
   <build_depend>nav_msgs</build_depend>
+  <build_depend>robot_localization</build_depend>
   <build_depend>sensor_msgs</build_depend>
 
   <run_depend>roscpp</run_depend>

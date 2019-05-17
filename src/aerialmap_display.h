@@ -53,7 +53,6 @@ class Property;
 class RosTopicProperty;
 class StringProperty;
 class TfFrameProperty;
-class EnumProperty;
 
 /**
  * @class AerialMapDisplay
@@ -75,7 +74,6 @@ public:
 protected Q_SLOTS:
   void updateAlpha();
   void updateTopic();
-  void updateFrame();
   void updateDrawUnder();
   void updateTileUrl();
   void updateZoom();
@@ -151,14 +149,12 @@ protected:
 
   // properties
   RosTopicProperty* topic_property_;
-  TfFrameProperty* frame_property_;
   StringProperty* tile_url_property_;
   IntProperty* zoom_property_;
   IntProperty* blocks_property_;
   FloatProperty* resolution_property_;
   FloatProperty* alpha_property_;
   Property* draw_under_property_;
-  EnumProperty* frame_convention_property_;
 
   float alpha_;
   bool draw_under_;

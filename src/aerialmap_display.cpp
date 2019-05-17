@@ -27,13 +27,14 @@ limitations under the License. */
 #include <OGRE/OgreImageCodec.h>
 #include <OGRE/OgreVector3.h>
 
+#include <robot_localization/navsat_conversions.h>
+
 #include "rviz/frame_manager.h"
 #include "rviz/ogre_helpers/grid.h"
 #include "rviz/properties/enum_property.h"
 #include "rviz/properties/float_property.h"
 #include "rviz/properties/int_property.h"
 #include "rviz/properties/property.h"
-#include "rviz/properties/tf_frame_property.h"
 #include "rviz/properties/quaternion_property.h"
 #include "rviz/properties/ros_topic_property.h"
 #include "rviz/properties/vector_property.h"
@@ -43,10 +44,6 @@ limitations under the License. */
 #include "aerialmap_display.h"
 #include "General.h"
 
-int constexpr FRAME_CONVENTION_XYZ_ENU = 0;  //  X -> East, Y -> North
-int constexpr FRAME_CONVENTION_XYZ_NED = 1;  //  X -> North, Y -> East
-int constexpr FRAME_CONVENTION_XYZ_NWU = 2;  //  X -> North, Y -> West
-
 namespace rviz
 {
 AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false), received_msg_(false)
@@ -54,9 +51,6 @@ AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false), received_msg_(f
   topic_property_ =
       new RosTopicProperty("Topic", "", QString::fromStdString(ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
                            "nav_msgs::Odometry topic to subscribe to.", this, SLOT(updateTopic()));
-
-  frame_property_ = new TfFrameProperty("Robot frame", "world", "TF frame for the moving robot.", this, nullptr, false,
-                                        SLOT(updateFrame()), this);
 
   alpha_property_ =
       new FloatProperty("Alpha", 0.7, "Amount of transparency to apply to the map.", this, SLOT(updateAlpha()));
@@ -95,13 +89,6 @@ AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false), received_msg_(f
   blocks_property_->setMin(0);
   blocks_property_->setMax(maxBlocks);
 
-  frame_convention_property_ =
-      new EnumProperty("Frame Convention", "XYZ -> ENU", "Convention for mapping cartesian frame to the compass", this,
-                       SLOT(updateFrameConvention()));
-  frame_convention_property_->addOptionStd("XYZ -> ENU", FRAME_CONVENTION_XYZ_ENU);
-  frame_convention_property_->addOptionStd("XYZ -> NED", FRAME_CONVENTION_XYZ_NED);
-  frame_convention_property_->addOptionStd("XYZ -> NWU", FRAME_CONVENTION_XYZ_NWU);
-
   //  updating one triggers reload
   updateBlocks();
 }
@@ -114,7 +101,6 @@ AerialMapDisplay::~AerialMapDisplay()
 
 void AerialMapDisplay::onInitialize()
 {
-  frame_property_->setFrameManager(context_->getFrameManager());
 }
 
 void AerialMapDisplay::onEnable()
@@ -164,12 +150,6 @@ void AerialMapDisplay::updateAlpha()
   alpha_ = alpha_property_->getFloat();
   dirty_ = true;
   ROS_INFO("Changing alpha to %f", alpha_);
-}
-
-void AerialMapDisplay::updateFrame()
-{
-  ROS_INFO_STREAM("Changing robot frame to " << frame_property_->getFrameStd());
-  transformAerialMap();
 }
 
 void AerialMapDisplay::updateDrawUnder()
@@ -490,97 +470,54 @@ void AerialMapDisplay::transformAerialMap()
     return;
   }
 
-  // the parent frame of this scene node
-  static std::string const mapFrame = "map";
+  // the world's frame
+  std::string const utm = "utm"; // make this a configurable setting in rviz
 
-  // the robot's frame
-  std::string const frame = frame_property_->getFrameStd();
+  // tile ID (integer x/y/zoom) corresponding to the downloaded tile / navsat message
+  auto const tile = fromWGSCoordinate<int>({ ref_fix_.latitude, ref_fix_.longitude }, zoom_);
 
-  // note: the orientation is not used on purpose
+  // Latitude and longitude of this tile's origin
+  double longitude = tile.x / std::pow(2.0, zoom_) * 360.0 - 180;
+  double n = M_PI - 2.0 * M_PI * (1 + tile.y) / std::pow(2.0, zoom_);
+  double latitude = 180.0 / M_PI * std::atan(0.5 * (std::exp(n) - std::exp(-n)));
+
+  // Tile's origin in UTM coordinates
+  double northing, easting;
+  std::string utm_zone;
+  RobotLocalization::NavsatConversions::LLtoUTM(latitude, longitude, northing, easting, utm_zone);
+
+  // Origin of the tile in utm coordinates
+  geometry_msgs::Pose origin;
+  origin.position.x = easting;
+  origin.position.y = northing;
+  origin.position.z = 0;
+  origin.orientation.x = 0;
+  origin.orientation.y = 0;
+  origin.orientation.z = 0;
+  origin.orientation.w = 1;
+
+  // Set the position and orientation of the tile
   Ogre::Quaternion orientation;
   Ogre::Vector3 position;
-
-  // can mapFrame be used as a fixed frame?
-  std::string errMsg;
-  if (context_->getFrameManager()->frameHasProblems(mapFrame, ros::Time{}, errMsg) ||
-      context_->getFrameManager()->transformHasProblems(mapFrame, ros::Time{}, errMsg))
-  {
-    context_->getFrameManager()->setFixedFrame(lastFixedFrame_);
-    setStatus(StatusProperty::Error, "Transform", QString::fromStdString(errMsg));
-    return;
-  }
-
-  // Set the pseudo fixed frame to map so that we can align the tiles to north just by setting identity as the
-  // orientation
-  context_->getFrameManager()->setFixedFrame(mapFrame);
-
-  // Get the latest transform between the robot frame and fixed frame from the FrameManager
-  if (!context_->getFrameManager()->getTransform(frame, ros::Time(), position, orientation))
+  if (!context_->getFrameManager()->transform(utm, ros::Time(), origin, position, orientation))
   {
     // display error
     std::string error;
-    if (context_->getFrameManager()->transformHasProblems(frame, ros::Time(), error))
+    if (context_->getFrameManager()->transformHasProblems(utm, ros::Time(), error))
     {
       setStatus(StatusProperty::Error, "Transform", QString::fromStdString(error));
     }
     else
     {
       setStatus(StatusProperty::Error, "Transform",
-                "Could not transform from [" + QString::fromStdString(frame) + "] to Fixed Frame [" + fixed_frame_ +
+                "Could not transform from [" + QString::fromStdString(utm) + "] to Fixed Frame [" + fixed_frame_ +
                     "] for an unknown reason");
     }
     return;
   }
-
-  if (position.isNaN())
-  {
-    // This can occur if an invalid TF is published.
-    // Show an error and don't apply anything, so OGRE does not throw an assertion.
-    setStatus(StatusProperty::Error, "Transform", "Received invalid transform");
-    return;
-  }
-
   setStatus(StatusProperty::Ok, "Transform", "Transform OK");
-
-  // apply transform and add offset from origin
-  // decimal places are needed here to calculate the offset
-  auto const center = fromWGSCoordinate<double>({ ref_fix_.latitude, ref_fix_.longitude }, zoom_);
-  auto const originOffsetX = center.x - std::floor(center.x);
-  auto const originOffsetY = 1 - center.y + std::floor(center.y);  // y coord is flipped
-  double const tile_w_h_m = getTileWH();
-  position.x -= originOffsetX * tile_w_h_m;
-  position.y -= originOffsetY * tile_w_h_m;
   scene_node_->setPosition(position);
-
-  int const convention = frame_convention_property_->getOptionInt();
-  if (convention == FRAME_CONVENTION_XYZ_ENU)
-  {
-    // ENU corresponds to our default drawing method
-    scene_node_->setOrientation(Ogre::Quaternion::IDENTITY);
-  }
-  else if (convention == FRAME_CONVENTION_XYZ_NED)
-  {
-    // XYZ->NED will cause the map to appear reversed when viewed from above (from +z).
-    // clang-format off
-		Ogre::Matrix3 const xyz_R_ned(0, 1, 0,
-		                              1, 0, 0,
-		                              0, 0, -1);
-    // clang-format on
-    scene_node_->setOrientation(xyz_R_ned.Transpose());
-  }
-  else if (convention == FRAME_CONVENTION_XYZ_NWU)
-  {
-    // clang-format off
-		Ogre::Matrix3 const xyz_R_nwu(0, -1, 0,
-		                              1, 0, 0,
-		                              0, 0, 1);
-    // clang-format on
-    scene_node_->setOrientation(xyz_R_nwu.Transpose());
-  }
-  else
-  {
-    ROS_ERROR_STREAM("Invalid convention code: " << convention);
-  }
+  scene_node_->setOrientation(orientation);
 }
 
 void AerialMapDisplay::fixedFrameChanged()

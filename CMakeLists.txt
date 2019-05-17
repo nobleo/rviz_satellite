@@ -14,6 +14,7 @@ endif()
 
 find_package(catkin REQUIRED COMPONENTS
   nav_msgs
+  robot_localization
   roscpp
   rviz
   sensor_msgs
