@@ -3,7 +3,7 @@ header:
   stamp:
     secs: 1435607489
     nsecs: 924811809
-  frame_id: base_link
+  frame_id: nav_sat_fix_base
 status:
   status: 0
   service: 1

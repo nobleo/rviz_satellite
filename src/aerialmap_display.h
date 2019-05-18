@@ -20,6 +20,7 @@ limitations under the License. */
 #include <ros/time.h>
 #include <rviz/display.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <OGRE/OgreTexture.h>
 #include <OGRE/OgreMaterial.h>
@@ -53,6 +54,7 @@ class Property;
 class RosTopicProperty;
 class StringProperty;
 class TfFrameProperty;
+class EnumProperty;
 
 /**
  * @class AerialMapDisplay
@@ -74,6 +76,7 @@ public:
 protected Q_SLOTS:
   void updateAlpha();
   void updateTopic();
+  void updateFrame();
   void updateDrawUnder();
   void updateTileUrl();
   void updateZoom();
@@ -130,6 +133,8 @@ protected:
    */
   void transformAerialMap();
 
+  void computeTransformations();
+
   /**
    * Tile with associated Ogre data
    */
@@ -147,14 +152,20 @@ protected:
 
   ros::Subscriber coord_sub_;
 
+  // tf2-listener
+  tf2_ros::Buffer tfBuffer_;
+  tf2_ros::TransformListener tfListener_;
+
   // properties
   RosTopicProperty* topic_property_;
+  TfFrameProperty* frame_property_;
   StringProperty* tile_url_property_;
   IntProperty* zoom_property_;
   IntProperty* blocks_property_;
   FloatProperty* resolution_property_;
   FloatProperty* alpha_property_;
   Property* draw_under_property_;
+  EnumProperty* frame_convention_property_;
 
   float alpha_;
   bool draw_under_;
@@ -170,6 +181,14 @@ protected:
   /// Last request()ed tile id
   boost::optional<TileId> lastTileId_;
   std::string lastFixedFrame_;
+
+  // coordinates
+  WGSCoordinate baseWGS_;
+  CartesianCoordinate baseCartesian_;
+  WGSCoordinate robotWGS_;
+  CartesianCoordinate robotCartesian_;
+  WGSCoordinate tileWGS_;
+  CartesianCoordinate tileCartesian_;
 
   /**
    * Calculate the tile width/ height in meter

@@ -6,5 +6,8 @@
     <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rviz_satellite)/launch/demo.rviz"/>
 
     <!-- Static fake TF transform -->
-    <node pkg="tf2_ros" type="static_transform_publisher" name="static_tf_fake" args="0 0 0 0 0 0 map base_link" />
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_tf_fake" args="50 50 0 0.5 0 0 fixed_frame map" />
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_tf_fake2" args="100 100 0 0.5 0 0 map nav_sat_fix_base" />
+    <node pkg="tf2_ros" type="static_transform_publisher" name="static_tf_fake3" args="300 0 0 0.5 0 0 nav_sat_fix_base robot" />
+
 </launch>

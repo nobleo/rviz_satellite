@@ -21,6 +21,11 @@ limitations under the License. */
 
 #include "General.h"
 
+struct CartesianCoordinate
+{
+  double xEasting, yNorthing;
+};
+
 /**
  * A WGS coordinate consisting of a latitude and longitude.
  */

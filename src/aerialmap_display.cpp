@@ -35,6 +35,7 @@ limitations under the License. */
 #include "rviz/properties/float_property.h"
 #include "rviz/properties/int_property.h"
 #include "rviz/properties/property.h"
+#include "rviz/properties/tf_frame_property.h"
 #include "rviz/properties/quaternion_property.h"
 #include "rviz/properties/ros_topic_property.h"
 #include "rviz/properties/vector_property.h"
@@ -44,13 +45,22 @@ limitations under the License. */
 #include "aerialmap_display.h"
 #include "General.h"
 
+int constexpr FRAME_CONVENTION_XYZ_ENU = 0;  //  X -> East, Y -> North
+
 namespace rviz
 {
-AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false), received_msg_(false)
+AerialMapDisplay::AerialMapDisplay() : Display(), tfListener_{ tfBuffer_ }, dirty_(false), received_msg_(false)
 {
-  topic_property_ =
-      new RosTopicProperty("Topic", "", QString::fromStdString(ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
-                           "nav_msgs::Odometry topic to subscribe to.", this, SLOT(updateTopic()));
+  topic_property_ = new RosTopicProperty(
+      "NavSatFix", "", QString::fromStdString(ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
+      "nav_msgs::NavSatFix topic to subscribe to, this determines the link between geo-coordinates (lat/lon/alt) and "
+      "local Cartesian coordinates. The frame_id of this topic is assumed to be exactly at the lat/lon/alt coordinates "
+      "of this message.",
+      this, SLOT(updateTopic()));
+
+  frame_property_ = new TfFrameProperty("Robot frame", "robot", "TF frame for the moving robot, must be connected to "
+                                                                "the base frame of the NavSatFix message.",
+                                        this, nullptr, false, SLOT(updateFrame()), this);
 
   alpha_property_ =
       new FloatProperty("Alpha", 0.7, "Amount of transparency to apply to the map.", this, SLOT(updateAlpha()));
@@ -59,10 +69,10 @@ AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false), received_msg_(f
   alpha_property_->setMax(1);
   alpha_property_->setShouldBeSaved(true);
 
-  draw_under_property_ = new Property("Draw Behind", false,
-                                      "Rendering option, controls whether or not the map is always"
-                                      " drawn behind everything else.",
-                                      this, SLOT(updateDrawUnder()));
+  draw_under_property_ =
+      new Property("Draw Behind", false, "Rendering option, controls whether or not the map is always"
+                                         " drawn behind everything else.",
+                   this, SLOT(updateDrawUnder()));
   draw_under_property_->setShouldBeSaved(true);
   draw_under_ = draw_under_property_->getValue().toBool();
 
@@ -89,6 +99,13 @@ AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false), received_msg_(f
   blocks_property_->setMin(0);
   blocks_property_->setMax(maxBlocks);
 
+  frame_convention_property_ =
+      new EnumProperty("Frame Convention", "XYZ -> ENU",
+                       "Convention for mapping cartesian frame to the compass, "
+                       "refering to the base frame of the NavSatFix msg. Only XYZ -> ENU is supported.",
+                       this, SLOT(updateFrameConvention()));
+  frame_convention_property_->addOptionStd("XYZ -> ENU", FRAME_CONVENTION_XYZ_ENU);
+
   //  updating one triggers reload
   updateBlocks();
 }
@@ -101,12 +118,20 @@ AerialMapDisplay::~AerialMapDisplay()
 
 void AerialMapDisplay::onInitialize()
 {
+  frame_property_->setFrameManager(context_->getFrameManager());
 }
 
 void AerialMapDisplay::onEnable()
 {
   lastFixedFrame_ = context_->getFrameManager()->getFixedFrame();
   subscribe();
+}
+
+void AerialMapDisplay::updateFrame()
+{
+  ROS_INFO_STREAM("Changing robot frame to " << frame_property_->getFrameStd());
+  computeTransformations();
+  transformAerialMap();
 }
 
 void AerialMapDisplay::onDisable()
@@ -189,6 +214,7 @@ void AerialMapDisplay::updateBlocks()
 
 void AerialMapDisplay::updateFrameConvention()
 {
+  computeTransformations();
   transformAerialMap();
 }
 
@@ -257,6 +283,7 @@ void AerialMapDisplay::createGeometry()
 
 void AerialMapDisplay::update(float, float)
 {
+  computeTransformations();
   // create all geometry, if necessary
   assembleScene();
 
@@ -270,6 +297,7 @@ void AerialMapDisplay::navFixCallback(sensor_msgs::NavSatFixConstPtr const& msg)
 
   // re-load imagery
   received_msg_ = true;
+  computeTransformations();
   loadImagery();
   transformAerialMap();
 }
@@ -296,7 +324,7 @@ void AerialMapDisplay::loadImagery()
     return;
   }
 
-  TileId tileId{ tile_url_, fromWGSCoordinate({ ref_fix_.latitude, ref_fix_.longitude }, zoom_), zoom_ };
+  TileId tileId{ tile_url_, fromWGSCoordinate({ robotWGS_.lat, robotWGS_.lon }, zoom_), zoom_ };
   if (!lastTileId_ || !(tileId == *lastTileId_))
   {
     lastTileId_ = tileId;
@@ -321,8 +349,8 @@ void AerialMapDisplay::loadImagery()
   }
   else if (errorRate > 0.3)
   {
-    setStatus(StatusProperty::Level::Warn, "Message",
-              "Not all requested tiles have been received. Possibly the server is throttling?");
+    setStatus(StatusProperty::Level::Warn, "Message", "Not all requested tiles have been received. Possibly the server "
+                                                      "is throttling?");
   }
   else
   {
@@ -347,7 +375,7 @@ void AerialMapDisplay::assembleScene()
     tileCache_.request({ *lastTileId_, blocks_ });
   }
 
-  TileId tileId{ tile_url_, fromWGSCoordinate({ ref_fix_.latitude, ref_fix_.longitude }, zoom_), zoom_ };
+  TileId tileId{ tile_url_, fromWGSCoordinate({ robotWGS_.lat, robotWGS_.lon }, zoom_), zoom_ };
   Area area(tileId, blocks_);
 
   TileCacheGuard guard(tileCache_);
@@ -470,26 +498,10 @@ void AerialMapDisplay::transformAerialMap()
     return;
   }
 
-  // the world's frame
-  std::string const utm = "utm"; // make this a configurable setting in rviz
-
-  // tile ID (integer x/y/zoom) corresponding to the downloaded tile / navsat message
-  auto const tile = fromWGSCoordinate<int>({ ref_fix_.latitude, ref_fix_.longitude }, zoom_);
-
-  // Latitude and longitude of this tile's origin
-  double longitude = tile.x / std::pow(2.0, zoom_) * 360.0 - 180;
-  double n = M_PI - 2.0 * M_PI * (1 + tile.y) / std::pow(2.0, zoom_);
-  double latitude = 180.0 / M_PI * std::atan(0.5 * (std::exp(n) - std::exp(-n)));
-
-  // Tile's origin in UTM coordinates
-  double northing, easting;
-  std::string utm_zone;
-  RobotLocalization::NavsatConversions::LLtoUTM(latitude, longitude, northing, easting, utm_zone);
-
   // Origin of the tile in utm coordinates
   geometry_msgs::Pose origin;
-  origin.position.x = easting;
-  origin.position.y = northing;
+  origin.position.x = tileCartesian_.xEasting - baseCartesian_.xEasting;
+  origin.position.y = tileCartesian_.yNorthing - baseCartesian_.yNorthing;
   origin.position.z = 0;
   origin.orientation.x = 0;
   origin.orientation.y = 0;
@@ -499,19 +511,19 @@ void AerialMapDisplay::transformAerialMap()
   // Set the position and orientation of the tile
   Ogre::Quaternion orientation;
   Ogre::Vector3 position;
-  if (!context_->getFrameManager()->transform(utm, ros::Time(), origin, position, orientation))
+  if (!context_->getFrameManager()->transform(ref_fix_.header.frame_id, ros::Time(), origin, position, orientation))
   {
     // display error
     std::string error;
-    if (context_->getFrameManager()->transformHasProblems(utm, ros::Time(), error))
+    if (context_->getFrameManager()->transformHasProblems(ref_fix_.header.frame_id, ros::Time(), error))
     {
       setStatus(StatusProperty::Error, "Transform", QString::fromStdString(error));
     }
     else
     {
       setStatus(StatusProperty::Error, "Transform",
-                "Could not transform from [" + QString::fromStdString(utm) + "] to Fixed Frame [" + fixed_frame_ +
-                    "] for an unknown reason");
+                "Could not transform from [" + QString::fromStdString(ref_fix_.header.frame_id) + "] to Fixed Frame [" +
+                    fixed_frame_ + "] for an unknown reason");
     }
     return;
   }
@@ -520,8 +532,59 @@ void AerialMapDisplay::transformAerialMap()
   scene_node_->setOrientation(orientation);
 }
 
+void AerialMapDisplay::computeTransformations()
+{
+  std::string errMsg;
+  if (context_->getFrameManager()->frameHasProblems(context_->getFrameManager()->getFixedFrame(), ros::Time{},
+                                                    errMsg) ||
+      context_->getFrameManager()->transformHasProblems(context_->getFrameManager()->getFixedFrame(), ros::Time{},
+                                                        errMsg) ||
+      context_->getFrameManager()->frameHasProblems(frame_property_->getFrameStd(), ros::Time{}, errMsg) ||
+      context_->getFrameManager()->transformHasProblems(frame_property_->getFrameStd(), ros::Time{}, errMsg) ||
+      context_->getFrameManager()->frameHasProblems(ref_fix_.header.frame_id, ros::Time{}, errMsg) ||
+      context_->getFrameManager()->transformHasProblems(ref_fix_.header.frame_id, ros::Time{}, errMsg))
+  {
+    setStatus(StatusProperty::Error, "Transform", QString::fromStdString(errMsg));
+    setStatus(StatusProperty::Error, "README",
+              QString::fromStdString("Tiles might be visible, but in the wrong place!"));
+    // todo: replace this readme by hiding the tiles in a way
+    // that only those that should be shown are activated again below
+    return;
+  }
+  deleteStatus("README");
+
+  // compute latitude and longitude of the robot frame
+  baseWGS_.lat = ref_fix_.latitude;
+  baseWGS_.lon = ref_fix_.longitude;
+  std::string utm_zone;
+  RobotLocalization::NavsatConversions::LLtoUTM(baseWGS_.lat, baseWGS_.lon, baseCartesian_.yNorthing,
+                                                baseCartesian_.xEasting, utm_zone);
+
+  geometry_msgs::TransformStamped transform = tfBuffer_.lookupTransform(
+      ref_fix_.header.frame_id, frame_property_->getFrameStd(), ros::Time(0), ros::Duration(10.0));
+
+  robotCartesian_.xEasting = baseCartesian_.xEasting + transform.transform.translation.x;
+  robotCartesian_.yNorthing = baseCartesian_.yNorthing + transform.transform.translation.y;
+
+  RobotLocalization::NavsatConversions::UTMtoLL(robotCartesian_.yNorthing, robotCartesian_.xEasting, utm_zone,
+                                                robotWGS_.lat, robotWGS_.lon);
+
+  // tile ID (integer x/y/zoom) corresponding to the downloaded tile / navsat message
+  auto const tile = fromWGSCoordinate<int>({ robotWGS_.lat, robotWGS_.lon }, zoom_);
+
+  // Latitude and longitude of this tile's origin
+  tileWGS_.lon = tile.x / std::pow(2.0, zoom_) * 360.0 - 180;
+  double n = M_PI - 2.0 * M_PI * (1 + tile.y) / std::pow(2.0, zoom_);
+  tileWGS_.lat = 180.0 / M_PI * std::atan(0.5 * (std::exp(n) - std::exp(-n)));
+
+  // Tile's origin in UTM coordinates
+  RobotLocalization::NavsatConversions::LLtoUTM(tileWGS_.lat, tileWGS_.lon, tileCartesian_.yNorthing,
+                                                tileCartesian_.xEasting, utm_zone);
+}
+
 void AerialMapDisplay::fixedFrameChanged()
 {
+  computeTransformations();
   transformAerialMap();
 }
 
