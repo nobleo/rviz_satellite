@@ -67,7 +67,6 @@ public:
   ~AerialMapDisplay() override;
 
   // Overrides from Display
-  void onInitialize() override;
   void fixedFrameChanged() override;
   void reset() override;
   void update(float, float) override;

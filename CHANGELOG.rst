@@ -4,6 +4,7 @@ Changelog for package rviz_satellite
 
 Forthcoming
 -----------
+* Remove the robot frame property. Instead use the frame from the NavSatFix topic
 * Fix demo.launch
 
 1.2.0 (2019-03-07)

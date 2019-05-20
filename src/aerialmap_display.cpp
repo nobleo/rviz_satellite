@@ -108,10 +108,6 @@ AerialMapDisplay::~AerialMapDisplay()
   clear();
 }
 
-void AerialMapDisplay::onInitialize()
-{
-}
-
 void AerialMapDisplay::onEnable()
 {
   lastFixedFrame_ = context_->getFrameManager()->getFixedFrame();

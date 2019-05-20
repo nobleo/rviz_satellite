@@ -40,7 +40,6 @@ Visualization Manager:
       Frame Convention: XYZ -> ENU
       Name: AerialMapDisplay
       Object URI: https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png
-      Robot frame: base_link
       Topic: /gps/fix
       Value: true
       Zoom: 18
