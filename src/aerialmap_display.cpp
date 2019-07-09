@@ -53,7 +53,7 @@ AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false), received_msg_(f
 {
   topic_property_ =
       new RosTopicProperty("Topic", "", QString::fromStdString(ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
-                           "nav_msgs::Odometry topic to subscribe to.", this, SLOT(updateTopic()));
+                           "sensor_msgs::NavSatFix topic to subscribe to.", this, SLOT(updateTopic()));
 
   frame_property_ = new TfFrameProperty("Robot frame", "world", "TF frame for the moving robot.", this, nullptr, false,
                                         SLOT(updateFrame()), this);
