@@ -33,7 +33,6 @@ limitations under the License. */
 #include "rviz/properties/float_property.h"
 #include "rviz/properties/int_property.h"
 #include "rviz/properties/property.h"
-#include "rviz/properties/tf_frame_property.h"
 #include "rviz/properties/quaternion_property.h"
 #include "rviz/properties/ros_topic_property.h"
 #include "rviz/properties/vector_property.h"
@@ -54,9 +53,6 @@ AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false), received_msg_(f
   topic_property_ =
       new RosTopicProperty("Topic", "", QString::fromStdString(ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
                            "sensor_msgs::NavSatFix topic to subscribe to.", this, SLOT(updateTopic()));
-
-  frame_property_ = new TfFrameProperty("Robot frame", "world", "TF frame for the moving robot.", this, nullptr, false,
-                                        SLOT(updateFrame()), this);
 
   alpha_property_ =
       new FloatProperty("Alpha", 0.7, "Amount of transparency to apply to the map.", this, SLOT(updateAlpha()));
@@ -112,11 +108,6 @@ AerialMapDisplay::~AerialMapDisplay()
   clear();
 }
 
-void AerialMapDisplay::onInitialize()
-{
-  frame_property_->setFrameManager(context_->getFrameManager());
-}
-
 void AerialMapDisplay::onEnable()
 {
   lastFixedFrame_ = context_->getFrameManager()->getFixedFrame();
@@ -164,12 +155,6 @@ void AerialMapDisplay::updateAlpha()
   alpha_ = alpha_property_->getFloat();
   dirty_ = true;
   ROS_INFO("Changing alpha to %f", alpha_);
-}
-
-void AerialMapDisplay::updateFrame()
-{
-  ROS_INFO_STREAM("Changing robot frame to " << frame_property_->getFrameStd());
-  transformAerialMap();
 }
 
 void AerialMapDisplay::updateDrawUnder()
@@ -494,7 +479,7 @@ void AerialMapDisplay::transformAerialMap()
   static std::string const mapFrame = "map";
 
   // the robot's frame
-  std::string const frame = frame_property_->getFrameStd();
+  std::string const frame = ref_fix_.header.frame_id;
 
   // note: the orientation is not used on purpose
   Ogre::Quaternion orientation;

@@ -67,7 +67,6 @@ public:
   ~AerialMapDisplay() override;
 
   // Overrides from Display
-  void onInitialize() override;
   void fixedFrameChanged() override;
   void reset() override;
   void update(float, float) override;
@@ -75,7 +74,6 @@ public:
 protected Q_SLOTS:
   void updateAlpha();
   void updateTopic();
-  void updateFrame();
   void updateDrawUnder();
   void updateTileUrl();
   void updateZoom();
@@ -115,7 +113,7 @@ protected:
    * There are four relevant frames: The robot's frame, Rviz's fixed frame, the ENU/ NED/ NWU world fixed frame, and
    * the tile frame.
    *
-   * * The robot's frame is a frame rigidly attached to the robot. This frame is configurable in the plugin's GUI.
+   * * The NavSatFix frame is a frame rigidly attached to the robot.
    * * The fixed frame is set in Rviz by the user.
    * * The ENU/ NED/ NWU world fixed frame is assumed to be called "map". This name is standardized, see
    * http://www.ros.org/reps/rep-0105.html The map frame can be either ENU, NED, or NWU. The code only uses ENU
@@ -151,7 +149,6 @@ protected:
 
   // properties
   RosTopicProperty* topic_property_;
-  TfFrameProperty* frame_property_;
   StringProperty* tile_url_property_;
   IntProperty* zoom_property_;
   IntProperty* blocks_property_;
