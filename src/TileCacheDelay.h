@@ -132,7 +132,7 @@ public:
  *
  * This is done by trying to load a whole square instead of just a single tile. The exact algorithm is as follows:
  *
- * Everytime the robot enters a new center tile, request() is called. This functions stores the requested
+ * Every time the robot enters a new center tile, request() is called. This functions stores the requested
  * detail::ExpiringArea, where a ExpiringArea is just an Area at a tile id with a timeout. Therefore we will collect a
  * history of Areas (detail::AreaHistory) while the robot moves.
  *
@@ -141,7 +141,7 @@ public:
  * * either of the following things happened:
  *   * the tile is inside an Area which has all its tiles successfully loaded, or
  *   * the tile is inside an Area which expired, i.e. the Area was requested some seconds ago but not all tiles are
- * loaded.
+ *     loaded.
  *
  * @warning Since TileCache isn't a virtual class, you shouldn't upcast a TileCacheDelay object to a TileCache object!
  */

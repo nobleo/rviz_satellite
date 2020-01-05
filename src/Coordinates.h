@@ -43,7 +43,7 @@ struct TileCoordinateGeneric
 };
 
 /**
- * Convert lat/ lon to a tile coordinate with the mercator projection.
+ * Convert lat/ lon to a tile coordinate with the Mercator projection.
  *
  * @see https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames for explanation of these calculations.
  */

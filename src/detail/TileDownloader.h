@@ -33,7 +33,7 @@ namespace detail
 /**
  * @brief Tile downloader
  *
- * The purpose of this class is to encapsulate all the Qt stuff regarding downloading away.
+ * This class encapsulates away all the Qt stuff regarding downloading.
  */
 class TileDownloader : public QObject
 {
