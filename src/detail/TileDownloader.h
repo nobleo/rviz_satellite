@@ -67,8 +67,8 @@ public:
   {
     // see https://foundation.wikimedia.org/wiki/Maps_Terms_of_Use#Using_maps_in_third-party_services
     auto const requestUrl = QUrl(QString::fromStdString(tileURL(tileId)));
-    ROS_DEBUG_STREAM_NAMED("rviz_satellite", "requesting tile from URL: " << requestUrl.toString().toStdString());
-    
+    ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loading tile " << requestUrl.toString().toStdString());
+
     QNetworkRequest request(requestUrl);
     char constexpr agent[] = "rviz_satellite/" RVIZ_SATELLITE_VERSION " (+https://github.com/gareth-cross/"
                              "rviz_satellite)";
@@ -99,12 +99,14 @@ public slots:
     }
 
     // log if tile comes from cache or web
-    QVariant fromCache = reply->attribute(QNetworkRequest::SourceIsFromCacheAttribute);
-    if (fromCache.toBool()) {
-      ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loaded tile from cache (" << url.toString().toStdString() << ")");
+    bool const fromCache = reply->attribute(QNetworkRequest::SourceIsFromCacheAttribute).toBool();
+    if (fromCache)
+    {
+      ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loaded tile from cache " << url.toString().toStdString());
     }
-    else {
-      ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loaded tile from web (" << url.toString().toStdString() << ")");
+    else
+    {
+      ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loaded tile from web " << url.toString().toStdString());
     }
 
     QImageReader reader(reply);
