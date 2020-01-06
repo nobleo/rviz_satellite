@@ -66,12 +66,16 @@ public:
   void loadTile(TileId const& tileId)
   {
     // see https://foundation.wikimedia.org/wiki/Maps_Terms_of_Use#Using_maps_in_third-party_services
-    QNetworkRequest request(QUrl(QString::fromStdString(tileURL(tileId))));
+    auto const requestUrl = QUrl(QString::fromStdString(tileURL(tileId)));
+    ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loading tile " << requestUrl.toString().toStdString());
+
+    QNetworkRequest request(requestUrl);
     char constexpr agent[] = "rviz_satellite/" RVIZ_SATELLITE_VERSION " (+https://github.com/gareth-cross/"
                              "rviz_satellite)";
     request.setHeader(QNetworkRequest::KnownHeaders::UserAgentHeader, agent);
     QVariant variant;
     variant.setValue(tileId);
+    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::CacheLoadControl::PreferCache);
     request.setAttribute(QNetworkRequest::User, variant);
     manager->get(request);
   }
@@ -85,13 +89,24 @@ public slots:
     QUrl const url = reply->url();
     if (reply->error())
     {
-      ROS_ERROR_STREAM(reply->errorString().toStdString());
+      ROS_ERROR_STREAM("Got error when loading tile: " << reply->errorString().toStdString());
       errorRates.issueError(tileId.tileServer);
       return;
     }
     else
     {
       errorRates.issueSuccess(tileId.tileServer);
+    }
+
+    // log if tile comes from cache or web
+    bool const fromCache = reply->attribute(QNetworkRequest::SourceIsFromCacheAttribute).toBool();
+    if (fromCache)
+    {
+      ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loaded tile from cache " << url.toString().toStdString());
+    }
+    else
+    {
+      ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loaded tile from web " << url.toString().toStdString());
     }
 
     QImageReader reader(reply);

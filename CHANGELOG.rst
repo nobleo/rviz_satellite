@@ -4,6 +4,7 @@ Changelog for package rviz_satellite
 
 Forthcoming
 -----------
+* Set tile fetching preference to cache
 * Remove the robot frame property. Instead use the frame from the NavSatFix topic
 * Fix demo.launch
 * Fix uninitialized variable
