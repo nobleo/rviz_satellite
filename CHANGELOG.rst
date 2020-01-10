@@ -4,6 +4,7 @@ Changelog for package rviz_satellite
 
 Forthcoming
 -----------
+* Fix setting the fixed frame
 * Fix race when reading the blocks property
 * Set tile fetching preference to cache
 * Remove the robot frame property. Instead use the frame from the NavSatFix topic

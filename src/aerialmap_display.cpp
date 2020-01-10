@@ -42,9 +42,12 @@ limitations under the License. */
 #include "aerialmap_display.h"
 #include "General.h"
 
-int constexpr FRAME_CONVENTION_XYZ_ENU = 0;  //  X -> East, Y -> North
-int constexpr FRAME_CONVENTION_XYZ_NED = 1;  //  X -> North, Y -> East
-int constexpr FRAME_CONVENTION_XYZ_NWU = 2;  //  X -> North, Y -> West
+enum class frame_convention
+{
+  enu = 0,  // X = East,  Y = North
+  ned,      // X = North, Y = East
+  nwu,      // X = North, Y = West
+};
 
 namespace rviz
 {
@@ -95,9 +98,9 @@ AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false), received_msg_(f
   frame_convention_property_ =
       new EnumProperty("Frame Convention", "XYZ -> ENU", "Convention for mapping cartesian frame to the compass", this,
                        SLOT(updateFrameConvention()));
-  frame_convention_property_->addOptionStd("XYZ -> ENU", FRAME_CONVENTION_XYZ_ENU);
-  frame_convention_property_->addOptionStd("XYZ -> NED", FRAME_CONVENTION_XYZ_NED);
-  frame_convention_property_->addOptionStd("XYZ -> NWU", FRAME_CONVENTION_XYZ_NWU);
+  frame_convention_property_->addOptionStd("XYZ -> ENU", static_cast<int>(frame_convention::enu));
+  frame_convention_property_->addOptionStd("XYZ -> NED", static_cast<int>(frame_convention::ned));
+  frame_convention_property_->addOptionStd("XYZ -> NWU", static_cast<int>(frame_convention::nwu));
 }
 
 AerialMapDisplay::~AerialMapDisplay()
@@ -108,7 +111,6 @@ AerialMapDisplay::~AerialMapDisplay()
 
 void AerialMapDisplay::onEnable()
 {
-  lastFixedFrame_ = context_->getFrameManager()->getFixedFrame();
   subscribe();
 }
 
@@ -116,7 +118,6 @@ void AerialMapDisplay::onDisable()
 {
   unsubscribe();
   clear();
-  context_->getFrameManager()->setFixedFrame(lastFixedFrame_);
 }
 
 void AerialMapDisplay::subscribe()
@@ -300,9 +301,9 @@ void AerialMapDisplay::loadImagery()
   }
 
   TileId tileId{ tile_url_, fromWGSCoordinate({ ref_fix_.latitude, ref_fix_.longitude }, zoom_), zoom_ };
-  if (!lastTileId_ || !(tileId == *lastTileId_))
+  if (!lastCenterTile_ || !(tileId == *lastCenterTile_))
   {
-    lastTileId_ = tileId;
+    lastCenterTile_ = tileId;
 
     try
     {
@@ -335,7 +336,7 @@ void AerialMapDisplay::loadImagery()
 
 void AerialMapDisplay::assembleScene()
 {
-  if (!isEnabled() || !dirty_ || !lastTileId_)
+  if (!isEnabled() || !dirty_ || !lastCenterTile_)
   {
     return;
   }
@@ -347,7 +348,7 @@ void AerialMapDisplay::assembleScene()
     createGeometry();
 
     // e.g. when the number of blocks got bigger, the new tiles have to be loaded
-    tileCache_.request({ *lastTileId_, blocks_ });
+    tileCache_.request({ *lastCenterTile_, blocks_ });
   }
 
   TileId tileId{ tile_url_, fromWGSCoordinate({ ref_fix_.latitude, ref_fix_.longitude }, zoom_), zoom_ };
@@ -411,17 +412,31 @@ void AerialMapDisplay::assembleScene()
       // tile width/ height in meter
       double const tile_w_h_m = getTileWH();
 
-      // determine position of this tile relative to the robot's position
-      // note: We invert the y-axis so that positive y corresponds to north. See transformAerialMap().
-      double const x = (xx - lastTileId_->coord.x) * tile_w_h_m;
-      double const y = -(yy - lastTileId_->coord.y) * tile_w_h_m;
+      // Note: In the following we will do two things:
+      //
+      // * We flip the position's y coordinate.
+      // * We flip the texture's v coordinate.
+      //
+      // For more explanation see the function transformAerialMap()
+
+      // The center tile has the coordinates left-bot = (0,0) and right-top =
+      // (1,1) in the AerialMap frame.
+      double const x = (xx - lastCenterTile_->coord.x) * tile_w_h_m;
+      // flip the y coordinate because we need to flip the tiles to align the tile's frame with the ENU "map" frame
+      double const y = -(yy - lastCenterTile_->coord.y) * tile_w_h_m;
 
       // create a quad for this tile
-      // note: We have to create the vertices everytime and cannot reuse the old vertices: tile_w_h_m depends on the
-      // latitude.
+      // note: We have to recreate the vertices and cannot reuse the old vertices: tile_w_h_m depends on the latitude
       obj->clear();
 
       obj->begin(material->getName(), Ogre::RenderOperation::OT_TRIANGLE_LIST);
+
+      // We assign the Ogre texture coordinates in a way so that we flip the
+      // texture along the v coordinate. For example, we assign the bottom left
+      // corner of the tile to the top left texture corner.
+      //
+      // Note that the Ogre texture coordinate system is: (0,0) = top left of the loaded image and (1,1) = bottom right
+      // of the loaded image
 
       // bottom left
       obj->position(x, y, 0.0f);
@@ -466,56 +481,129 @@ void AerialMapDisplay::assembleScene()
   tileCache_.purge({ tileId, blocks_ });
 }
 
+namespace
+{
+// rotation matrix for rotating the current frame to ENU
+Ogre::Matrix3 rotationToENU(frame_convention convention)
+{
+  switch (convention)
+  {
+    case frame_convention::ned:
+    {
+      // XYZ->NED will cause the map to appear reversed when viewed from above (from +z).
+      // clang-format off
+      Ogre::Matrix3 const xyz_R_ned(0, 1, 0,
+                                    1, 0, 0,
+                                    0, 0, -1);
+      // clang-format on
+      return xyz_R_ned.Transpose();
+    }
+    case frame_convention::nwu:
+    {
+      // clang-format off
+      Ogre::Matrix3 const xyz_R_nwu(0, -1, 0,
+                                    1, 0, 0,
+                                    0, 0, 1);
+      // clang-format on
+      return xyz_R_nwu.Transpose();
+    }
+    case frame_convention::enu:
+    default:  // this should never be the case
+      return Ogre::Matrix3::IDENTITY;
+  }
+}
+}  // namespace
+
+bool AerialMapDisplay::getTransform(const std::string& frame, ros::Time time, Ogre::Vector3& position,
+                                    Ogre::Quaternion& orientation)
+{
+  if (context_->getFrameManager()->getTransform(frame, time, position, orientation))
+  {
+    return true;
+  }
+
+  // display error
+  std::string error;
+  if (context_->getFrameManager()->transformHasProblems(frame, time, error))
+  {
+    setStatus(StatusProperty::Error, "Transform", QString::fromStdString(error));
+  }
+  else
+  {
+    setStatus(StatusProperty::Error, "Transform",
+              "Could not transform from [" + QString::fromStdString(frame) + "] to Fixed Frame [" + fixed_frame_ +
+                  "] for an unknown reason");
+  }
+
+  return false;
+}
+
+boost::optional<Ogre::Vector3> AerialMapDisplay::getPosition(const std::string& frame, ros::Time time)
+{
+  Ogre::Vector3 position;
+  Ogre::Quaternion orientation;
+  if (getTransform(frame, time, position, orientation))
+  {
+    return position;
+  }
+  else
+  {
+    return boost::none;
+  }
+}
+
+boost::optional<Ogre::Quaternion> AerialMapDisplay::getOrientation(const std::string& frame, ros::Time time)
+{
+  Ogre::Vector3 position;
+  Ogre::Quaternion orientation;
+  if (getTransform(frame, time, position, orientation))
+  {
+    return orientation;
+  }
+  else
+  {
+    return boost::none;
+  }
+}
+
 void AerialMapDisplay::transformAerialMap()
 {
+  // We will use five frames in this function:
+  //
+  // * The frame from the NavSatFix message. It is rigidly attached to the robot.
+  // * Rviz's fixed frame (referred to as Ff). It is set by the user in Rviz.
+  // * The ENU/ NED/ NWU world frame "map". The code only uses ENU internally and rotates the frame into NED or NWU at
+  //   the end of the calculations.
+  // * The frame of the tiles. We assume that the tiles are in a frame where x points eastwards and y southwards. This
+  //   frame is used by OSM and Google Maps, see
+  //   https://en.wikipedia.org/wiki/Web_Mercator_projection and
+  //   https://developers.google.com/maps/documentation/javascript/coordinates
+  // * The AerialMap frame is an ENU frame. This is where all tiles are placed in. The center tile is in the first
+  //   quadrant, to be exact the left bottom corner of the center tile has coordinates (0,0) in the AerialMap frame.
+
   if (!isEnabled())
   {
     return;
   }
 
-  // the parent frame of this scene node
-  static std::string const mapFrame = "map";
+  // the frame "map" is defined here: https://www.ros.org/reps/rep-0105.html#map
+  std::string const static frameMap = "map";
+  std::string const frameNavSatFix = ref_fix_.header.frame_id;
 
-  // the robot's frame
-  std::string const frame = ref_fix_.header.frame_id;
-
-  // note: the orientation is not used on purpose
-  Ogre::Quaternion orientation;
-  Ogre::Vector3 position;
-
-  // can mapFrame be used as a fixed frame?
-  std::string errMsg;
-  if (context_->getFrameManager()->frameHasProblems(mapFrame, ros::Time{}, errMsg) ||
-      context_->getFrameManager()->transformHasProblems(mapFrame, ros::Time{}, errMsg))
+  // rotation from the fixed frame into the map frame
+  boost::optional<Ogre::Quaternion> rotationFfToMap = getOrientation(frameMap, ref_fix_.header.stamp);
+  if (!rotationFfToMap)
   {
-    context_->getFrameManager()->setFixedFrame(lastFixedFrame_);
-    setStatus(StatusProperty::Error, "Transform", QString::fromStdString(errMsg));
     return;
   }
 
-  // Set the pseudo fixed frame to map so that we can align the tiles to north just by setting identity as the
-  // orientation
-  context_->getFrameManager()->setFixedFrame(mapFrame);
-
-  // Get the latest transform between the robot frame and fixed frame from the FrameManager
-  if (!context_->getFrameManager()->getTransform(frame, ros::Time(), position, orientation))
+  // translation from the fixed frame to the nav sat fix frame
+  boost::optional<Ogre::Vector3> translationFfToNavSatFix = getPosition(frameNavSatFix, ref_fix_.header.stamp);
+  if (!translationFfToNavSatFix)
   {
-    // display error
-    std::string error;
-    if (context_->getFrameManager()->transformHasProblems(frame, ros::Time(), error))
-    {
-      setStatus(StatusProperty::Error, "Transform", QString::fromStdString(error));
-    }
-    else
-    {
-      setStatus(StatusProperty::Error, "Transform",
-                "Could not transform from [" + QString::fromStdString(frame) + "] to Fixed Frame [" + fixed_frame_ +
-                    "] for an unknown reason");
-    }
     return;
   }
-
-  if (position.isNaN())
+  else if (translationFfToNavSatFix->isNaN())
   {
     // This can occur if an invalid TF is published.
     // Show an error and don't apply anything, so OGRE does not throw an assertion.
@@ -523,47 +611,46 @@ void AerialMapDisplay::transformAerialMap()
     return;
   }
 
+  // overwrite status set in getOrientation() and getPosition()
   setStatus(StatusProperty::Ok, "Transform", "Transform OK");
 
-  // apply transform and add offset from origin
-  // decimal places are needed here to calculate the offset
-  auto const center = fromWGSCoordinate<double>({ ref_fix_.latitude, ref_fix_.longitude }, zoom_);
-  auto const originOffsetX = center.x - std::floor(center.x);
-  auto const originOffsetY = 1 - center.y + std::floor(center.y);  // y coord is flipped
-  double const tile_w_h_m = getTileWH();
-  position.x -= originOffsetX * tile_w_h_m;
-  position.y -= originOffsetY * tile_w_h_m;
-  scene_node_->setPosition(position);
+  // Our goal is to align the tiles properly and to fix them in space (i.e. they e.g. shouldn't move with the robot). We
+  // know that frames are in the OSM frame where x points eastwards and y southwards. Furthermore we know that "map"
+  // satisfies the ENU, NED, or NWU convention. ENU means that x points eastwards and y points northwards. Therefore, we
+  // can align the tiles properly by putting the tiles into an ENU "map" frame where we flip all tiles along the y
+  // coordinate. If "map" isn't ENU but NED or NWU we will just rotate "map" in the end of the calculations into ENU,
+  // i.e. internally we will just assume ENU.
+  Ogre::Matrix3 rotationFfToMap_;
+  rotationFfToMap->ToRotationMatrix(rotationFfToMap_);
+  auto const rotationMapToENU =
+      rotationToENU(static_cast<frame_convention>(frame_convention_property_->getOptionInt()));
+  auto const rotationFfToAerialMap = rotationMapToENU * rotationFfToMap_;
+  scene_node_->setOrientation(rotationFfToAerialMap);
 
-  int const convention = frame_convention_property_->getOptionInt();
-  if (convention == FRAME_CONVENTION_XYZ_ENU)
-  {
-    // ENU corresponds to our default drawing method
-    scene_node_->setOrientation(Ogre::Quaternion::IDENTITY);
-  }
-  else if (convention == FRAME_CONVENTION_XYZ_NED)
-  {
-    // XYZ->NED will cause the map to appear reversed when viewed from above (from +z).
-    // clang-format off
-		Ogre::Matrix3 const xyz_R_ned(0, 1, 0,
-		                              1, 0, 0,
-		                              0, 0, -1);
-    // clang-format on
-    scene_node_->setOrientation(xyz_R_ned.Transpose());
-  }
-  else if (convention == FRAME_CONVENTION_XYZ_NWU)
-  {
-    // clang-format off
-		Ogre::Matrix3 const xyz_R_nwu(0, -1, 0,
-		                              1, 0, 0,
-		                              0, 0, 1);
-    // clang-format on
-    scene_node_->setOrientation(xyz_R_nwu.Transpose());
-  }
-  else
-  {
-    ROS_ERROR_STREAM("Invalid convention code: " << convention);
-  }
+  // As already said, we want to put the AerialMap into "map". In assembleScene() we have already created the tiles. In
+  // this function, we now calculate the exact coordinate (i.e. with the fractional part) of the NavSatFix coordinate
+  // (in the AerialMap frame). That is we then have the transform "map to AerialMap". Furthermore, we have the transform
+  // "NavSatFix to fixed frame". Thus we can calculate "AerialMap to fixed frame".
+
+  // The "center tile" is by definition always the tile where the NavSatFix is.
+  auto const centerTile = fromWGSCoordinate<double>({ ref_fix_.latitude, ref_fix_.longitude }, zoom_);
+
+  // In assembleScene() we shifted the AerialMap so that the center tile's left-bottom corner has the coordinate (0,0).
+  // Therefore we can calculate the NavSatFix coordinate (in the AerialMap frame) by just looking at the fractional part
+  // of the coordinate. That is we calculate the offset from the left bottom corner of the center tile.
+  auto const centerTileOffsetX = centerTile.x - std::floor(centerTile.x);
+  // In assembleScene() the tiles are created so that the texture is flipped along the y coordinate. Since we want to
+  // calculate the positions of the center tile, we also need to flip the texture's v coordinate here.
+  auto const centerTileOffsetY = 1 - (centerTile.y - std::floor(centerTile.y));
+
+  double const tile_w_h_m = getTileWH();
+  auto const translationAerialMapToNavSatFix =
+      Ogre::Vector3(centerTileOffsetX * tile_w_h_m, centerTileOffsetY * tile_w_h_m, 0);
+  auto const translationNavSatFixToAerialMap = -translationAerialMapToNavSatFix;
+
+  auto const translationFfToAerialMap =
+      *translationFfToNavSatFix + rotationFfToAerialMap * translationNavSatFixToAerialMap;
+  scene_node_->setPosition(translationFfToAerialMap);
 }
 
 void AerialMapDisplay::fixedFrameChanged()

@@ -107,26 +107,19 @@ protected:
   void clearGeometry();
   void createGeometry();
 
+  // Convienece wrapper around FrameManager::getTransform
+  bool getTransform(const std::string& frame, ros::Time time, Ogre::Vector3& position, Ogre::Quaternion& orientation);
+
+  // Convienece wrapper around FrameManager::getTransform to only get the
+  // position
+  boost::optional<Ogre::Vector3> getPosition(const std::string& frame, ros::Time time);
+
+  // Convienece wrapper around FrameManager::getTransform to only get the
+  // orientation
+  boost::optional<Ogre::Quaternion> getOrientation(const std::string& frame, ros::Time time);
+
   /**
-   * @brief Transforms from the robot's frame to the fixed frame.
-   *
-   * There are four relevant frames: The robot's frame, Rviz's fixed frame, the ENU/ NED/ NWU world fixed frame, and
-   * the tile frame.
-   *
-   * * The NavSatFix frame is a frame rigidly attached to the robot.
-   * * The fixed frame is set in Rviz by the user.
-   * * The ENU/ NED/ NWU world fixed frame is assumed to be called "map". This name is standardized, see
-   * http://www.ros.org/reps/rep-0105.html The map frame can be either ENU, NED, or NWU. The code only uses ENU
-   * internally and later rotates the frame into NED or NWU accordingly.
-   * * We assume that the tiles are in a frame where x points eastwards and y southwards. This frame is used by
-   * OSM and Google Maps, see https://developers.google.com/maps/documentation/javascript/coordinates
-   *
-   * Since the code works with ENU internally, the tiles' y-coordinate is flipped so that y points to north. Therefore
-   * we can align the tiles to north by putting them into the frame "map" with an orientation of
-   * Ogre::Quaternion::IDENTITY. We place the tiles indirectly into the "map" frame by using the "map" frame as the
-   * pseudo fixed frame.
-   *
-   * Thus we will end up with the tile mesh being aligned to the north regardless of which fixed frame is chosen.
+   * @brief Transforms the tiles into the fixed frame.
    */
   void transformAerialMap();
 
@@ -168,9 +161,8 @@ protected:
   bool received_msg_;
   sensor_msgs::NavSatFix ref_fix_;
   TileCacheDelay<OgreTile> tileCache_;
-  /// Last request()ed tile id
-  boost::optional<TileId> lastTileId_;
-  std::string lastFixedFrame_;
+  /// Last request()ed tile id (which is the center tile)
+  boost::optional<TileId> lastCenterTile_;
 
   /**
    * Calculate the tile width/ height in meter
