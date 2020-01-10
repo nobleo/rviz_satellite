@@ -32,9 +32,10 @@ struct WGSCoordinate
 /**
  * A coordinate for identifying the position of a tile at a given zoom level
  *
- * @note Please use the non-generic TileCoordinate unless you have a specific reason not to.
+ * "Tile coordinates" use the coordinate system explained in
+ * https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#X_and_Y
  *
- * @see fromWGSCoordinate
+ * @note Please use the non-generic TileCoordinate unless you have a specific reason not to.
  */
 template <typename NumericType = int>
 struct TileCoordinateGeneric
