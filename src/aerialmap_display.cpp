@@ -90,7 +90,7 @@ AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false), received_msg_(f
   blocks_property_->setShouldBeSaved(true);
   blocks_property_->setMin(0);
   blocks_property_->setMax(maxBlocks);
-  blocks_ = -1;
+  blocks_ = blocks_property_->getInt();
 
   frame_convention_property_ =
       new EnumProperty("Frame Convention", "XYZ -> ENU", "Convention for mapping cartesian frame to the compass", this,
