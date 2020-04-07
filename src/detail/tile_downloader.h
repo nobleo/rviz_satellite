@@ -23,7 +23,7 @@ limitations under the License. */
 #include <QtCore>
 #include <QtNetwork>
 
-#include <ros/ros.h>
+#include "rviz_common/logging.hpp"
 
 #include "detail/error_rate_manager.h"
 #include "tile_id.h"
@@ -67,7 +67,7 @@ public:
   {
     // see https://foundation.wikimedia.org/wiki/Maps_Terms_of_Use#Using_maps_in_third-party_services
     auto const request_url = QUrl(QString::fromStdString(tileURL(tile_id)));
-    ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loading tile " << request_url.toString().toStdString());
+    RVIZ_COMMON_LOG_INFO_STREAM("Loading tile " << request_url.toString().toStdString());
 
     QNetworkRequest request(request_url);
     char constexpr agent[] = "rviz_satellite/" RVIZ_SATELLITE_VERSION " (+https://github.com/gareth-cross/"
@@ -89,7 +89,7 @@ public slots:
     QUrl const url = reply->url();
     if (reply->error())
     {
-      ROS_ERROR_STREAM("Got error when loading tile: " << reply->errorString().toStdString());
+      RVIZ_COMMON_LOG_ERROR_STREAM("Got error when loading tile: " << reply->errorString().toStdString());
       error_rates.issueError(tile_id.tile_server);
       return;
     }
@@ -102,17 +102,17 @@ public slots:
     bool const from_cache = reply->attribute(QNetworkRequest::SourceIsFromCacheAttribute).toBool();
     if (from_cache)
     {
-      ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loaded tile from cache " << url.toString().toStdString());
+      RVIZ_COMMON_LOG_INFO_STREAM("Loaded tile from cache " << url.toString().toStdString());
     }
     else
     {
-      ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loaded tile from web " << url.toString().toStdString());
+      RVIZ_COMMON_LOG_INFO_STREAM("Loaded tile from web " << url.toString().toStdString());
     }
 
     QImageReader reader(reply);
     if (!reader.canRead())
     {
-      ROS_ERROR_STREAM("Unable to decode image at " << reply->request().url().toString().toLatin1().data());
+      RVIZ_COMMON_LOG_ERROR_STREAM("Unable to decode image at " << reply->request().url().toString().toLatin1().data());
       return;
     }
 

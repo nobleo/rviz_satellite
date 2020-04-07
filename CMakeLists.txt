@@ -1,19 +1,31 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.5)
 project(rviz_satellite)
 
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  rviz
-  sensor_msgs
-)
+# Default to C99
+if(NOT CMAKE_C_STANDARD)
+  set(CMAKE_C_STANDARD 99)
+endif()
 
-catkin_package(
-  CATKIN_DEPENDS sensor_msgs
-)
+# Default to C++14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
 
-find_package(Qt5 ${rviz_QT_VERSION} EXACT REQUIRED Core Gui Network REQUIRED)
-set(QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Network)
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wunused)
+endif()
 
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rviz_common REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(OGRE REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system)
+
+find_package(Qt5 COMPONENTS Core Gui Network Concurrent Widgets REQUIRED)
+set(QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Network Qt5::Concurrent Qt5::Widgets)
 
 ##
 ## BUILD
@@ -37,49 +49,49 @@ set(PROJECT_SOURCE_FILES
   ${${PROJECT_NAME}_MOC_FILES}
 )
 
-link_directories(
-  ${catkin_LIBRARY_DIRS}
-)
-
 add_library(
   ${PROJECT_NAME}
+  SHARED
   ${PROJECT_SOURCE_FILES}
 )
 
-# set compiler options and inject version of software (see tile_downloader.h)
-# rviz_satellite_VERSION is defined via catkin and is read from the package.xml
+# inject version of software (see tile_downloader.h)
+# rviz_satellite_VERSION is defined via ament and is read from the package.xml
 target_compile_options(
   ${PROJECT_NAME}
   PUBLIC
-  -Wall -Wunused -std=c++11 "-DRVIZ_SATELLITE_VERSION=\"${rviz_satellite_VERSION}\""
-)
+  "-DRVIZ_SATELLITE_VERSION=\"${rviz_satellite_VERSION}\"")
 
 target_include_directories(
   ${PROJECT_NAME}
   PUBLIC
+  ${OGRE_INCLUDE_DIRS}
   src
-  ${catkin_INCLUDE_DIRS}
 )
-
+  
 target_link_libraries(
   ${PROJECT_NAME}
-  PUBLIC
   ${QT_LIBRARIES}
-  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
 )
 
+ament_export_include_directories(include)
+ament_target_dependencies(${PROJECT_NAME} rclcpp tf2_ros sensor_msgs rviz_common)
+ament_export_dependencies(rclcpp tf2_ros sensor_msgs rviz_common)
+
+# prevent pluginlib from using boost
+target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
 
 ##
 ## INSTALL
 
 install(TARGETS
   ${PROJECT_NAME}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION lib
 )
 
-install(FILES
-  plugin_description.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
+pluginlib_export_plugin_description_file(rviz_common plugin_description.xml)
+
+ament_package()

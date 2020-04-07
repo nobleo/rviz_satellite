@@ -14,7 +14,7 @@ limitations under the License. */
 
 #pragma once
 
-#include <OGRE/OgreTextureManager.h>
+#include <OgreTextureManager.h>
 #include <QImage>
 #include <utility>
 

@@ -11,20 +11,27 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
+#include "aerialmap_display.h"
 
-#include <OGRE/OgreManualObject.h>
-#include <OGRE/OgreMaterialManager.h>
-#include <OGRE/OgreSceneManager.h>
-#include <OGRE/OgreSceneNode.h>
-#include <OGRE/OgreTextureManager.h>
+#include <iomanip>
 
-#include "rviz/display_context.h"
-#include "rviz/frame_manager.h"
-#include "rviz/properties/float_property.h"
-#include "rviz/properties/int_property.h"
-#include "rviz/properties/property.h"
-#include "rviz/properties/ros_topic_property.h"
-#include "rviz/properties/string_property.h"
+#include <OgreManualObject.h>
+#include <OgreMaterialManager.h>
+#include <OgreSceneManager.h>
+#include <OgreSceneNode.h>
+#include <OgreTextureManager.h>
+#include <OgreTechnique.h>
+
+#include "rviz_common/properties/float_property.hpp"
+#include "rviz_common/properties/int_property.hpp"
+#include "rviz_common/properties/status_property.hpp"
+#include "rviz_common/properties/property.hpp"
+#include "rviz_common/properties/quaternion_property.hpp"
+#include "rviz_common/properties/ros_topic_property.hpp"
+#include "rviz_common/properties/vector_property.hpp"
+#include "rviz_common/validate_floats.hpp"
+#include "rviz_common/display_context.hpp"
+#include "rviz_common/logging.hpp"
 
 #include "aerialmap_display.h"
 #include "mercator.h"
@@ -43,12 +50,20 @@ namespace rviz
  * Splitting this transform lookup is necessary to mitigate frame jitter.
  */
 
+using rviz_common::properties::FloatProperty;
+using rviz_common::properties::IntProperty;
+using rviz_common::properties::Property;
+using rviz_common::properties::RosTopicProperty;
+using rviz_common::properties::StringProperty;
+using rviz_common::properties::StatusProperty;
+
 std::string const AerialMapDisplay::MAP_FRAME = "map";
 
 AerialMapDisplay::AerialMapDisplay() : Display()
 {
+
   topic_property_ =
-      new RosTopicProperty("Topic", "", QString::fromStdString(ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
+      new RosTopicProperty("Topic", "", "",
                            "sensor_msgs::NavSatFix topic to subscribe to.", this, SLOT(updateTopic()));
 
   alpha_property_ =
@@ -92,6 +107,19 @@ AerialMapDisplay::~AerialMapDisplay()
   clearAll();
 }
 
+void AerialMapDisplay::onInitialize()
+{
+  Display::onInitialize();
+  rviz_ros_node_ = context_->getRosNodeAbstraction();
+  topic_property_->initialize(rviz_ros_node_);
+  // TODO - eloquent
+  // update_profile_property_->initialize(
+  // [this](rclcpp::QoS profile) {
+  //   this->update_profile_ = profile;
+  //   updateMapUpdateTopic();
+  // });
+}
+
 void AerialMapDisplay::onEnable()
 {
   createTileObjects();
@@ -113,24 +141,24 @@ void AerialMapDisplay::subscribe()
 
   if (!topic_property_->getTopic().isEmpty())
   {
-    try
-    {
-      ROS_INFO("Subscribing to %s", topic_property_->getTopicStd().c_str());
+    try {
       navsat_fix_sub_ =
-          update_nh_.subscribe(topic_property_->getTopicStd(), 1, &AerialMapDisplay::navFixCallback, this);
-
-      setStatus(StatusProperty::Ok, "Topic", "OK");
-    }
-    catch (ros::Exception& e)
-    {
-      setStatus(StatusProperty::Error, "Topic", QString("Error subscribing: ") + e.what());
+        rviz_ros_node_.lock()->get_raw_node()->
+        template create_subscription<sensor_msgs::msg::NavSatFix>(
+        topic_property_->getTopicStd(), update_profile_, 
+        std::bind(&AerialMapDisplay::navFixCallback, this, std::placeholders::_1));
+      setStatus(rviz_common::properties::StatusProperty::Ok, "Topic", "OK");
+    } catch (rclcpp::exceptions::InvalidTopicNameError & e) {
+      setStatus(
+        rviz_common::properties::StatusProperty::Error, "Topic",
+        QString("Error subscribing: ") + e.what());
     }
   }
 }
 
 void AerialMapDisplay::unsubscribe()
 {
-  navsat_fix_sub_.shutdown();
+  navsat_fix_sub_.reset();
 }
 
 void AerialMapDisplay::updateAlpha()
@@ -301,7 +329,7 @@ void AerialMapDisplay::destroyTileObjects()
     scene_manager_->destroyManualObject(obj.object);
 
     // destroy material
-    if (!obj.material.isNull())
+    if (obj.material)
     {
       Ogre::MaterialManager::getSingleton().remove(obj.material->getName());
     }
@@ -341,7 +369,7 @@ void AerialMapDisplay::createTileObjects()
     obj->setVisible(false);
     scene_node_->attachObject(obj);
 
-    assert(!material.isNull());
+    assert(material);
     objects_.emplace_back(obj, material);
   }
 }
@@ -359,14 +387,14 @@ void AerialMapDisplay::update(float, float)
   transformMapTileToFixedFrame();
 }
 
-void AerialMapDisplay::navFixCallback(sensor_msgs::NavSatFixConstPtr const& msg)
+void AerialMapDisplay::navFixCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
 {
   updateCenterTile(msg);
 
   setStatus(StatusProperty::Ok, "Message", "NavSatFix message received");
 }
 
-void AerialMapDisplay::updateCenterTile(sensor_msgs::NavSatFixConstPtr const& msg)
+void AerialMapDisplay::updateCenterTile(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
 {
   if (!isEnabled())
   {
@@ -385,7 +413,7 @@ void AerialMapDisplay::updateCenterTile(sensor_msgs::NavSatFixConstPtr const& ms
     return;
   }
 
-  ROS_DEBUG_NAMED("rviz_satellite", "Updating center tile");
+  RVIZ_COMMON_LOG_INFO("Updating center tile");
 
   center_tile_ = new_center_tile_id;
   ref_fix_ = msg;
@@ -415,7 +443,7 @@ void AerialMapDisplay::requestTileTextures()
 
   try
   {
-    ROS_DEBUG_NAMED("rviz_satellite", "Requesting new tile images from the server");
+    RVIZ_COMMON_LOG_INFO("Requesting new tile images from the server");
     tile_cache_.request({ *center_tile_, blocks_ });
     triggerSceneAssembly();
   }
@@ -447,7 +475,7 @@ void AerialMapDisplay::checkRequestErrorRate()
 
 void AerialMapDisplay::triggerSceneAssembly()
 {
-  ROS_DEBUG_NAMED("rviz_satellite", "Starting to repaint all tiles");
+  RVIZ_COMMON_LOG_INFO("Starting to repaint all tiles");
   dirty_ = true;
 }
 
@@ -464,7 +492,8 @@ void AerialMapDisplay::assembleScene()
 
   if (objects_.empty())
   {
-    ROS_ERROR_THROTTLE_NAMED(5, "rviz_satellite", "No objects to draw on, call createTileObjects() first!");
+    // FIXME - Not supported yet
+    // RVIZ_COMMON_LOG_ERROR_THROTTLE(std::chrono::seconds(5), "No objects to draw on, call createTileObjects() first!");
     return;
   }
 
@@ -483,7 +512,7 @@ void AerialMapDisplay::assembleScene()
     {
       auto obj = it->object;
       auto& material = it->material;
-      assert(!material.isNull());
+      assert(material);
       ++it;
 
       TileId const to_find{ center_tile_->tile_server, { xx, yy }, center_tile_->zoom };
@@ -595,7 +624,7 @@ void AerialMapDisplay::assembleScene()
   }
   else
   {
-    ROS_DEBUG_NAMED("rviz_satellite", "Finished assembling all tiles");
+    RVIZ_COMMON_LOG_INFO("Finished assembling all tiles");
   }
 
   tile_cache_.purge({ *center_tile_, blocks_ });
@@ -607,7 +636,8 @@ void AerialMapDisplay::transformTileToMapFrame()
 {
   if (not ref_fix_ or not center_tile_)
   {
-    ROS_FATAL_THROTTLE_NAMED(2, "rviz_satellite", "ref_fix_ not set, can't create transforms");
+    // FIXME - Not supported yet
+    // RVIZ_COMMON_LOG_FATAL_THROTTLE(std::chrono::seconds(2), "ref_fix_ not set, can't create transforms");
     return;
   }
 
@@ -647,7 +677,7 @@ void AerialMapDisplay::transformTileToMapFrame()
   auto const center_tile_offset_y = 1 - (center_tile.y - std::floor(center_tile.y));
 
   double const tile_w_h_m = getTileWH(ref_fix_->latitude, zoom_);
-  ROS_DEBUG_NAMED("rviz_satellite", "Tile resolution is %.1fm", tile_w_h_m);
+  RVIZ_COMMON_LOG_INFO_STREAM("Tile resolution is " << std::setprecision(1) << std::fixed << tile_w_h_m << "m");
 
   // translation of the center-tile w.r.t. the NavSatFix frame
   auto const t_centertile_navsat =
@@ -656,7 +686,7 @@ void AerialMapDisplay::transformTileToMapFrame()
   t_centertile_map = t_navsat_map - t_centertile_navsat;
 }
 
-bool AerialMapDisplay::getMapTransform(std::string const& query_frame, ros::Time const& timestamp,
+bool AerialMapDisplay::getMapTransform(std::string const& query_frame, rclcpp::Time const& timestamp,
                                        Ogre::Vector3& position, Ogre::Quaternion& orientation, std::string& error)
 {
   // Unfortunately the FrameManager API does not allow looking up arbitrary frame transforms, only towards the currently
@@ -677,7 +707,7 @@ bool AerialMapDisplay::getMapTransform(std::string const& query_frame, ros::Time
   // get first transform (query-frame to fixed-frame)
   if (!context_->getFrameManager()->getTransform(query_frame, timestamp, t_query_fixed, o_query_fixed))
   {
-    // check error
+    // check errorgetMapTransform
     if (not context_->getFrameManager()->transformHasProblems(query_frame, timestamp, error))
     {
       error = "Could not transform from [" + query_frame + "] to Fixed Frame for an unknown reason";
@@ -687,10 +717,10 @@ bool AerialMapDisplay::getMapTransform(std::string const& query_frame, ros::Time
   }
 
   // get second transform (map-frame to fixed-frame)
-  if (!context_->getFrameManager()->getTransform(MAP_FRAME, timestamp, t_map_fixed, o_map_fixed))
+  if (!context_->getFrameManager()->getTransform(MAP_FRAME, t_map_fixed, o_map_fixed))
   {
     // check error
-    if (not context_->getFrameManager()->transformHasProblems(query_frame, timestamp, error))
+    if (not context_->getFrameManager()->transformHasProblems(query_frame, error))
     {
       error = "Could not transform from [" + MAP_FRAME + "] to Fixed Frame for an unknown reason";
     }
@@ -713,7 +743,7 @@ void AerialMapDisplay::transformMapTileToFixedFrame()
   Ogre::Vector3 t_fixed_map;
 
   // get transform between map-frame and fixed-frame from the FrameManager
-  if (context_->getFrameManager()->getTransform(MAP_FRAME, ros::Time(), t_fixed_map, o_fixed_map))
+  if (context_->getFrameManager()->getTransform(MAP_FRAME, t_fixed_map, o_fixed_map))
   {
     setStatus(::rviz::StatusProperty::Ok, "Transform", "Transform OK");
 
@@ -727,7 +757,7 @@ void AerialMapDisplay::transformMapTileToFixedFrame()
   {
     // display error
     std::string error;
-    if (context_->getFrameManager()->transformHasProblems(MAP_FRAME, ros::Time(), error))
+    if (context_->getFrameManager()->transformHasProblems(MAP_FRAME, error))
     {
       setStatus(::rviz::StatusProperty::Error, "Transform", QString::fromStdString(error));
     }
@@ -749,5 +779,5 @@ void AerialMapDisplay::reset()
 
 }  // namespace rviz
 
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(rviz::AerialMapDisplay, rviz::Display)
+#include <pluginlib/class_list_macros.hpp>  // NOLINT
+PLUGINLIB_EXPORT_CLASS(rviz::AerialMapDisplay, rviz_common::Display)
