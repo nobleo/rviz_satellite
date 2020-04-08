@@ -154,7 +154,7 @@ protected:
 
     MapObject(Ogre::ManualObject* o, Ogre::MaterialPtr m) : object(o), material(m)
     {
-      assert(!material.isNull());
+      assert(material);
     }
   };
 

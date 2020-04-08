@@ -102,11 +102,11 @@ public slots:
     bool const from_cache = reply->attribute(QNetworkRequest::SourceIsFromCacheAttribute).toBool();
     if (from_cache)
     {
-      RVIZ_COMMON_LOG_INFO_STREAM("Loaded tile from cache " << url.toString().toStdString());
+      RVIZ_COMMON_LOG_DEBUG_STREAM("Loaded tile from cache " << url.toString().toStdString());
     }
     else
     {
-      RVIZ_COMMON_LOG_INFO_STREAM("Loaded tile from web " << url.toString().toStdString());
+      RVIZ_COMMON_LOG_DEBUG_STREAM("Loaded tile from web " << url.toString().toStdString());
     }
 
     QImageReader reader(reply);

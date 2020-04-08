@@ -78,6 +78,7 @@ target_link_libraries(
 ament_export_include_directories(include)
 ament_target_dependencies(${PROJECT_NAME} rclcpp tf2_ros sensor_msgs rviz_common)
 ament_export_dependencies(rclcpp tf2_ros sensor_msgs rviz_common)
+ament_export_libraries(${PROJECT_NAME})
 
 # prevent pluginlib from using boost
 target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
