@@ -37,11 +37,9 @@ Visualization Manager:
       Class: rviz_plugins/AerialMapDisplay
       Draw Behind: false
       Enabled: true
-      Frame Convention: XYZ -> ENU
       Name: AerialMapDisplay
       Object URI: https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png
       Topic: /gps/fix
-      Value: true
       Zoom: 18
     - Class: rviz/Axes
       Enabled: true

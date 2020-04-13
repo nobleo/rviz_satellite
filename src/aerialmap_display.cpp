@@ -29,7 +29,6 @@ limitations under the License. */
 
 #include "rviz/frame_manager.h"
 #include "rviz/ogre_helpers/grid.h"
-#include "rviz/properties/enum_property.h"
 #include "rviz/properties/float_property.h"
 #include "rviz/properties/int_property.h"
 #include "rviz/properties/property.h"
@@ -41,13 +40,6 @@ limitations under the License. */
 
 #include "aerialmap_display.h"
 #include "General.h"
-
-enum class frame_convention
-{
-  enu = 0,  // X = East,  Y = North
-  ned,      // X = North, Y = East
-  nwu,      // X = North, Y = West
-};
 
 namespace rviz
 {
@@ -94,13 +86,6 @@ AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false), received_msg_(f
   blocks_property_->setMin(0);
   blocks_property_->setMax(maxBlocks);
   blocks_ = blocks_property_->getInt();
-
-  frame_convention_property_ =
-      new EnumProperty("Frame Convention", "XYZ -> ENU", "Convention for mapping cartesian frame to the compass", this,
-                       SLOT(updateFrameConvention()));
-  frame_convention_property_->addOptionStd("XYZ -> ENU", static_cast<int>(frame_convention::enu));
-  frame_convention_property_->addOptionStd("XYZ -> NED", static_cast<int>(frame_convention::ned));
-  frame_convention_property_->addOptionStd("XYZ -> NWU", static_cast<int>(frame_convention::nwu));
 }
 
 AerialMapDisplay::~AerialMapDisplay()
@@ -189,11 +174,6 @@ void AerialMapDisplay::updateBlocks()
 
     clear();
   }
-}
-
-void AerialMapDisplay::updateFrameConvention()
-{
-  transformAerialMap();
 }
 
 void AerialMapDisplay::updateTopic()
@@ -481,39 +461,6 @@ void AerialMapDisplay::assembleScene()
   tileCache_.purge({ tileId, blocks_ });
 }
 
-namespace
-{
-// rotation matrix for rotating the current frame to ENU
-Ogre::Matrix3 rotationToENU(frame_convention convention)
-{
-  switch (convention)
-  {
-    case frame_convention::ned:
-    {
-      // XYZ->NED will cause the map to appear reversed when viewed from above (from +z).
-      // clang-format off
-      Ogre::Matrix3 const xyz_R_ned(0, 1, 0,
-                                    1, 0, 0,
-                                    0, 0, -1);
-      // clang-format on
-      return xyz_R_ned.Transpose();
-    }
-    case frame_convention::nwu:
-    {
-      // clang-format off
-      Ogre::Matrix3 const xyz_R_nwu(0, -1, 0,
-                                    1, 0, 0,
-                                    0, 0, 1);
-      // clang-format on
-      return xyz_R_nwu.Transpose();
-    }
-    case frame_convention::enu:
-    default:  // this should never be the case
-      return Ogre::Matrix3::IDENTITY;
-  }
-}
-}  // namespace
-
 bool AerialMapDisplay::getTransform(const std::string& frame, ros::Time time, Ogre::Vector3& position,
                                     Ogre::Quaternion& orientation)
 {
@@ -571,9 +518,8 @@ void AerialMapDisplay::transformAerialMap()
   // We will use five frames in this function:
   //
   // * The frame from the NavSatFix message. It is rigidly attached to the robot.
-  // * Rviz's fixed frame (referred to as Ff). It is set by the user in Rviz.
-  // * The ENU/ NED/ NWU world frame "map". The code only uses ENU internally and rotates the frame into NED or NWU at
-  //   the end of the calculations.
+  // * RViz's fixed frame (referred to as Ff). It is set by the user in RViz.
+  // * The ENU world frame "map".
   // * The frame of the tiles. We assume that the tiles are in a frame where x points eastwards and y southwards. This
   //   frame is used by OSM and Google Maps, see
   //   https://en.wikipedia.org/wiki/Web_Mercator_projection and
@@ -616,16 +562,12 @@ void AerialMapDisplay::transformAerialMap()
 
   // Our goal is to align the tiles properly and to fix them in space (i.e. they e.g. shouldn't move with the robot). We
   // know that frames are in the OSM frame where x points eastwards and y southwards. Furthermore we know that "map"
-  // satisfies the ENU, NED, or NWU convention. ENU means that x points eastwards and y points northwards. Therefore, we
+  // satisfies the ENU convention. ENU means that x points eastwards and y points northwards. Therefore, we
   // can align the tiles properly by putting the tiles into an ENU "map" frame where we flip all tiles along the y
-  // coordinate. If "map" isn't ENU but NED or NWU we will just rotate "map" in the end of the calculations into ENU,
-  // i.e. internally we will just assume ENU.
+  // coordinate.
   Ogre::Matrix3 rotationFfToMap_;
   rotationFfToMap->ToRotationMatrix(rotationFfToMap_);
-  auto const rotationMapToENU =
-      rotationToENU(static_cast<frame_convention>(frame_convention_property_->getOptionInt()));
-  auto const rotationFfToAerialMap = rotationMapToENU * rotationFfToMap_;
-  scene_node_->setOrientation(rotationFfToAerialMap);
+  scene_node_->setOrientation(rotationFfToMap_);
 
   // As already said, we want to put the AerialMap into "map". In assembleScene() we have already created the tiles. In
   // this function, we now calculate the exact coordinate (i.e. with the fractional part) of the NavSatFix coordinate
@@ -648,8 +590,7 @@ void AerialMapDisplay::transformAerialMap()
       Ogre::Vector3(centerTileOffsetX * tile_w_h_m, centerTileOffsetY * tile_w_h_m, 0);
   auto const translationNavSatFixToAerialMap = -translationAerialMapToNavSatFix;
 
-  auto const translationFfToAerialMap =
-      *translationFfToNavSatFix + rotationFfToAerialMap * translationNavSatFixToAerialMap;
+  auto const translationFfToAerialMap = *translationFfToNavSatFix + rotationFfToMap_ * translationNavSatFixToAerialMap;
   scene_node_->setPosition(translationFfToAerialMap);
 }
 
