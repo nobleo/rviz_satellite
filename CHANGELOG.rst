@@ -2,8 +2,8 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.3.0 (2020-04-17)
+------------------
 * Fix setting the fixed frame
 * Fix race when reading the blocks property
 * Set tile fetching preference to cache
