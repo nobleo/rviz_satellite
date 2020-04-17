@@ -2,6 +2,10 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Drop Qt4 support
+
 1.3.0 (2020-04-17)
 ------------------
 * Fix setting the fixed frame

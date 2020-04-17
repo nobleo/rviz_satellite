@@ -21,12 +21,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 catkin_package(CATKIN_DEPENDS nav_msgs sensor_msgs)
 
-if (rviz_QT_VERSION VERSION_LESS "5")
-	find_package(Qt4 COMPONENTS QtCore QtGui QtNetwork REQUIRED)
-	include(${QT_USE_FILE})
-else()
-	find_package(Qt5 COMPONENTS Core Gui Network Concurrent REQUIRED)
-endif()
+find_package(Qt5 COMPONENTS Core Gui Network Concurrent REQUIRED)
 
 set(${PROJECT_NAME}_SOURCES
   src/aerialmap_display.cpp
@@ -40,27 +35,19 @@ set(${PROJECT_NAME}_HEADERS
 )
 
 # invoke MOC and UI/ include Qt headers/ link Qt libraries
-if (rviz_QT_VERSION VERSION_LESS "5")
-	qt4_wrap_cpp(${PROJECT_NAME}_MOCSrcs ${${PROJECT_NAME}_HEADERS})
-	include_directories(${Qt4_INCLUDE_DIR})
-	link_libraries(
-  		${QT_LIBRARIES}
-		)
-else()
-	qt5_wrap_cpp(${PROJECT_NAME}_MOCSrcs ${${PROJECT_NAME}_HEADERS})
-	include_directories(
-		${Qt5Core_INCLUDE_DIRS}
-		${Qt5Gui_INCLUDE_DIRS}
-		${Qt5Network_INCLUDE_DIRS}
-		${Qt5Concurrent_INCLUDE_DIRS}
-		)
-	link_libraries(
-		${Qt5Core_LIBRARIES}
-		${Qt5Gui_LIBRARIES}
-		${Qt5Network_LIBRARIES}
-		${Qt5Concurrent_LIBRARIES}
-		)
-endif()
+qt5_wrap_cpp(${PROJECT_NAME}_MOCSrcs ${${PROJECT_NAME}_HEADERS})
+include_directories(
+  ${Qt5Core_INCLUDE_DIRS}
+  ${Qt5Gui_INCLUDE_DIRS}
+  ${Qt5Network_INCLUDE_DIRS}
+  ${Qt5Concurrent_INCLUDE_DIRS}
+  )
+link_libraries(
+  ${Qt5Core_LIBRARIES}
+  ${Qt5Gui_LIBRARIES}
+  ${Qt5Network_LIBRARIES}
+  ${Qt5Concurrent_LIBRARIES}
+  )
 
 # Other includes
 include_directories(
