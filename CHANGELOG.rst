@@ -2,6 +2,10 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Remove NED and NWU frame conversion options
+
 2.0.0 (2020-04-17)
 ------------------
 * Drop Qt4 support
