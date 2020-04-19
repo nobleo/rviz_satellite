@@ -131,6 +131,11 @@ protected:
   void checkRequestErrorRate();
 
   /**
+   * Calculate the tile width/ height in meter
+   */
+  double getTileWH(double const latitude, int const zoom) const;
+
+  /**
    * Tile with associated Ogre data
    */
   struct MapObject
@@ -152,7 +157,6 @@ protected:
   StringProperty* tile_url_property_;
   IntProperty* zoom_property_;
   IntProperty* blocks_property_;
-  FloatProperty* resolution_property_;
   FloatProperty* alpha_property_;
   Property* draw_under_property_;
 
@@ -175,20 +179,6 @@ protected:
   Ogre::Vector3 t_centertile_map{ Ogre::Vector3::ZERO };
   /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
   std::string static const MAP_FRAME;
-
-  /**
-   * Calculate the tile width/ height in meter
-   */
-  double getTileWH()
-  {
-    // tile width/ height in pixel
-    // according to https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
-    int constexpr tile_w_h_px = 256;
-
-    auto const resolution = zoomToResolution(ref_fix_->latitude, zoom_);
-    double const tile_w_h_m = tile_w_h_px * resolution;
-    return tile_w_h_m;
-  }
 };
 
 }  // namespace rviz
