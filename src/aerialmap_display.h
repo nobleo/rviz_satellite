@@ -118,11 +118,12 @@ protected:
 
   /**
    * @brief Get the transform from frame_id w.r.t. the map-frame
-   * 
+   *
    * @return true if the transform lookup was successful
    * @return false if the transform lookup failed
    */
-  bool getMapTransform(std::string const & query_frame, ros::Time const & timestamp, Ogre::Vector3 & position, Ogre::Quaternion & orientation, std::string & error);
+  bool getMapTransform(std::string const& query_frame, ros::Time const& timestamp, Ogre::Vector3& position,
+                       Ogre::Quaternion& orientation, std::string& error);
 
   /**
    * @brief Checks how may tiles were loaded successfully, and sets the status accordingly.
@@ -171,7 +172,7 @@ protected:
   /// Last request()ed tile id (which is the center tile)
   boost::optional<TileId> lastCenterTile_;
   /// translation of the center-tile w.r.t. the map frame
-  Ogre::Vector3 t_centertile_map { Ogre::Vector3::ZERO };
+  Ogre::Vector3 t_centertile_map{ Ogre::Vector3::ZERO };
   /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
   std::string static const MAP_FRAME;
 

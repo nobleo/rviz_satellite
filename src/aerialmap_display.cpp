@@ -42,17 +42,17 @@ limitations under the License. */
 
 namespace rviz
 {
-  /**
-   * @file 
-   * The sequence of events is rather complex due to the asynchronous nature of the tile texture updates, and the different
-   * coordinate systems and frame transforms involved:
-   * 
-   * The navSatFixCallback calls the updateCenterTile function, which then queries a texture update and calls 
-   * transformTileToMapFrame. The latter finds and stores the transform from the NavSatFix frame to the map-frame, to which 
-   * the tiles are rigidly attached by ENU convention and Mercator projection. On each frame, update() is called, which calls 
-   * transformMapTileToFixedFrame, which then transforms the tile-map from the map-frame to the fixed-frame.
-   * Splitting this transform lookup is necessary to mitigate frame jitter.
-   */
+/**
+ * @file
+ * The sequence of events is rather complex due to the asynchronous nature of the tile texture updates, and the
+ * different coordinate systems and frame transforms involved:
+ *
+ * The navSatFixCallback calls the updateCenterTile function, which then queries a texture update and calls
+ * transformTileToMapFrame. The latter finds and stores the transform from the NavSatFix frame to the map-frame, to
+ * which the tiles are rigidly attached by ENU convention and Mercator projection. On each frame, update() is called,
+ * which calls transformMapTileToFixedFrame, which then transforms the tile-map from the map-frame to the fixed-frame.
+ * Splitting this transform lookup is necessary to mitigate frame jitter.
+ */
 
 std::string const AerialMapDisplay::MAP_FRAME = "map";
 
@@ -362,7 +362,8 @@ void AerialMapDisplay::createTileObjects()
 
 void AerialMapDisplay::update(float, float)
 {
-  if(not ref_fix_ or not lastCenterTile_) {
+  if (not ref_fix_ or not lastCenterTile_)
+  {
     return;
   }
 
@@ -438,7 +439,8 @@ void AerialMapDisplay::queryTileTextures()
   }
 }
 
-void AerialMapDisplay::checkRequestErrorRate() {
+void AerialMapDisplay::checkRequestErrorRate()
+{
   // the following error rate thresholds are randomly chosen
   float const errorRate = tileCache_.getTileServerErrorRate(tile_url_);
   if (errorRate > 0.95)
@@ -538,7 +540,7 @@ void AerialMapDisplay::assembleScene()
       //
       // For more explanation see the function transformAerialMap()
 
-      // The center tile has the coordinates left-bot = (0,0) and right-top = (1,1) in the AerialMap frame. 
+      // The center tile has the coordinates left-bot = (0,0) and right-top = (1,1) in the AerialMap frame.
       double const x = (xx - lastCenterTile_->coord.x) * tile_w_h_m;
       // flip the y coordinate because we need to flip the tiles to align the tile's frame with the ENU "map" frame
       double const y = -(yy - lastCenterTile_->coord.y) * tile_w_h_m;
@@ -549,7 +551,7 @@ void AerialMapDisplay::assembleScene()
 
       obj->begin(material->getName(), Ogre::RenderOperation::OT_TRIANGLE_LIST);
 
-      // We assign the Ogre texture coordinates in a way so that we flip the 
+      // We assign the Ogre texture coordinates in a way so that we flip the
       // texture along the v coordinate. For example, we assign the bottom left
       //
       // Note that the Ogre texture coordinate system is: (0,0) = top left of the loaded image and (1,1) = bottom right
@@ -602,7 +604,8 @@ void AerialMapDisplay::assembleScene()
 
 void AerialMapDisplay::transformTileToMapFrame()
 {
-  if(not ref_fix_) {
+  if (not ref_fix_)
+  {
     ROS_FATAL_THROTTLE_NAMED(2, "rviz_satellite", "ref_fix_  not set, can't create transforms");
     return;
   }
@@ -611,7 +614,8 @@ void AerialMapDisplay::transformTileToMapFrame()
   //
   // * The frame from the NavSatFix message. It is rigidly attached to the robot.
   // * The ENU world frame "map".
-  // * The frame of the tiles. We assume that the tiles are in a frame where x points eastwards and y southwards (ENU). This
+  // * The frame of the tiles. We assume that the tiles are in a frame where x points eastwards and y southwards (ENU).
+  // This
   //   frame is used by OSM and Google Maps, see https://en.wikipedia.org/wiki/Web_Mercator_projection and
   //   https://developers.google.com/maps/documentation/javascript/coordinates.
 
@@ -623,12 +627,14 @@ void AerialMapDisplay::transformTileToMapFrame()
   Ogre::Vector3 t_navsat_map;
 
   std::string error;
-  bool const gotTransform = getMapTransform(ref_fix_->header.frame_id, ref_fix_->header.stamp, t_navsat_map, o_navsat_map, error);
-  if(not gotTransform) {
+  bool const gotTransform =
+      getMapTransform(ref_fix_->header.frame_id, ref_fix_->header.stamp, t_navsat_map, o_navsat_map, error);
+  if (not gotTransform)
+  {
     setStatus(StatusProperty::Error, "Transform", QString::fromStdString(error));
     return;
   }
-  
+
   auto const centerTile = fromWGSCoordinate<double>({ ref_fix_->latitude, ref_fix_->longitude }, zoom_);
 
   // In assembleScene() we shift the AerialMap so that the center tile's left-bottom corner has the coordinate (0,0).
@@ -640,24 +646,27 @@ void AerialMapDisplay::transformTileToMapFrame()
   auto const centerTileOffsetY = 1 - (centerTile.y - std::floor(centerTile.y));
 
   double const tile_w_h_m = getTileWH();
-  auto const translationAerialMapToNavSatFix = Ogre::Vector3(centerTileOffsetX * tile_w_h_m, centerTileOffsetY * tile_w_h_m, 0);
+  auto const translationAerialMapToNavSatFix =
+      Ogre::Vector3(centerTileOffsetX * tile_w_h_m, centerTileOffsetY * tile_w_h_m, 0);
   auto const translationNavSatFixToAerialMap = -translationAerialMapToNavSatFix;
 
   t_centertile_map = t_navsat_map + translationNavSatFixToAerialMap;
 }
 
-bool AerialMapDisplay::getMapTransform(std::string const & query_frame, ros::Time const & timestamp, Ogre::Vector3 & position, Ogre::Quaternion & orientation, std::string & error)
+bool AerialMapDisplay::getMapTransform(std::string const& query_frame, ros::Time const& timestamp,
+                                       Ogre::Vector3& position, Ogre::Quaternion& orientation, std::string& error)
 {
-  // Unfortunately the FrameManager API does not allow looking up arbitrary frame transforms, only towards the currently selected
-  // fixed-frame. To get the transform, we split the transform into two: frame_id to fixed-frame and map-frame to fixed-frame.
-  // It would be easier to work with (tf2) Transforms here and a tf2 buffer, but the FrameManager has its own cache and logic one
-  // should use. However, this creates the overhead to rotate and translate a bit manual here ..
+  // Unfortunately the FrameManager API does not allow looking up arbitrary frame transforms, only towards the currently
+  // selected fixed-frame. To get the transform, we split the transform into two: frame_id to fixed-frame and map-frame
+  // to fixed-frame. It would be easier to work with (tf2) Transforms here and a tf2 buffer, but the FrameManager has
+  // its own cache and logic one should use. However, this creates the overhead to rotate and translate a bit manual
+  // here ..
 
   // orientation of the query-frame w.r.t. fixed-frame
   Ogre::Quaternion o_query_fixed;
   // translation of the query-frame w.r.t. fixed-frame
   Ogre::Vector3 t_query_fixed;
-    // orientation of the map-frame w.r.t. fixed-frame
+  // orientation of the map-frame w.r.t. fixed-frame
   Ogre::Quaternion o_map_fixed;
   // translation of the map-frame w.r.t. fixed-frame
   Ogre::Vector3 t_map_fixed;
@@ -670,7 +679,7 @@ bool AerialMapDisplay::getMapTransform(std::string const & query_frame, ros::Tim
     {
       error = "Could not transform from [" + query_frame + "] to Fixed Frame for an unknown reason";
     }
-    
+
     return false;
   }
 
@@ -682,17 +691,16 @@ bool AerialMapDisplay::getMapTransform(std::string const & query_frame, ros::Tim
     {
       error = "Could not transform from [" + MAP_FRAME + "] to Fixed Frame for an unknown reason";
     }
-    
+
     return false;
   }
 
   // this is a bit cryptic, but that's how it is with transforms ;)
   orientation = o_map_fixed.Inverse() * o_query_fixed;
-  position = o_map_fixed.Inverse() * t_query_fixed + o_map_fixed.Inverse()*-t_map_fixed;
+  position = o_map_fixed.Inverse() * t_query_fixed + o_map_fixed.Inverse() * -t_map_fixed;
 
   return true;
 }
-
 
 void AerialMapDisplay::transformMapTileToFixedFrame()
 {
