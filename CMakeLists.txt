@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 2.8.12)
 project(rviz_satellite)
 
 find_package(catkin REQUIRED COMPONENTS
@@ -37,26 +37,35 @@ set(PROJECT_SOURCE_FILES
   ${${PROJECT_NAME}_MOC_FILES}
 )
 
-include_directories(
-  src
-  ${catkin_INCLUDE_DIRS}
-)
-
-link_directories(
-  ${catkin_LIBRARY_DIRS}
+add_library(
+  ${PROJECT_NAME}
+  ${PROJECT_SOURCE_FILES}
 )
 
 # set compiler options and inject version of software (see TileDownloader.h)
 # rviz_satellite_VERSION is defined via catkin and is read from the package.xml
-add_definitions("-Wall -Wunused -std=c++11 -DRVIZ_SATELLITE_VERSION=\"\\\"${rviz_satellite_VERSION}\\\"\"")
+target_compile_options(
+  ${PROJECT_NAME}
+  PUBLIC
+  -Wall -Wunused -std=c++11 "-DRVIZ_SATELLITE_VERSION=\"${rviz_satellite_VERSION}\""
+)
 
-add_library(
-  ${PROJECT_NAME} 
-  ${PROJECT_SOURCE_FILES}
+target_include_directories(
+  ${PROJECT_NAME}
+  PUBLIC
+  src
+  ${catkin_INCLUDE_DIRS}
+)
+
+target_link_directories(
+  ${PROJECT_NAME}
+  PUBLIC
+  ${catkin_LIBRARY_DIRS}
 )
 
 target_link_libraries(
   ${PROJECT_NAME}
+  PUBLIC
   ${QT_LIBRARIES}
   ${catkin_LIBRARIES}
 )
