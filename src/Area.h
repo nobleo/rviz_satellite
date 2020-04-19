@@ -15,9 +15,9 @@ limitations under the License. */
 #pragma once
 
 #include <cmath>
-#include <utility>
 #include <stdexcept>
 #include <tuple>
+#include <utility>
 
 #include "General.h"
 #include "TileId.h"

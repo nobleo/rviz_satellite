@@ -12,29 +12,18 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include <unordered_map>
-#include <QtGlobal>
-#include <QImage>
-
-#include <ros/ros.h>
-#include <tf/transform_listener.h>
-
 #include <OGRE/OgreManualObject.h>
 #include <OGRE/OgreMaterialManager.h>
 #include <OGRE/OgreSceneManager.h>
 #include <OGRE/OgreSceneNode.h>
 #include <OGRE/OgreTextureManager.h>
-#include <OGRE/OgreImageCodec.h>
 
 #include "rviz/frame_manager.h"
-#include "rviz/ogre_helpers/grid.h"
 #include "rviz/properties/float_property.h"
 #include "rviz/properties/int_property.h"
 #include "rviz/properties/property.h"
-#include "rviz/properties/quaternion_property.h"
 #include "rviz/properties/ros_topic_property.h"
-#include "rviz/properties/vector_property.h"
-#include "rviz/validate_floats.h"
+#include "rviz/properties/string_property.h"
 #include "rviz/display_context.h"
 
 #include "aerialmap_display.h"

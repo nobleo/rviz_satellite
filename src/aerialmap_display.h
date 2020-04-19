@@ -14,30 +14,19 @@ limitations under the License. */
 
 #pragma once
 
-// NOTE: workaround for issue: https://bugreports.qt.io/browse/QTBUG-22829
-#ifndef Q_MOC_RUN
+#include <string>
+#include <vector>
+
+#include <boost/optional.hpp>
+
 #include <ros/ros.h>
 #include <ros/time.h>
 #include <rviz/display.h>
 #include <sensor_msgs/NavSatFix.h>
 
-#include <OGRE/OgreTexture.h>
 #include <OGRE/OgreMaterial.h>
 #include <OGRE/OgreVector3.h>
-#endif  //  Q_MOC_RUN
 
-#include <QObject>
-#include <QtConcurrentRun>
-#include <QFuture>
-#include <utility>
-#include <boost/optional.hpp>
-#include <QByteArray>
-#include <QFile>
-#include <QNetworkRequest>
-
-#include <string>
-#include <vector>
-#include <memory>
 #include "TileCacheDelay.h"
 #include "OgreTile.h"
 
@@ -53,7 +42,6 @@ class IntProperty;
 class Property;
 class RosTopicProperty;
 class StringProperty;
-class TfFrameProperty;
 
 /**
  * @class AerialMapDisplay

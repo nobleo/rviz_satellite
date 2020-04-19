@@ -11,8 +11,8 @@ catkin_package(
   CATKIN_DEPENDS sensor_msgs
 )
 
-find_package(Qt5 ${rviz_QT_VERSION} EXACT REQUIRED Core Gui Network Concurrent REQUIRED)
-set(QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Network Qt5::Concurrent)
+find_package(Qt5 ${rviz_QT_VERSION} EXACT REQUIRED Core Gui Network REQUIRED)
+set(QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Network)
 
 
 ##
