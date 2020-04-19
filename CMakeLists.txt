@@ -11,10 +11,6 @@ catkin_package(
   CATKIN_DEPENDS sensor_msgs
 )
 
-if(rviz_QT_VERSION VERSION_LESS "5")
-  message(FATAL_ERROR "Need at least Qt5, found: ${rviz_QT_VERSION}")
-endif()
-
 find_package(Qt5 ${rviz_QT_VERSION} EXACT REQUIRED Core Gui Network Concurrent REQUIRED)
 set(QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Network Qt5::Concurrent)
 
@@ -51,6 +47,7 @@ link_directories(
 )
 
 # set compiler options and inject version of software (see TileDownloader.h)
+# rviz_satellite_VERSION is defined via catkin and is read from the package.xml
 add_definitions("-Wall -Wunused -std=c++11 -DRVIZ_SATELLITE_VERSION=\"\\\"${rviz_satellite_VERSION}\\\"\"")
 
 add_library(
@@ -79,11 +76,3 @@ install(FILES
   plugin_description.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
-
-
-
-get_cmake_property(_variableNames VARIABLES)
-list (SORT _variableNames)
-foreach (_variableName ${_variableNames})
-    message(STATUS "${_variableName}=${${_variableName}}")
-endforeach()
