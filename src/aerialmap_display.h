@@ -117,6 +117,14 @@ protected:
   void transformMapTileToFixedFrame();
 
   /**
+   * @brief Get the transform from frame_id w.r.t. the map-frame
+   * 
+   * @return true if the transform lookup was successful
+   * @return false if the transform lookup failed
+   */
+  bool getMapTransform(std::string const & query_frame, ros::Time const & timestamp, Ogre::Vector3 & position, Ogre::Quaternion & orientation, std::string & error);
+
+  /**
    * @brief Checks how may tiles were loaded successfully, and sets the status accordingly.
    */
   void checkRequestErrorRate();
