@@ -19,9 +19,9 @@ limitations under the License. */
 #include <tuple>
 #include <utility>
 
-#include "Coordinates.h"
-#include "General.h"
-#include "TileId.h"
+#include "coordinates.h"
+#include "mercator.h"
+#include "tile_id.h"
 
 /**
  * A square area around a specific tile.
@@ -30,8 +30,8 @@ limitations under the License. */
  */
 struct Area
 {
-  TileCoordinate leftTop;
-  TileCoordinate rightBottom;
+  TileCoordinate left_top;
+  TileCoordinate right_bottom;
   TileId center;
 
   /**
@@ -46,25 +46,25 @@ struct Area
       throw std::invalid_argument("The number of blocks has to be positive");
     }
 
-    TileCoordinate const& centerTile = center.coord;
+    TileCoordinate const& center_tile = center.coord;
 
     // An Area is defined through its left top and right bottom coordinates. These points will be calculated.
     // Furthermore, constraints from the documentation https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#X_and_Y
     // are satisfied.
-    int const min_x = std::max(0, centerTile.x - blocks);
-    int const min_y = std::max(0, centerTile.y - blocks);
-    int const max_x = std::min(zoomToMaxTiles(center.zoom), centerTile.x + blocks);
-    int const max_y = std::min(zoomToMaxTiles(center.zoom), centerTile.y + blocks);
+    int const min_x = std::max(0, center_tile.x - blocks);
+    int const min_y = std::max(0, center_tile.y - blocks);
+    int const max_x = std::min(zoomToMaxTiles(center.zoom), center_tile.x + blocks);
+    int const max_y = std::min(zoomToMaxTiles(center.zoom), center_tile.y + blocks);
 
-    leftTop = { min_x, min_y };
-    rightBottom = { max_x, max_y };
+    left_top = { min_x, min_y };
+    right_bottom = { max_x, max_y };
   }
 };
 
 inline bool operator==(Area const& self, Area const& other)
 {
-  return std::tie(self.leftTop, self.rightBottom, self.center) ==
-         std::tie(other.leftTop, other.rightBottom, other.center);
+  return std::tie(self.left_top, self.right_bottom, self.center) ==
+         std::tie(other.left_top, other.right_bottom, other.center);
 }
 
 /**
@@ -74,7 +74,7 @@ inline bool operator==(Area const& self, Area const& other)
  */
 inline bool areaContainsTile(Area const& haystack, TileId const& needle)
 {
-  bool const inArea = needle.coord >= haystack.leftTop && needle.coord <= haystack.rightBottom;
-  bool const corresponds = haystack.center.tileServer == needle.tileServer && haystack.center.zoom == needle.zoom;
-  return inArea && corresponds;
+  bool const in_area = needle.coord >= haystack.left_top && needle.coord <= haystack.right_bottom;
+  bool const corresponds = haystack.center.tile_server == needle.tile_server && haystack.center.zoom == needle.zoom;
+  return in_area && corresponds;
 }

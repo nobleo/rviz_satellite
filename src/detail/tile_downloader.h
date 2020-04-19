@@ -25,8 +25,8 @@ limitations under the License. */
 
 #include <ros/ros.h>
 
-#include "TileId.h"
-#include "detail/ErrorRateManager.h"
+#include "detail/error_rate_manager.h"
+#include "tile_id.h"
 
 namespace detail
 {
@@ -42,19 +42,19 @@ class TileDownloader : public QObject
   std::function<void(TileId, QImage)> callback;
 
 public:
-  detail::ErrorRateManager<std::string> errorRates;
+  detail::ErrorRateManager<std::string> error_rates;
 
   TileDownloader(decltype(callback) callback) : manager(new QNetworkAccessManager(this)), callback(std::move(callback))
   {
     connect(manager, SIGNAL(finished(QNetworkReply*)), SLOT(downloadFinished(QNetworkReply*)));
 
-    QNetworkDiskCache* diskCache = new QNetworkDiskCache(this);
-    QString const cachePath =
+    QNetworkDiskCache* disk_cache = new QNetworkDiskCache(this);
+    QString const cache_path =
         QDir(QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation)).filePath("rviz_satellite");
-    diskCache->setCacheDirectory(cachePath);
+    disk_cache->setCacheDirectory(cache_path);
     // there is no option to disable maximum cache size
-    diskCache->setMaximumCacheSize(std::numeric_limits<qint64>::max());
-    manager->setCache(diskCache);
+    disk_cache->setMaximumCacheSize(std::numeric_limits<qint64>::max());
+    manager->setCache(disk_cache);
   }
 
   /**
@@ -63,18 +63,18 @@ public:
    * Since QNetworkDiskCache is used, tiles will be loaded from the file system if they have been cached. Otherwise they
    * get downloaded.
    */
-  void loadTile(TileId const& tileId)
+  void loadTile(TileId const& tile_id)
   {
     // see https://foundation.wikimedia.org/wiki/Maps_Terms_of_Use#Using_maps_in_third-party_services
-    auto const requestUrl = QUrl(QString::fromStdString(tileURL(tileId)));
-    ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loading tile " << requestUrl.toString().toStdString());
+    auto const request_url = QUrl(QString::fromStdString(tileURL(tile_id)));
+    ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loading tile " << request_url.toString().toStdString());
 
-    QNetworkRequest request(requestUrl);
+    QNetworkRequest request(request_url);
     char constexpr agent[] = "rviz_satellite/" RVIZ_SATELLITE_VERSION " (+https://github.com/gareth-cross/"
                              "rviz_satellite)";
     request.setHeader(QNetworkRequest::KnownHeaders::UserAgentHeader, agent);
     QVariant variant;
-    variant.setValue(tileId);
+    variant.setValue(tile_id);
     request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::CacheLoadControl::PreferCache);
     request.setAttribute(QNetworkRequest::User, variant);
     manager->get(request);
@@ -84,23 +84,23 @@ public slots:
   void downloadFinished(QNetworkReply* reply)
   {
     QVariant const variant = reply->request().attribute(QNetworkRequest::User);
-    TileId const tileId = variant.value<TileId>();
+    TileId const tile_id = variant.value<TileId>();
 
     QUrl const url = reply->url();
     if (reply->error())
     {
       ROS_ERROR_STREAM("Got error when loading tile: " << reply->errorString().toStdString());
-      errorRates.issueError(tileId.tileServer);
+      error_rates.issueError(tile_id.tile_server);
       return;
     }
     else
     {
-      errorRates.issueSuccess(tileId.tileServer);
+      error_rates.issueSuccess(tile_id.tile_server);
     }
 
     // log if tile comes from cache or web
-    bool const fromCache = reply->attribute(QNetworkRequest::SourceIsFromCacheAttribute).toBool();
-    if (fromCache)
+    bool const from_cache = reply->attribute(QNetworkRequest::SourceIsFromCacheAttribute).toBool();
+    if (from_cache)
     {
       ROS_DEBUG_STREAM_NAMED("rviz_satellite", "Loaded tile from cache " << url.toString().toStdString());
     }
@@ -116,7 +116,7 @@ public slots:
       return;
     }
 
-    callback(tileId, reader.read());
+    callback(tile_id, reader.read());
 
     reply->deleteLater();
   }

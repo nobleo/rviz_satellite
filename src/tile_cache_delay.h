@@ -18,7 +18,7 @@ limitations under the License. */
 
 #include <QTimer>
 
-#include "TileCache.h"
+#include "tile_cache.h"
 
 template <typename Tile>
 class TileCacheDelay;
@@ -117,10 +117,10 @@ public:
    * Is the tile in at least one Area that is ready?
    */
   template <typename Tile>
-  bool ready(TileCacheDelay<Tile> const& cache, TileId const& toFind) const
+  bool ready(TileCacheDelay<Tile> const& cache, TileId const& to_find) const
   {
-    return std::any_of(history_.begin(), history_.end(), [&toFind, &cache](ExpiringArea const& ea) {
-      return areaContainsTile(ea.area, toFind) && ea.ready(cache);
+    return std::any_of(history_.begin(), history_.end(), [&to_find, &cache](ExpiringArea const& ea) {
+      return areaContainsTile(ea.area, to_find) && ea.ready(cache);
     });
   }
 };
@@ -163,10 +163,10 @@ public:
   /**
    * @note You have to use TileCacheGuard to guard this function call and the returned tile.
    */
-  Tile const* ready(TileId const& toFind) const
+  Tile const* ready(TileId const& to_find) const
   {
-    Tile const* tile = TileCache<Tile>::ready(toFind);
-    if (tile && history_.ready(*this, toFind))
+    Tile const* tile = TileCache<Tile>::ready(to_find);
+    if (tile && history_.ready(*this, to_find))
     {
       return tile;
     }

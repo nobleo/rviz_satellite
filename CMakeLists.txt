@@ -20,13 +20,13 @@ set(QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Network)
 
 set(${PROJECT_NAME}_SOURCES
   src/aerialmap_display.cpp
-  src/OgreTile.cpp
-  src/TileId.cpp
+  src/ogre_tile.cpp
+  src/tile_id.cpp
 )
 
 set(${PROJECT_NAME}_HEADERS
   src/aerialmap_display.h
-  src/detail/TileDownloader.h
+  src/detail/tile_downloader.h
 )
 
 # invoke MOC and UI/ include Qt headers/ link Qt libraries - alternatively, see CMAKE_AUTOMOC
@@ -46,7 +46,7 @@ add_library(
   ${PROJECT_SOURCE_FILES}
 )
 
-# set compiler options and inject version of software (see TileDownloader.h)
+# set compiler options and inject version of software (see tile_downloader.h)
 # rviz_satellite_VERSION is defined via catkin and is read from the package.xml
 target_compile_options(
   ${PROJECT_NAME}

@@ -17,10 +17,10 @@ limitations under the License. */
 #include <cmath>
 
 /// Max number of adjacent blocks to support.
-static constexpr int maxBlocks = 8;
+static constexpr int MAX_BLOCKS = 8;
 
 /// Max zoom level to support.
-static constexpr int maxZoom = 22;
+static constexpr int MAX_ZOOM = 22;
 
 /**
  * Convert latitude and zoom level to ground resolution.
@@ -30,10 +30,10 @@ static constexpr int maxZoom = 22;
  */
 inline float zoomToResolution(double lat, int zoom)
 {
-  float constexpr metersPerPixelZoom0 = 156543.034;
+  float constexpr METER_PER_PIXEL_ZOOM_0 = 156543.034;
 
-  float const latRad = lat * M_PI / 180;
-  return metersPerPixelZoom0 * std::cos(latRad) / (1 << zoom);
+  float const lat_rad = lat * M_PI / 180;
+  return METER_PER_PIXEL_ZOOM_0 * std::cos(lat_rad) / (1 << zoom);
 }
 
 /**
@@ -42,4 +42,24 @@ inline float zoomToResolution(double lat, int zoom)
 inline int zoomToMaxTiles(int zoom)
 {
   return (1 << zoom) - 1;
+}
+
+/**
+ * Calculate the tile width/height in meter
+ */
+inline double getTileWH(double const latitude, int const zoom) {
+  // this constant origins from how the base resolution is calculated
+  // see https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+  
+  // TODO: actually this not needed and could be removed from both formulas, since they cancel out each other;
+  // it origins from most tile map applications directly rendering images with pixel dimensions;
+  // in here we have OpenGL, pixel do not matter, only meters
+  int constexpr tile_w_h_px = 256;
+
+  // meter/pixel
+  auto const resolution = zoomToResolution(latitude, zoom);
+  // gives tile size (with and height) in meter
+  double const tile_w_h_m = tile_w_h_px * resolution;
+  
+  return tile_w_h_m;
 }

@@ -4,6 +4,7 @@ Changelog for package rviz_satellite
 
 Forthcoming
 -----------
+* Code cleanup (#76, #75)
 * Remove the 'resolution' property (#74)
 * Fix frame jitter by splitting map and fixed-frame transforms (#56)
 * Cleanup cmake (#70)

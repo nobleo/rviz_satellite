@@ -21,7 +21,7 @@ limitations under the License. */
 
 #include <QMetaType>
 
-#include "Coordinates.h"
+#include "coordinates.h"
 
 /**
  * All information to uniquely identify a tile at a tile server
@@ -30,7 +30,7 @@ limitations under the License. */
  */
 struct TileId
 {
-  std::string tileServer;
+  std::string tile_server;
   TileCoordinate coord;
   int zoom;
 };
@@ -41,14 +41,14 @@ template <>
 struct hash<TileId>
 {
 public:
-  size_t operator()(TileId const& tileId) const;
+  size_t operator()(TileId const& tile_id) const;
 };
 }  // namespace std
 
 inline bool operator==(TileId const& self, TileId const& other)
 {
-  // optimization: check the tileServer last
-  return std::tie(self.coord, self.zoom, self.tileServer) == std::tie(other.coord, other.zoom, other.tileServer);
+  // optimization: check the tile_server last
+  return std::tie(self.coord, self.zoom, self.tile_server) == std::tie(other.coord, other.zoom, other.tile_server);
 }
 
 // Make type available for QVariant
@@ -57,4 +57,4 @@ Q_DECLARE_METATYPE(TileId)
 /**
  * Generate the URL to download a tile from
  */
-std::string tileURL(TileId const& tileId);
+std::string tileURL(TileId const& tile_id);
