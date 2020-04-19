@@ -42,6 +42,18 @@ limitations under the License. */
 
 namespace rviz
 {
+  /**
+   * @file 
+   * The sequence of events is rather complex due to the asynchronous nature of the tile texture updates, and the different
+   * coordinate systems and frame transforms involved:
+   * 
+   * The navSatFixCallback calls the updateCenterTile function, which then queries a texture update and calls 
+   * transformTileToMapFrame. The latter finds and stores the transform from the NavSatFix frame to the map-frame, to which 
+   * the tiles are rigidly attached by ENU convention and Mercator projection. On each frame, update() is called, which calls 
+   * transformMapTileToFixedFrame, which then transforms the tile-map from the map-frame to the fixed-frame.
+   * Splitting this transform lookup is necessary to mitigate frame jitter.
+   */
+
 std::string const AerialMapDisplay::MAP_FRAME = "map";
 
 AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false)
@@ -350,6 +362,10 @@ void AerialMapDisplay::createTileObjects()
 
 void AerialMapDisplay::update(float, float)
 {
+  if(not ref_fix_ or not lastCenterTile_) {
+    return;
+  }
+
   // update tiles, if necessary
   assembleScene();
   // transform scene object into fixed frame
