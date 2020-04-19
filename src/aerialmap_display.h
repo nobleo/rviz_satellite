@@ -94,7 +94,7 @@ protected:
   /**
    * Load images to cache (non-blocking)
    */
-  void loadTileTextures();
+  void queryTileTextures();
   void updateCenterTile(sensor_msgs::NavSatFixConstPtr const& msg);
 
   /**
@@ -102,15 +102,24 @@ protected:
    */
   void assembleScene();
 
-  void clear();
-  void clearGeometry();
-  void createGeometry();
+  void clearAll();
+  void destroyTileObjects();
+  void createTileObjects();
 
   /**
-   * @brief Transforms the tiles into the fixed frame.
+   * @brief Transforms the tile objects into the map frame.
    */
   void transformTileToMapFrame();
+
+  /**
+   * @brief Transforms the tile objects into the fixed frame.
+   */
   void transformMapTileToFixedFrame();
+
+  /**
+   * @brief Checks how may tiles were loaded successfully, and sets the status accordingly.
+   */
+  void checkRequestErrorRate();
 
   /**
    * Tile with associated Ogre data
@@ -153,8 +162,8 @@ protected:
   TileCacheDelay<OgreTile> tileCache_;
   /// Last request()ed tile id (which is the center tile)
   boost::optional<TileId> lastCenterTile_;
-  /// translation between the map frame and the tile coordinates from the last update
-  Ogre::Vector3 t_map_center_tile_{ Ogre::Vector3::ZERO };
+  /// translation of the center-tile w.r.t. the map frame
+  Ogre::Vector3 t_centertile_map { Ogre::Vector3::ZERO };
   /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
   std::string static const MAP_FRAME;
 
