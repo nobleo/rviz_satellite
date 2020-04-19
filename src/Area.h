@@ -19,9 +19,9 @@ limitations under the License. */
 #include <tuple>
 #include <utility>
 
+#include "Coordinates.h"
 #include "General.h"
 #include "TileId.h"
-#include "Coordinates.h"
 
 /**
  * A square area around a specific tile.

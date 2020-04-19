@@ -14,19 +14,19 @@ limitations under the License. */
 
 #include <functional>
 
+#include <QCryptographicHash>
 #include <QDir>
-#include <QtCore>
-#include <QtNetwork>
 #include <QImage>
 #include <QImageReader>
 #include <QStandardPaths>
 #include <QString>
-#include <QCryptographicHash>
+#include <QtCore>
+#include <QtNetwork>
 
 #include <ros/ros.h>
 
-#include "detail/ErrorRateManager.h"
 #include "TileId.h"
+#include "detail/ErrorRateManager.h"
 
 namespace detail
 {

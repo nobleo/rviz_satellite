@@ -14,18 +14,18 @@ limitations under the License. */
 
 #pragma once
 
-#include <utility>
-#include <unordered_map>
-#include <mutex>
-#include <limits>
 #include <functional>
+#include <limits>
+#include <mutex>
+#include <unordered_map>
+#include <utility>
 
 #include <QImage>
 
 #include <boost/optional.hpp>
 
-#include "TileId.h"
 #include "Area.h"
+#include "TileId.h"
 #include "detail/TileDownloader.h"
 
 /**

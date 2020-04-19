@@ -14,10 +14,10 @@ limitations under the License. */
 
 #pragma once
 
-#include <string>
-#include <tuple>
 #include <cstddef>
 #include <functional>
+#include <string>
+#include <tuple>
 
 #include <QMetaType>
 

@@ -18,16 +18,16 @@ limitations under the License. */
 #include <OGRE/OgreSceneNode.h>
 #include <OGRE/OgreTextureManager.h>
 
+#include "rviz/display_context.h"
 #include "rviz/frame_manager.h"
 #include "rviz/properties/float_property.h"
 #include "rviz/properties/int_property.h"
 #include "rviz/properties/property.h"
 #include "rviz/properties/ros_topic_property.h"
 #include "rviz/properties/string_property.h"
-#include "rviz/display_context.h"
 
-#include "aerialmap_display.h"
 #include "General.h"
+#include "aerialmap_display.h"
 
 namespace rviz
 {

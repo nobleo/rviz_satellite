@@ -27,8 +27,8 @@ limitations under the License. */
 #include <OGRE/OgreMaterial.h>
 #include <OGRE/OgreVector3.h>
 
-#include "TileCacheDelay.h"
 #include "OgreTile.h"
+#include "TileCacheDelay.h"
 
 namespace Ogre
 {
