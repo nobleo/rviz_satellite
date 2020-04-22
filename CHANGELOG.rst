@@ -4,6 +4,7 @@ Changelog for package rviz_satellite
 
 Forthcoming
 -----------
+* Cleanup cmake (#70)
 * Remove NED and NWU frame conversion options
 
 2.0.0 (2020-04-17)

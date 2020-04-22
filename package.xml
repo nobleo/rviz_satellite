@@ -9,7 +9,6 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <build_depend>nav_msgs</build_depend>
   <build_depend>qtbase5-dev</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>rviz</build_depend>
@@ -17,7 +16,6 @@
 
   <run_depend>roscpp</run_depend>
   <run_depend>rviz</run_depend>
-  <run_depend>nav_msgs</run_depend>
   <run_depend>sensor_msgs</run_depend>
   <run_depend>tf2_ros</run_depend>
 
