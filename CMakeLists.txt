@@ -37,6 +37,10 @@ set(PROJECT_SOURCE_FILES
   ${${PROJECT_NAME}_MOC_FILES}
 )
 
+link_directories(
+  ${catkin_LIBRARY_DIRS}
+)
+
 add_library(
   ${PROJECT_NAME}
   ${PROJECT_SOURCE_FILES}
@@ -55,12 +59,6 @@ target_include_directories(
   PUBLIC
   src
   ${catkin_INCLUDE_DIRS}
-)
-
-target_link_directories(
-  ${PROJECT_NAME}
-  PUBLIC
-  ${catkin_LIBRARY_DIRS}
 )
 
 target_link_libraries(
