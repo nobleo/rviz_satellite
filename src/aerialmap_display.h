@@ -94,7 +94,7 @@ protected:
   /**
    * Load images to cache (non-blocking)
    */
-  void queryTileTextures();
+  void requestTileTextures();
   void updateCenterTile(sensor_msgs::NavSatFixConstPtr const& msg);
 
   /**

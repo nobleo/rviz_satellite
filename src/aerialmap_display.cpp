@@ -222,7 +222,7 @@ void AerialMapDisplay::updateTileUrl()
     return;
   }
 
-  queryTileTextures();
+  requestTileTextures();
 }
 
 void AerialMapDisplay::updateZoom()
@@ -279,7 +279,7 @@ void AerialMapDisplay::updateBlocks()
   }
 
   createTileObjects();
-  queryTileTextures();
+  requestTileTextures();
 }
 
 void AerialMapDisplay::updateTopic()
@@ -404,11 +404,11 @@ void AerialMapDisplay::updateCenterTile(sensor_msgs::NavSatFixConstPtr const& ms
   lastCenterTile_ = newCenterTileID;
   ref_fix_ = msg;
 
-  queryTileTextures();
+  requestTileTextures();
   transformTileToMapFrame();
 }
 
-void AerialMapDisplay::queryTileTextures()
+void AerialMapDisplay::requestTileTextures()
 {
   if (!isEnabled())
   {
