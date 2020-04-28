@@ -23,6 +23,7 @@ limitations under the License. */
 
 #include <OGRE/OgreTexture.h>
 #include <OGRE/OgreMaterial.h>
+#include <OGRE/OgreVector3.h>
 #endif  //  Q_MOC_RUN
 
 #include <QObject>
@@ -66,7 +67,6 @@ public:
   ~AerialMapDisplay() override;
 
   // Overrides from Display
-  void fixedFrameChanged() override;
   void reset() override;
   void update(float, float) override;
 
@@ -94,32 +94,41 @@ protected:
   /**
    * Load images to cache (non-blocking)
    */
-  void loadImagery();
+  void requestTileTextures();
+  void updateCenterTile(sensor_msgs::NavSatFixConstPtr const& msg);
 
   /**
    * Create geometry
    */
   void assembleScene();
 
-  void clear();
-  void clearGeometry();
-  void createGeometry();
-
-  // Convienece wrapper around FrameManager::getTransform
-  bool getTransform(const std::string& frame, ros::Time time, Ogre::Vector3& position, Ogre::Quaternion& orientation);
-
-  // Convienece wrapper around FrameManager::getTransform to only get the
-  // position
-  boost::optional<Ogre::Vector3> getPosition(const std::string& frame, ros::Time time);
-
-  // Convienece wrapper around FrameManager::getTransform to only get the
-  // orientation
-  boost::optional<Ogre::Quaternion> getOrientation(const std::string& frame, ros::Time time);
+  void clearAll();
+  void destroyTileObjects();
+  void createTileObjects();
 
   /**
-   * @brief Transforms the tiles into the fixed frame.
+   * @brief Transforms the tile objects into the map frame.
    */
-  void transformAerialMap();
+  void transformTileToMapFrame();
+
+  /**
+   * @brief Transforms the tile objects into the fixed frame.
+   */
+  void transformMapTileToFixedFrame();
+
+  /**
+   * @brief Get the transform from frame_id w.r.t. the map-frame
+   *
+   * @return true if the transform lookup was successful
+   * @return false if the transform lookup failed
+   */
+  bool getMapTransform(std::string const& query_frame, ros::Time const& timestamp, Ogre::Vector3& position,
+                       Ogre::Quaternion& orientation, std::string& error);
+
+  /**
+   * @brief Checks how may tiles were loaded successfully, and sets the status accordingly.
+   */
+  void checkRequestErrorRate();
 
   /**
    * Tile with associated Ogre data
@@ -154,12 +163,18 @@ protected:
   int blocks_;
 
   // tile management
+  /// whether we need to re-query and re-assemble the tiles
   bool dirty_;
-  bool received_msg_;
-  sensor_msgs::NavSatFix ref_fix_;
+  /// the last NavSatFix message that lead to updating the tiles
+  sensor_msgs::NavSatFixConstPtr ref_fix_{ nullptr };
+  /// caches tile images, hashed by their fetch URL
   TileCacheDelay<OgreTile> tileCache_;
   /// Last request()ed tile id (which is the center tile)
   boost::optional<TileId> lastCenterTile_;
+  /// translation of the center-tile w.r.t. the map frame
+  Ogre::Vector3 t_centertile_map{ Ogre::Vector3::ZERO };
+  /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
+  std::string static const MAP_FRAME;
 
   /**
    * Calculate the tile width/ height in meter
@@ -170,7 +185,7 @@ protected:
     // according to https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
     int constexpr tile_w_h_px = 256;
 
-    auto const resolution = zoomToResolution(ref_fix_.latitude, zoom_);
+    auto const resolution = zoomToResolution(ref_fix_->latitude, zoom_);
     double const tile_w_h_m = tile_w_h_px * resolution;
     return tile_w_h_m;
   }
