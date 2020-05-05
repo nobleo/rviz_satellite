@@ -4,6 +4,7 @@ Changelog for package rviz_satellite
 
 Forthcoming
 -----------
+* Remove the 'resolution' property (#74)
 * Fix frame jitter by splitting map and fixed-frame transforms (#56)
 * Cleanup cmake (#70)
 * Remove NED and NWU frame conversion options

@@ -76,10 +76,6 @@ AerialMapDisplay::AerialMapDisplay() : Display(), dirty_(false)
   draw_under_property_->setShouldBeSaved(true);
   draw_under_ = draw_under_property_->getValue().toBool();
 
-  // output, resolution of the map in meters/pixel
-  resolution_property_ = new FloatProperty("Resolution", 0, "Resolution of the map. (Read only)", this);
-  resolution_property_->setReadOnly(true);
-
   // properties for map
   tile_url_property_ =
       new StringProperty("Object URI", "", "URL from which to retrieve map tiles.", this, SLOT(updateTileUrl()));
@@ -531,7 +527,7 @@ void AerialMapDisplay::assembleScene()
       tex_unit->setAlphaOperation(Ogre::LBX_SOURCE1, Ogre::LBS_MANUAL, Ogre::LBS_CURRENT, alpha_);
 
       // tile width/ height in meter
-      double const tile_w_h_m = getTileWH();
+      double const tile_w_h_m = getTileWH(ref_fix_->latitude, zoom_);
 
       // Note: In the following we will do two things:
       //
@@ -602,6 +598,27 @@ void AerialMapDisplay::assembleScene()
   checkRequestErrorRate();
 }
 
+/**
+ * Calculate the tile width/ height in meter
+ */
+double AerialMapDisplay::getTileWH(double const latitude, int const zoom) const
+{
+  // this constant origins from how the base resolution is calculated
+  //
+  // see https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+  //
+  // TODO: actually this not needed and could be removed from both formulas, since they cancel out each other;
+  // it origins from most tile map applications directly rendering images with pixel dimensions;
+  // in here we have OpenGL, pixel do not matter, only meters
+  int constexpr tile_w_h_px = 256;
+
+  // meter/pixel
+  auto const resolution = zoomToResolution(latitude, zoom);
+  // gives tile size (with and height) in meter
+  double const tile_w_h_m = tile_w_h_px * resolution;
+  return tile_w_h_m;
+}
+
 void AerialMapDisplay::transformTileToMapFrame()
 {
   if (not ref_fix_)
@@ -645,7 +662,9 @@ void AerialMapDisplay::transformTileToMapFrame()
   // calculate the positions of the center tile, we also need to flip the texture's v coordinate here.
   auto const centerTileOffsetY = 1 - (centerTile.y - std::floor(centerTile.y));
 
-  double const tile_w_h_m = getTileWH();
+  double const tile_w_h_m = getTileWH(ref_fix_->latitude, zoom_);
+  ROS_DEBUG_NAMED("rviz_satellite", "Tile resolution is %.1fm", tile_w_h_m);
+
   auto const translationAerialMapToNavSatFix =
       Ogre::Vector3(centerTileOffsetX * tile_w_h_m, centerTileOffsetY * tile_w_h_m, 0);
   auto const translationNavSatFixToAerialMap = -translationAerialMapToNavSatFix;
