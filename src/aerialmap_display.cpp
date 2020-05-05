@@ -603,7 +603,10 @@ void AerialMapDisplay::assembleScene()
  */
 double AerialMapDisplay::getTileWH(double const latitude, int const zoom) const
 {
-  // this constant origins from how the base resolution is calculated;
+  // this constant origins from how the base resolution is calculated
+  //
+  // see https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+  //
   // TODO: actually this not needed and could be removed from both formulas, since they cancel out each other;
   // it origins from most tile map applications directly rendering images with pixel dimensions;
   // in here we have OpenGL, pixel do not matter, only meters
