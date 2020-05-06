@@ -47,10 +47,11 @@ inline int zoomToMaxTiles(int zoom)
 /**
  * Calculate the tile width/height in meter
  */
-inline double getTileWH(double const latitude, int const zoom) {
+inline double getTileWH(double const latitude, int const zoom)
+{
   // this constant origins from how the base resolution is calculated
   // see https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
-  
+
   // TODO: actually this not needed and could be removed from both formulas, since they cancel out each other;
   // it origins from most tile map applications directly rendering images with pixel dimensions;
   // in here we have OpenGL, pixel do not matter, only meters
@@ -60,6 +61,6 @@ inline double getTileWH(double const latitude, int const zoom) {
   auto const resolution = zoomToResolution(latitude, zoom);
   // gives tile size (with and height) in meter
   double const tile_w_h_m = tile_w_h_px * resolution;
-  
+
   return tile_w_h_m;
 }

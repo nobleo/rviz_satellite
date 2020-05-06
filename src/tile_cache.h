@@ -79,7 +79,8 @@ class TileCache
   }
 
 public:
-  TileCache() : downloader([this](TileId tile_id, QImage image) { loadedTile(std::move(tile_id), std::move(image)); }){};
+  TileCache()
+    : downloader([this](TileId tile_id, QImage image) { loadedTile(std::move(tile_id), std::move(image)); }){};
 
   /**
    * Load a rectangular area of tiles
@@ -160,9 +161,9 @@ protected:
     {
       for (int yy = area.left_top.y; yy <= area.right_bottom.y; ++yy)
       {
-        TileId const toFind{ area.center.tile_server, { xx, yy }, area.center.zoom };
+        TileId const to_find{ area.center.tile_server, { xx, yy }, area.center.zoom };
 
-        if (cached_tiles.find(toFind) == cached_tiles.end())
+        if (cached_tiles.find(to_find) == cached_tiles.end())
         {
           return false;
         }

@@ -173,7 +173,7 @@ protected:
   std::string tile_url_;
   /// the zoom to use (Mercator)
   int zoom_;
-  /// the number of adjacent tile blocks
+  /// the number of tiles loaded in each direction around the center tile
   int blocks_;
 
   // tile management

@@ -289,7 +289,7 @@ void AerialMapDisplay::clearAll()
   center_tile_ = boost::none;
   destroyTileObjects();
 
-  setStatus(StatusProperty::Warn, "Message", "No map received yet");
+  setStatus(StatusProperty::Warn, "Message", "No NavSatFix message received yet");
 }
 
 void AerialMapDisplay::destroyTileObjects()
@@ -486,9 +486,9 @@ void AerialMapDisplay::assembleScene()
       assert(!material.isNull());
       ++it;
 
-      TileId const toFind{ center_tile_->tile_server, { xx, yy }, center_tile_->zoom };
+      TileId const to_find{ center_tile_->tile_server, { xx, yy }, center_tile_->zoom };
 
-      OgreTile const* tile = tile_cache_.ready(toFind);
+      OgreTile const* tile = tile_cache_.ready(to_find);
       if (!tile)
       {
         // don't show tiles with old textures
