@@ -607,7 +607,7 @@ void AerialMapDisplay::transformTileToMapFrame()
 {
   if (not ref_fix_ or not center_tile_)
   {
-    ROS_FATAL_THROTTLE_NAMED(2, "rviz_satellite", "ref_fix_  not set, can't create transforms");
+    ROS_FATAL_THROTTLE_NAMED(2, "rviz_satellite", "ref_fix_ not set, can't create transforms");
     return;
   }
 
