@@ -2,8 +2,8 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+3.0.0 (2020-05-26)
+------------------
 * Code cleanup (#76, #75)
 * Remove the 'resolution' property (#74)
 * Fix frame jitter by splitting map and fixed-frame transforms (#56)
