@@ -14,9 +14,9 @@ limitations under the License. */
 
 #pragma once
 
-#include <utility>
-#include <QImage>
 #include <OGRE/OgreTextureManager.h>
+#include <QImage>
+#include <utility>
 
 /**
  * A OgreTile holds a Ogre Texture for a tile in the GPU cache.

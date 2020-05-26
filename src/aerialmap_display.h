@@ -14,32 +14,21 @@ limitations under the License. */
 
 #pragma once
 
-// NOTE: workaround for issue: https://bugreports.qt.io/browse/QTBUG-22829
-#ifndef Q_MOC_RUN
+#include <string>
+#include <vector>
+
+#include <boost/optional.hpp>
+
 #include <ros/ros.h>
 #include <ros/time.h>
 #include <rviz/display.h>
 #include <sensor_msgs/NavSatFix.h>
 
-#include <OGRE/OgreTexture.h>
 #include <OGRE/OgreMaterial.h>
 #include <OGRE/OgreVector3.h>
-#endif  //  Q_MOC_RUN
 
-#include <QObject>
-#include <QtConcurrentRun>
-#include <QFuture>
-#include <utility>
-#include <boost/optional.hpp>
-#include <QByteArray>
-#include <QFile>
-#include <QNetworkRequest>
-
-#include <string>
-#include <vector>
-#include <memory>
-#include "TileCacheDelay.h"
-#include "OgreTile.h"
+#include "ogre_tile.h"
+#include "tile_cache_delay.h"
 
 namespace Ogre
 {
@@ -53,10 +42,8 @@ class IntProperty;
 class Property;
 class RosTopicProperty;
 class StringProperty;
-class TfFrameProperty;
 
 /**
- * @class AerialMapDisplay
  * @brief Displays a satellite map along the XY plane.
  */
 class AerialMapDisplay : public Display
@@ -95,29 +82,49 @@ protected:
    * Load images to cache (non-blocking)
    */
   void requestTileTextures();
+
+  /**
+   * Triggers texture update if the center-tile changed w.r.t. the current one
+   */
   void updateCenterTile(sensor_msgs::NavSatFixConstPtr const& msg);
 
   /**
-   * Create geometry
+   * Generates the tile's render geometry and applies the requested textures
    */
   void assembleScene();
 
+  /**
+   * Triggers to (re-) assemble the scene
+   */
+  void triggerSceneAssembly();
+
+  /**
+   * Destroys the scene-object and all children and their textures, along with the center-tile memory
+   */
   void clearAll();
+
+  /**
+   * Destroys the tile scene-objects
+   */
   void destroyTileObjects();
+
+  /**
+   * Creates the tile scene-objects and their materials
+   */
   void createTileObjects();
 
   /**
-   * @brief Transforms the tile objects into the map frame.
+   * Transforms the tile objects into the map frame.
    */
   void transformTileToMapFrame();
 
   /**
-   * @brief Transforms the tile objects into the fixed frame.
+   * Transforms the tile objects into the fixed frame.
    */
   void transformMapTileToFixedFrame();
 
   /**
-   * @brief Get the transform from frame_id w.r.t. the map-frame
+   * Get the transform from frame_id w.r.t. the map-frame
    *
    * @return true if the transform lookup was successful
    * @return false if the transform lookup failed
@@ -126,14 +133,9 @@ protected:
                        Ogre::Quaternion& orientation, std::string& error);
 
   /**
-   * @brief Checks how may tiles were loaded successfully, and sets the status accordingly.
+   * Checks how may tiles were loaded successfully, and sets the status accordingly.
    */
   void checkRequestErrorRate();
-
-  /**
-   * Calculate the tile width/ height in meter
-   */
-  double getTileWH(double const latitude, int const zoom) const;
 
   /**
    * Tile with associated Ogre data
@@ -148,9 +150,12 @@ protected:
       assert(!material.isNull());
     }
   };
+
+  /// the tile scene objects
   std::vector<MapObject> objects_;
 
-  ros::Subscriber coord_sub_;
+  /// the subscriber for the NavSatFix topic
+  ros::Subscriber navsat_fix_sub_;
 
   // properties
   RosTopicProperty* topic_property_;
@@ -160,21 +165,26 @@ protected:
   FloatProperty* alpha_property_;
   Property* draw_under_property_;
 
+  /// the alpha value of the tile's material
   float alpha_;
+  /// determines which render queue to use
   bool draw_under_;
+  /// the URL of the tile server to use
   std::string tile_url_;
+  /// the zoom to use (Mercator)
   int zoom_;
+  /// the number of tiles loaded in each direction around the center tile
   int blocks_;
 
   // tile management
   /// whether we need to re-query and re-assemble the tiles
-  bool dirty_;
+  bool dirty_{ false };
   /// the last NavSatFix message that lead to updating the tiles
   sensor_msgs::NavSatFixConstPtr ref_fix_{ nullptr };
   /// caches tile images, hashed by their fetch URL
-  TileCacheDelay<OgreTile> tileCache_;
+  TileCacheDelay<OgreTile> tile_cache_;
   /// Last request()ed tile id (which is the center tile)
-  boost::optional<TileId> lastCenterTile_;
+  boost::optional<TileId> center_tile_{ boost::none };
   /// translation of the center-tile w.r.t. the map frame
   Ogre::Vector3 t_centertile_map{ Ogre::Vector3::ZERO };
   /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map

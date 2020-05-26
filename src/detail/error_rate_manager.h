@@ -29,15 +29,15 @@ struct ErrorRateManager
     int total_num;
     int error_num;
   };
-  std::unordered_map<T, ErrorRate> errorRates;
+  std::unordered_map<T, ErrorRate> error_rates;
 
   /**
    * Calculate the error rate of an entity
    */
   float calculate(T const& id) const
   {
-    auto it = errorRates.find(id);
-    if (it == errorRates.end())
+    auto it = error_rates.find(id);
+    if (it == error_rates.end())
     {
       return 0;
     }
@@ -57,7 +57,7 @@ struct ErrorRateManager
    */
   void issueError(T const& id)
   {
-    auto& rate = errorRates[id];
+    auto& rate = error_rates[id];
     ++rate.total_num;
     ++rate.error_num;
   }
@@ -67,7 +67,7 @@ struct ErrorRateManager
    */
   void issueSuccess(T const& id)
   {
-    ++errorRates[id].total_num;
+    ++error_rates[id].total_num;
   }
 };
 }  // namespace detail

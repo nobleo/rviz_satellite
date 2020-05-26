@@ -15,11 +15,11 @@ limitations under the License. */
 #pragma once
 
 #include <cmath>
-#include <string>
 #include <stdexcept>
+#include <string>
 #include <tuple>
 
-#include "General.h"
+#include "mercator.h"
 
 /**
  * A WGS coordinate consisting of a latitude and longitude.
@@ -51,7 +51,7 @@ struct TileCoordinateGeneric
 template <typename NumericType = int>
 TileCoordinateGeneric<NumericType> fromWGSCoordinate(WGSCoordinate coord, int zoom)
 {
-  if (zoom > maxZoom)
+  if (zoom > MAX_ZOOM)
   {
     throw std::invalid_argument("Zoom level " + std::to_string(zoom) + " too high");
   }

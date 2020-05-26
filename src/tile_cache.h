@@ -14,19 +14,19 @@ limitations under the License. */
 
 #pragma once
 
-#include <utility>
-#include <unordered_map>
-#include <mutex>
-#include <limits>
 #include <functional>
+#include <limits>
+#include <mutex>
+#include <unordered_map>
+#include <utility>
 
 #include <QImage>
 
 #include <boost/optional.hpp>
 
-#include "TileId.h"
-#include "Area.h"
-#include "detail/TileDownloader.h"
+#include "area.h"
+#include "detail/tile_downloader.h"
+#include "tile_id.h"
 
 /**
  * Helper that you have to use when accessing tiles of a TileCache
@@ -61,25 +61,26 @@ template <typename Tile>
 class TileCache
 {
   friend TileCacheGuard;
-  std::unordered_map<TileId, Tile> cachedTiles;
+  std::unordered_map<TileId, Tile> cached_tiles;
   std::mutex mutable cachedTilesLock;
   detail::TileDownloader downloader;
 
   /**
    * Callback for `downloader`
    */
-  void loadedTile(TileId tileId, QImage image)
+  void loadedTile(TileId tile_id, QImage image)
   {
     TileCacheGuard guard(*this);
 
-    if (cachedTiles.find(tileId) == cachedTiles.end())
+    if (cached_tiles.find(tile_id) == cached_tiles.end())
     {
-      cachedTiles.emplace(std::make_pair(tileId, std::move(image)));
+      cached_tiles.emplace(std::make_pair(tile_id, std::move(image)));
     }
   }
 
 public:
-  TileCache() : downloader([this](TileId tileId, QImage image) { loadedTile(std::move(tileId), std::move(image)); }){};
+  TileCache()
+    : downloader([this](TileId tile_id, QImage image) { loadedTile(std::move(tile_id), std::move(image)); }){};
 
   /**
    * Load a rectangular area of tiles
@@ -90,29 +91,29 @@ public:
   {
     TileCacheGuard guard(*this);
 
-    for (int x = area.leftTop.x; x <= area.rightBottom.x; ++x)
+    for (int x = area.left_top.x; x <= area.right_bottom.x; ++x)
     {
-      for (int y = area.leftTop.y; y <= area.rightBottom.y; ++y)
+      for (int y = area.left_top.y; y <= area.right_bottom.y; ++y)
       {
-        TileId const toFind{ area.center.tileServer, { x, y }, area.center.zoom };
+        TileId const to_find{ area.center.tile_server, { x, y }, area.center.zoom };
 
-        if (cachedTiles.find(toFind) == cachedTiles.end())
+        if (cached_tiles.find(to_find) == cached_tiles.end())
         {
-          downloader.loadTile(toFind);
+          downloader.loadTile(to_find);
         }
       }
     }
   }
 
   /**
-   * Is the tile @p toFind cached? If yes, return the associated Tile.
+   * Is the tile @p to_find cached? If yes, return the associated Tile.
    * @note You have to use TileCacheGuard to guard this function call and the returned tile.
    */
-  Tile const* ready(TileId const& toFind) const
+  Tile const* ready(TileId const& to_find) const
   {
-    auto const it = cachedTiles.find(toFind);
+    auto const it = cached_tiles.find(to_find);
 
-    if (it == cachedTiles.cend())
+    if (it == cached_tiles.cend())
     {
       return nullptr;
     }
@@ -126,11 +127,11 @@ public:
    */
   void purge(Area const& area)
   {
-    for (auto it = cachedTiles.begin(); it != cachedTiles.end();)
+    for (auto it = cached_tiles.begin(); it != cached_tiles.end();)
     {
       if (!areaContainsTile(area, it->first))
       {
-        it = cachedTiles.erase(it);
+        it = cached_tiles.erase(it);
       }
       else
       {
@@ -144,9 +145,9 @@ public:
    *
    * error rate = number of HTTP requests that resulted in an error / total number of HTTP requests
    */
-  float getTileServerErrorRate(std::string const& tileServer) const
+  float getTileServerErrorRate(std::string const& tile_server) const
   {
-    return downloader.errorRates.calculate(tileServer);
+    return downloader.error_rates.calculate(tile_server);
   }
 
 protected:
@@ -156,13 +157,13 @@ protected:
    */
   bool isAreaReady(Area const& area) const
   {
-    for (int xx = area.leftTop.x; xx <= area.rightBottom.x; ++xx)
+    for (int xx = area.left_top.x; xx <= area.right_bottom.x; ++xx)
     {
-      for (int yy = area.leftTop.y; yy <= area.rightBottom.y; ++yy)
+      for (int yy = area.left_top.y; yy <= area.right_bottom.y; ++yy)
       {
-        TileId const toFind{ area.center.tileServer, { xx, yy }, area.center.zoom };
+        TileId const to_find{ area.center.tile_server, { xx, yy }, area.center.zoom };
 
-        if (cachedTiles.find(toFind) == cachedTiles.end())
+        if (cached_tiles.find(to_find) == cached_tiles.end())
         {
           return false;
         }
