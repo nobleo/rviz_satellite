@@ -186,7 +186,7 @@ protected:
   /// Last request()ed tile id (which is the center tile)
   boost::optional<TileId> center_tile_{ boost::none };
   /// translation of the center-tile w.r.t. the map frame
-  Ogre::Vector3 t_centertile_map{ Ogre::Vector3::ZERO };
+  Ogre::Vector3 t_centertile_map_{ Ogre::Vector3::ZERO };
   /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
   std::string static const MAP_FRAME;
 };

@@ -374,7 +374,7 @@ void AerialMapDisplay::updateCenterTile(sensor_msgs::NavSatFixConstPtr const& ms
   }
 
   // check if update is necessary
-  auto const tile_coordinates = fromWGSCoordinate({ msg->latitude, msg->longitude }, zoom_);
+  TileCoordinate const tile_coordinates = fromWGSCoordinate<int>({ msg->latitude, msg->longitude }, zoom_);
   TileId const new_center_tile_id{ tile_url_, tile_coordinates, zoom_ };
   bool const center_tile_changed = (!center_tile_ || !(new_center_tile_id == *center_tile_));
 
@@ -636,15 +636,17 @@ void AerialMapDisplay::transformTileToMapFrame()
     return;
   }
 
-  auto const center_tile = center_tile_->coord;
+  // FIXME: note the <double> template! this is different from center_tile_.coord, otherwise we could just use that
+  // since center_tile_ and ref_fix_ are in sync
+  auto const ref_fix_tile_coords = fromWGSCoordinate<double>({ ref_fix_->latitude, ref_fix_->longitude }, zoom_);
 
   // In assembleScene() we shift the AerialMap so that the center tile's left-bottom corner has the coordinate (0,0).
   // Therefore we can calculate the NavSatFix coordinate (in the AerialMap frame) by just looking at the fractional part
   // of the coordinate. That is we calculate the offset from the left bottom corner of the center tile.
-  auto const center_tile_offset_x = center_tile.x - std::floor(center_tile.x);
+  auto const center_tile_offset_x = ref_fix_tile_coords.x - std::floor(ref_fix_tile_coords.x);
   // In assembleScene() the tiles are created so that the texture is flipped along the y coordinate. Since we want to
   // calculate the positions of the center tile, we also need to flip the texture's v coordinate here.
-  auto const center_tile_offset_y = 1 - (center_tile.y - std::floor(center_tile.y));
+  auto const center_tile_offset_y = 1 - (ref_fix_tile_coords.y - std::floor(ref_fix_tile_coords.y));
 
   double const tile_w_h_m = getTileWH(ref_fix_->latitude, zoom_);
   ROS_DEBUG_NAMED("rviz_satellite", "Tile resolution is %.1fm", tile_w_h_m);
@@ -653,7 +655,7 @@ void AerialMapDisplay::transformTileToMapFrame()
   auto const t_centertile_navsat =
       Ogre::Vector3(center_tile_offset_x * tile_w_h_m, center_tile_offset_y * tile_w_h_m, 0);
 
-  t_centertile_map = t_navsat_map - t_centertile_navsat;
+  t_centertile_map_ = t_navsat_map - t_centertile_navsat;
 }
 
 bool AerialMapDisplay::getMapTransform(std::string const& query_frame, ros::Time const& timestamp,
@@ -718,7 +720,7 @@ void AerialMapDisplay::transformMapTileToFixedFrame()
     setStatus(::rviz::StatusProperty::Ok, "Transform", "Transform OK");
 
     // the translation of the tile w.r.t. the fixed-frame
-    auto const t_centertile_fixed = t_fixed_map + o_fixed_map * t_centertile_map;
+    auto const t_centertile_fixed = t_fixed_map + o_fixed_map * t_centertile_map_;
 
     scene_node_->setPosition(t_centertile_fixed);
     scene_node_->setOrientation(o_fixed_map);
