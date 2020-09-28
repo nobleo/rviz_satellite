@@ -94,6 +94,9 @@ AerialMapDisplay::~AerialMapDisplay()
 
 void AerialMapDisplay::onEnable()
 {
+  // this should be set in onInitialize (when the context_ becomes available) - but lets save the additional function
+  tf_buffer_ = context_->getFrameManager()->getTF2BufferPtr();
+
   createTileObjects();
   subscribe();
 }
@@ -620,19 +623,22 @@ void AerialMapDisplay::transformTileToMapFrame()
   //   frame is used by OSM and Google Maps, see https://en.wikipedia.org/wiki/Web_Mercator_projection and
   //   https://developers.google.com/maps/documentation/javascript/coordinates.
 
-  auto const current_fixed_frame = context_->getFrameManager()->getFixedFrame();
-
-  // orientation of NavSatFix frame w.r.t. the map frame (unused)
-  Ogre::Quaternion o_navsat_map;
-  // translation of NavSatFix frame w.r.t. the map frame
+  // translation of NavSatFix frame w.r.t. the map frame 
+  // NOTE: due to ENU convention, orientation is not needed, the tiles are rigidly attached to ENU
   Ogre::Vector3 t_navsat_map;
 
-  std::string error;
-  bool const got_transform =
-      getMapTransform(ref_fix_->header.frame_id, ref_fix_->header.stamp, t_navsat_map, o_navsat_map, error);
-  if (not got_transform)
+  try
   {
-    setStatus(StatusProperty::Error, "Transform", QString::fromStdString(error));
+    // Use a real TfBuffer for looking up this transform. The FrameManager only supplies transform to/from the
+    // currently selected RViz fixed-frame, which is of no help here.
+    auto const tf_navsat_map =
+        tf_buffer_->lookupTransform(MAP_FRAME, ref_fix_->header.frame_id, ref_fix_->header.stamp, ros::Duration(0.1));
+    auto const tf_pos = tf_navsat_map.transform.translation;
+    t_navsat_map = Ogre::Vector3(tf_pos.x, tf_pos.y, tf_pos.z);
+  }
+  catch (tf2::TransformException const& ex)
+  {
+    setStatus(StatusProperty::Error, "Transform", QString::fromStdString(ex.what()));
     return;
   }
 
@@ -656,55 +662,6 @@ void AerialMapDisplay::transformTileToMapFrame()
       Ogre::Vector3(center_tile_offset_x * tile_w_h_m, center_tile_offset_y * tile_w_h_m, 0);
 
   t_centertile_map_ = t_navsat_map - t_centertile_navsat;
-}
-
-bool AerialMapDisplay::getMapTransform(std::string const& query_frame, ros::Time const& timestamp,
-                                       Ogre::Vector3& position, Ogre::Quaternion& orientation, std::string& error)
-{
-  // Unfortunately the FrameManager API does not allow looking up arbitrary frame transforms, only towards the currently
-  // selected fixed-frame. To get the transform, we split the transform into two: frame_id to fixed-frame and map-frame
-  // to fixed-frame. It would be easier to work with (tf2) Transforms here and a tf2 buffer, but the FrameManager has
-  // its own cache and logic one should use. However, this creates the overhead to rotate and translate a bit manual
-  // here ..
-
-  // orientation of the query-frame w.r.t. fixed-frame
-  Ogre::Quaternion o_query_fixed;
-  // translation of the query-frame w.r.t. fixed-frame
-  Ogre::Vector3 t_query_fixed;
-  // orientation of the map-frame w.r.t. fixed-frame
-  Ogre::Quaternion o_map_fixed;
-  // translation of the map-frame w.r.t. fixed-frame
-  Ogre::Vector3 t_map_fixed;
-
-  // get first transform (query-frame to fixed-frame)
-  if (!context_->getFrameManager()->getTransform(query_frame, timestamp, t_query_fixed, o_query_fixed))
-  {
-    // check error
-    if (not context_->getFrameManager()->transformHasProblems(query_frame, timestamp, error))
-    {
-      error = "Could not transform from [" + query_frame + "] to Fixed Frame for an unknown reason";
-    }
-
-    return false;
-  }
-
-  // get second transform (map-frame to fixed-frame)
-  if (!context_->getFrameManager()->getTransform(MAP_FRAME, timestamp, t_map_fixed, o_map_fixed))
-  {
-    // check error
-    if (not context_->getFrameManager()->transformHasProblems(query_frame, timestamp, error))
-    {
-      error = "Could not transform from [" + MAP_FRAME + "] to Fixed Frame for an unknown reason";
-    }
-
-    return false;
-  }
-
-  // this is a bit cryptic, but that's how it is with transforms ;)
-  orientation = o_map_fixed.Inverse() * o_query_fixed;
-  position = o_map_fixed.Inverse() * t_query_fixed + o_map_fixed.Inverse() * -t_map_fixed;
-
-  return true;
 }
 
 void AerialMapDisplay::transformMapTileToFixedFrame()

@@ -2,6 +2,10 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Fix time synchronization of NavSat transform lookup
+
 3.0.1 (2020-08-03)
 ------------------
 * Fix cleanup bug breaking the navsat-tile transforms (#84, #85)

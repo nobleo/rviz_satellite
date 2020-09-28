@@ -23,6 +23,7 @@ limitations under the License. */
 #include <ros/time.h>
 #include <rviz/display.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <tf2_ros/buffer.h>
 
 #include <OGRE/OgreMaterial.h>
 #include <OGRE/OgreVector3.h>
@@ -124,15 +125,6 @@ protected:
   void transformMapTileToFixedFrame();
 
   /**
-   * Get the transform from frame_id w.r.t. the map-frame
-   *
-   * @return true if the transform lookup was successful
-   * @return false if the transform lookup failed
-   */
-  bool getMapTransform(std::string const& query_frame, ros::Time const& timestamp, Ogre::Vector3& position,
-                       Ogre::Quaternion& orientation, std::string& error);
-
-  /**
    * Checks how may tiles were loaded successfully, and sets the status accordingly.
    */
   void checkRequestErrorRate();
@@ -189,6 +181,9 @@ protected:
   Ogre::Vector3 t_centertile_map_{ Ogre::Vector3::ZERO };
   /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
   std::string static const MAP_FRAME;
+
+  /// buffer for tf lookups not related to fixed-frame
+  std::shared_ptr<tf2_ros::Buffer const> tf_buffer_{ nullptr };
 };
 
 }  // namespace rviz
