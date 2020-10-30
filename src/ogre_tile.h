@@ -37,14 +37,14 @@ public:
   OgreTile& operator=(OgreTile&& other) noexcept
   {
     texture = other.texture;
-    other.texture.setNull();
+    other.texture.reset();
 
     return *this;
   }
 
   ~OgreTile()
   {
-    if (!texture.isNull())
+    if (texture)
     {
       Ogre::TextureManager::getSingleton().remove(texture->getName());
     }

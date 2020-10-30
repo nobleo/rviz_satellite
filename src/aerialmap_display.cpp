@@ -33,6 +33,8 @@ limitations under the License. */
 #include "rviz_common/display_context.hpp"
 #include "rviz_common/logging.hpp"
 
+#include "rviz_default_plugins/transformation/tf_wrapper.hpp"
+
 #include "aerialmap_display.h"
 #include "mercator.h"
 
@@ -112,16 +114,16 @@ void AerialMapDisplay::onInitialize()
   Display::onInitialize();
   rviz_ros_node_ = context_->getRosNodeAbstraction();
   topic_property_->initialize(rviz_ros_node_);
-  // TODO - eloquent
-  // update_profile_property_->initialize(
-  // [this](rclcpp::QoS profile) {
-  //   this->update_profile_ = profile;
-  //   updateMapUpdateTopic();
-  // });
 }
 
 void AerialMapDisplay::onEnable()
 {
+  // this should be set in onInitialize (when the context_ becomes available) - but lets save the additional function
+  auto tf_wrapper = std::dynamic_pointer_cast<rviz_default_plugins::transformation::TFWrapper>(
+    context_->getFrameManager()->getConnector().lock());
+
+  if (tf_wrapper) tf_buffer_ = tf_wrapper->getBuffer();
+
   createTileObjects();
   subscribe();
 }
@@ -145,7 +147,7 @@ void AerialMapDisplay::subscribe()
       navsat_fix_sub_ =
         rviz_ros_node_.lock()->get_raw_node()->
         template create_subscription<sensor_msgs::msg::NavSatFix>(
-        topic_property_->getTopicStd(), update_profile_, 
+        topic_property_->getTopicStd(), update_profile_,
         std::bind(&AerialMapDisplay::navFixCallback, this, std::placeholders::_1));
       setStatus(rviz_common::properties::StatusProperty::Ok, "Topic", "OK");
     } catch (rclcpp::exceptions::InvalidTopicNameError & e) {
@@ -402,7 +404,7 @@ void AerialMapDisplay::updateCenterTile(const sensor_msgs::msg::NavSatFix::Share
   }
 
   // check if update is necessary
-  auto const tile_coordinates = fromWGSCoordinate({ msg->latitude, msg->longitude }, zoom_);
+  TileCoordinate const tile_coordinates = fromWGSCoordinate<int>({ msg->latitude, msg->longitude }, zoom_);
   TileId const new_center_tile_id{ tile_url_, tile_coordinates, zoom_ };
   bool const center_tile_changed = (!center_tile_ || !(new_center_tile_id == *center_tile_));
 
@@ -650,31 +652,37 @@ void AerialMapDisplay::transformTileToMapFrame()
   //   frame is used by OSM and Google Maps, see https://en.wikipedia.org/wiki/Web_Mercator_projection and
   //   https://developers.google.com/maps/documentation/javascript/coordinates.
 
-  auto const current_fixed_frame = context_->getFrameManager()->getFixedFrame();
-
-  // orientation of NavSatFix frame w.r.t. the map frame (unused)
-  Ogre::Quaternion o_navsat_map;
   // translation of NavSatFix frame w.r.t. the map frame
+  // NOTE: due to ENU convention, orientation is not needed, the tiles are rigidly attached to ENU
   Ogre::Vector3 t_navsat_map;
 
-  std::string error;
-  bool const got_transform =
-      getMapTransform(ref_fix_->header.frame_id, ref_fix_->header.stamp, t_navsat_map, o_navsat_map, error);
-  if (not got_transform)
+  try
   {
-    setStatus(StatusProperty::Error, "Transform", QString::fromStdString(error));
+    // Use a real TfBuffer for looking up this transform. The FrameManager only supplies transform to/from the
+    // currently selected RViz fixed-frame, which is of no help here.
+    auto const tf_navsat_map =
+        tf_buffer_->lookupTransform(MAP_FRAME, ref_fix_->header.frame_id, ref_fix_->header.stamp, tf2::durationFromSec(0.1));
+
+    auto const tf_pos = tf_navsat_map.transform.translation;
+    t_navsat_map = Ogre::Vector3(tf_pos.x, tf_pos.y, tf_pos.z);
+  }
+  catch (tf2::TransformException const& ex)
+  {
+    setStatus(StatusProperty::Error, "Transform", QString::fromStdString(ex.what()));
     return;
   }
 
-  auto const center_tile = center_tile_->coord;
+  // FIXME: note the <double> template! this is different from center_tile_.coord, otherwise we could just use that
+  // since center_tile_ and ref_fix_ are in sync
+  auto const ref_fix_tile_coords = fromWGSCoordinate<double>({ ref_fix_->latitude, ref_fix_->longitude }, zoom_);
 
   // In assembleScene() we shift the AerialMap so that the center tile's left-bottom corner has the coordinate (0,0).
   // Therefore we can calculate the NavSatFix coordinate (in the AerialMap frame) by just looking at the fractional part
   // of the coordinate. That is we calculate the offset from the left bottom corner of the center tile.
-  auto const center_tile_offset_x = center_tile.x - std::floor(center_tile.x);
+  auto const center_tile_offset_x = ref_fix_tile_coords.x - std::floor(ref_fix_tile_coords.x);
   // In assembleScene() the tiles are created so that the texture is flipped along the y coordinate. Since we want to
   // calculate the positions of the center tile, we also need to flip the texture's v coordinate here.
-  auto const center_tile_offset_y = 1 - (center_tile.y - std::floor(center_tile.y));
+  auto const center_tile_offset_y = 1 - (ref_fix_tile_coords.y - std::floor(ref_fix_tile_coords.y));
 
   double const tile_w_h_m = getTileWH(ref_fix_->latitude, zoom_);
   RVIZ_COMMON_LOG_INFO_STREAM("Tile resolution is " << std::setprecision(1) << std::fixed << tile_w_h_m << "m");
@@ -683,56 +691,7 @@ void AerialMapDisplay::transformTileToMapFrame()
   auto const t_centertile_navsat =
       Ogre::Vector3(center_tile_offset_x * tile_w_h_m, center_tile_offset_y * tile_w_h_m, 0);
 
-  t_centertile_map = t_navsat_map - t_centertile_navsat;
-}
-
-bool AerialMapDisplay::getMapTransform(std::string const& query_frame, rclcpp::Time const& timestamp,
-                                       Ogre::Vector3& position, Ogre::Quaternion& orientation, std::string& error)
-{
-  // Unfortunately the FrameManager API does not allow looking up arbitrary frame transforms, only towards the currently
-  // selected fixed-frame. To get the transform, we split the transform into two: frame_id to fixed-frame and map-frame
-  // to fixed-frame. It would be easier to work with (tf2) Transforms here and a tf2 buffer, but the FrameManager has
-  // its own cache and logic one should use. However, this creates the overhead to rotate and translate a bit manual
-  // here ..
-
-  // orientation of the query-frame w.r.t. fixed-frame
-  Ogre::Quaternion o_query_fixed;
-  // translation of the query-frame w.r.t. fixed-frame
-  Ogre::Vector3 t_query_fixed;
-  // orientation of the map-frame w.r.t. fixed-frame
-  Ogre::Quaternion o_map_fixed;
-  // translation of the map-frame w.r.t. fixed-frame
-  Ogre::Vector3 t_map_fixed;
-
-  // get first transform (query-frame to fixed-frame)
-  if (!context_->getFrameManager()->getTransform(query_frame, timestamp, t_query_fixed, o_query_fixed))
-  {
-    // check errorgetMapTransform
-    if (not context_->getFrameManager()->transformHasProblems(query_frame, timestamp, error))
-    {
-      error = "Could not transform from [" + query_frame + "] to Fixed Frame for an unknown reason";
-    }
-
-    return false;
-  }
-
-  // get second transform (map-frame to fixed-frame)
-  if (!context_->getFrameManager()->getTransform(MAP_FRAME, t_map_fixed, o_map_fixed))
-  {
-    // check error
-    if (not context_->getFrameManager()->transformHasProblems(query_frame, error))
-    {
-      error = "Could not transform from [" + MAP_FRAME + "] to Fixed Frame for an unknown reason";
-    }
-
-    return false;
-  }
-
-  // this is a bit cryptic, but that's how it is with transforms ;)
-  orientation = o_map_fixed.Inverse() * o_query_fixed;
-  position = o_map_fixed.Inverse() * t_query_fixed + o_map_fixed.Inverse() * -t_map_fixed;
-
-  return true;
+  t_centertile_map_ = t_navsat_map - t_centertile_navsat;
 }
 
 void AerialMapDisplay::transformMapTileToFixedFrame()
@@ -748,7 +707,7 @@ void AerialMapDisplay::transformMapTileToFixedFrame()
     setStatus(::rviz::StatusProperty::Ok, "Transform", "Transform OK");
 
     // the translation of the tile w.r.t. the fixed-frame
-    auto const t_centertile_fixed = t_fixed_map + o_fixed_map * t_centertile_map;
+    auto const t_centertile_fixed = t_fixed_map + o_fixed_map * t_centertile_map_;
 
     scene_node_->setPosition(t_centertile_fixed);
     scene_node_->setOrientation(o_fixed_map);

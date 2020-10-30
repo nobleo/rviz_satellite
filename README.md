@@ -4,6 +4,9 @@ Plugin for rviz for displaying satellite maps loaded from the internet.
 
 ![Alt text](.screenshot.png?raw=true "Example Image")
 
+In the near future this plugin will not add support for ROS 2.
+For an unofficial ROS 2 fork see [blacksoul000/rviz_satellite](https://github.com/blacksoul000/rviz_satellite/tree/dashing).
+
 In order to use rviz_satellite, add this package to your catkin workspace.
 
 ## Demo

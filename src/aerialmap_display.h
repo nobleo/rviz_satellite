@@ -23,6 +23,7 @@ limitations under the License. */
 #include <rviz_common/display.hpp>
 #include <rviz_common/ros_integration/ros_node_abstraction_iface.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <tf2_ros/buffer.h>
 
 // #include <OgreTexture.h>
 #include <OgreMaterial.h>
@@ -131,15 +132,6 @@ protected:
   void transformMapTileToFixedFrame();
 
   /**
-   * Get the transform from frame_id w.r.t. the map-frame
-   *
-   * @return true if the transform lookup was successful
-   * @return false if the transform lookup failed
-   */
-  bool getMapTransform(std::string const& query_frame, rclcpp::Time const& timestamp, Ogre::Vector3& position,
-                       Ogre::Quaternion& orientation, std::string& error);
-
-  /**
    * Checks how may tiles were loaded successfully, and sets the status accordingly.
    */
   void checkRequestErrorRate();
@@ -192,13 +184,15 @@ protected:
   /// Last request()ed tile id (which is the center tile)
   boost::optional<TileId> center_tile_{ boost::none };
   /// translation of the center-tile w.r.t. the map frame
-  Ogre::Vector3 t_centertile_map{ Ogre::Vector3::ZERO };
+  Ogre::Vector3 t_centertile_map_{ Ogre::Vector3::ZERO };
   /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
   std::string static const MAP_FRAME;
   /// rclcpp node
   rviz_common::ros_integration::RosNodeAbstractionIface::WeakPtr rviz_ros_node_;
   /// qos
-  rclcpp::QoS update_profile_ = rclcpp::SystemDefaultsQoS();
+  rclcpp::QoS update_profile_ = rclcpp::SensorDataQoS();
+  /// buffer for tf lookups not related to fixed-frame
+  std::shared_ptr< tf2_ros::Buffer > tf_buffer_;
 };
 
 }  // namespace rviz
