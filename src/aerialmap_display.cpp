@@ -267,7 +267,7 @@ void AerialMapDisplay::updateZoom()
 
   if (ref_fix_)
   {
-    updateCenterTile(ref_fix_);
+    updateCenterTile(ref_fix_, true);
   }
 }
 
@@ -391,12 +391,13 @@ void AerialMapDisplay::update(float, float)
 
 void AerialMapDisplay::navFixCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
 {
-  updateCenterTile(msg);
+  updateCenterTile(msg, false);
+  navframe = msg->header.frame_id;
 
   setStatus(StatusProperty::Ok, "Message", "NavSatFix message received");
 }
 
-void AerialMapDisplay::updateCenterTile(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
+void AerialMapDisplay::updateCenterTile(const sensor_msgs::msg::NavSatFix::SharedPtr msg, bool new_zoom_)
 {
   if (!isEnabled())
   {
@@ -406,12 +407,13 @@ void AerialMapDisplay::updateCenterTile(const sensor_msgs::msg::NavSatFix::Share
   // check if update is necessary
   TileCoordinate const tile_coordinates = fromWGSCoordinate<int>({ msg->latitude, msg->longitude }, zoom_);
   TileId const new_center_tile_id{ tile_url_, tile_coordinates, zoom_ };
-  bool const center_tile_changed = (!center_tile_ || !(new_center_tile_id == *center_tile_));
+  bool const center_tile_changed = (!center_tile_ || new_zoom_);// || !(new_center_tile_id == *center_tile_));
 
   if (not center_tile_changed)
   {
     // TODO: Maybe we should update the transform here even if the center tile did not change?
     // The localization might have been updated.
+    transformTileToMapFrame();
     return;
   }
 
@@ -661,8 +663,7 @@ void AerialMapDisplay::transformTileToMapFrame()
     // Use a real TfBuffer for looking up this transform. The FrameManager only supplies transform to/from the
     // currently selected RViz fixed-frame, which is of no help here.
     auto const tf_navsat_map =
-        tf_buffer_->lookupTransform(MAP_FRAME, ref_fix_->header.frame_id, ref_fix_->header.stamp, tf2::durationFromSec(0.1));
-
+        tf_buffer_->lookupTransform(navframe, ref_fix_->header.frame_id, ref_fix_->header.stamp, tf2::durationFromSec(0.1));
     auto const tf_pos = tf_navsat_map.transform.translation;
     t_navsat_map = Ogre::Vector3(tf_pos.x, tf_pos.y, tf_pos.z);
   }
