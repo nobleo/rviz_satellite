@@ -686,7 +686,7 @@ void AerialMapDisplay::transformTileToMapFrame()
   auto const center_tile_offset_y = 1 - (ref_fix_tile_coords.y - std::floor(ref_fix_tile_coords.y));
 
   double const tile_w_h_m = getTileWH(ref_fix_->latitude, zoom_);
-  RVIZ_COMMON_LOG_INFO_STREAM("Tile resolution is " << std::setprecision(1) << std::fixed << tile_w_h_m << "m");
+  //RVIZ_COMMON_LOG_INFO_STREAM("Tile resolution is " << std::setprecision(1) << std::fixed << tile_w_h_m << "m");
 
   // translation of the center-tile w.r.t. the NavSatFix frame
   auto const t_centertile_navsat =
