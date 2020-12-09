@@ -94,7 +94,7 @@ protected:
   /**
    * Triggers texture update if the center-tile changed w.r.t. the current one
    */
-  void updateCenterTile(const sensor_msgs::msg::NavSatFix::SharedPtr msg, bool new_zoom_);
+  void updateCenterTile(const sensor_msgs::msg::NavSatFix::SharedPtr msg);
 
   /**
    * Generates the tile's render geometry and applies the requested textures
@@ -187,7 +187,6 @@ protected:
   Ogre::Vector3 t_centertile_map_{ Ogre::Vector3::ZERO };
   /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
   std::string static const MAP_FRAME;
-  std::string navframe;
   /// rclcpp node
   rviz_common::ros_integration::RosNodeAbstractionIface::WeakPtr rviz_ros_node_;
   /// qos
