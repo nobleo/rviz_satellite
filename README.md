@@ -2,6 +2,8 @@
 
 Plugin for rviz for displaying satellite maps loaded from the internet.
 
+> This repo is [currently unmaintained](https://github.com/gareth-cross/rviz_satellite/issues/94) and looking for new maintainers.
+
 ![Alt text](.screenshot.png?raw=true "Example Image")
 
 In the near future this plugin will not add support for ROS 2.
