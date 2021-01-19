@@ -1,14 +1,18 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.0.2)
 project(rviz_satellite)
 
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  rviz
-  sensor_msgs
+find_package(catkin REQUIRED
+  COMPONENTS
+    roscpp
+    rviz
+    sensor_msgs
 )
 
 catkin_package(
-  CATKIN_DEPENDS sensor_msgs
+  CATKIN_DEPENDS
+    roscpp
+    rviz
+    sensor_msgs
 )
 
 find_package(Qt5 ${rviz_QT_VERSION} EXACT REQUIRED Core Gui Network REQUIRED)
