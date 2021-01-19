@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package>
   <name>rviz_satellite</name>
-  <version>3.0.2</version>
+  <version>3.0.3</version>
   <description>Display satellite map tiles in RViz</description>
   <url>https://github.com/nobleo/rviz_satellite</url>
 
