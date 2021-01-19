@@ -29,6 +29,9 @@ limitations under the License. */
 #include "aerialmap_display.h"
 #include "mercator.h"
 
+#include <regex>
+
+
 namespace rviz
 {
 /**
@@ -202,6 +205,17 @@ void AerialMapDisplay::updateTileUrl()
   if (tile_url == tile_url_)
   {
     return;
+  }
+
+  // Check for valid url: https://stackoverflow.com/a/38608262
+  if (!std::regex_match(tile_url, std::regex(R"(^(https?:\/\/).*)")))
+  {
+    ROS_ERROR("Invalid Object URI: %s", tile_url.c_str());
+    // Still setting the url since keeping the old is probably unexpected
+  }
+  else if (!std::regex_match(tile_url, std::regex(R"(.*\{[xyz]\}.*)")))
+  {
+    ROS_ERROR("No coordinates ({x}, {y} or {z}) found in URI: %s", tile_url.c_str());
   }
 
   tile_url_ = tile_url;
@@ -623,7 +637,7 @@ void AerialMapDisplay::transformTileToMapFrame()
   //   frame is used by OSM and Google Maps, see https://en.wikipedia.org/wiki/Web_Mercator_projection and
   //   https://developers.google.com/maps/documentation/javascript/coordinates.
 
-  // translation of NavSatFix frame w.r.t. the map frame 
+  // translation of NavSatFix frame w.r.t. the map frame
   // NOTE: due to ENU convention, orientation is not needed, the tiles are rigidly attached to ENU
   Ogre::Vector3 t_navsat_map;
 
