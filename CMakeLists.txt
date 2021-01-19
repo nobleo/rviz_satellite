@@ -19,8 +19,7 @@ find_package(Qt5 ${rviz_QT_VERSION} EXACT REQUIRED Core Gui Network REQUIRED)
 set(QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Network)
 
 
-##
-## BUILD
+## BUILD ##
 
 set(${PROJECT_NAME}_SOURCES
   src/aerialmap_display.cpp
@@ -41,8 +40,9 @@ set(PROJECT_SOURCE_FILES
   ${${PROJECT_NAME}_MOC_FILES}
 )
 
-link_directories(
-  ${catkin_LIBRARY_DIRS}
+include_directories(
+  src
+  ${catkin_INCLUDE_DIRS}
 )
 
 add_library(
@@ -58,23 +58,14 @@ target_compile_options(
   -Wall -Wunused -std=c++11 "-DRVIZ_SATELLITE_VERSION=\"${rviz_satellite_VERSION}\""
 )
 
-target_include_directories(
-  ${PROJECT_NAME}
-  PUBLIC
-  src
-  ${catkin_INCLUDE_DIRS}
-)
-
 target_link_libraries(
   ${PROJECT_NAME}
-  PUBLIC
   ${QT_LIBRARIES}
   ${catkin_LIBRARIES}
 )
 
 
-##
-## INSTALL
+## INSTALL ##
 
 install(TARGETS
   ${PROJECT_NAME}
