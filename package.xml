@@ -3,8 +3,12 @@
   <name>rviz_satellite</name>
   <version>3.0.2</version>
   <description>Display satellite map tiles in RViz</description>
+
   <author email="gcross.code@icloud.com">Gareth Cross</author>
-  <maintainer email="andre.schroeder@tomtom.com">Andre Schröder</maintainer>
+  <author email="andre.schroeder@tomtom.com">Andre Schröder</author>
+
+  <maintainer email="tim.clephas@nobleo.nl">Tim Clephas</maintainer>
+
   <license>Apache 2</license>
 
   <buildtool_depend>catkin</buildtool_depend>
