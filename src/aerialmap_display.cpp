@@ -17,6 +17,7 @@ limitations under the License. */
 #include <OGRE/OgreSceneManager.h>
 #include <OGRE/OgreSceneNode.h>
 #include <OGRE/OgreTextureManager.h>
+#include <OGRE/OgreTechnique.h>
 
 #include "rviz/display_context.h"
 #include "rviz/frame_manager.h"
