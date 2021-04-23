@@ -19,7 +19,7 @@ limitations under the License. */
 #include <string>
 #include <tuple>
 
-#include "mercator.h"
+#include "mercator.hpp"
 
 /**
  * A WGS coordinate consisting of a latitude and longitude.

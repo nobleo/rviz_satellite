@@ -1,7 +1,5 @@
 <library path="rviz_satellite">
-  <class name="rviz_plugins/AerialMapDisplay"
-         type="rviz::AerialMapDisplay"
-         base_class_type="rviz_common::Display">
+  <class name="rviz_plugins/AerialMapDisplay" type="rviz::AerialMapDisplay" base_class_type="rviz_common::Display">
     <description>
       Display of satellite image map.
     </description>

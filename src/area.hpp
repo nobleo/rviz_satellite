@@ -19,9 +19,9 @@ limitations under the License. */
 #include <tuple>
 #include <utility>
 
-#include "coordinates.h"
-#include "mercator.h"
-#include "tile_id.h"
+#include "coordinates.hpp"
+#include "mercator.hpp"
+#include "tile_id.hpp"
 
 /**
  * A square area around a specific tile.

@@ -1,10 +1,11 @@
 <?xml version="1.0"?>
-<package>
+<package format="3">
   <name>rviz_satellite</name>
-  <version>3.0.2</version>
+  <version>3.1.0</version>
   <description>Display satellite map tiles in RViz</description>
   <author email="gcross.code@icloud.com">Gareth Cross</author>
   <maintainer email="andre.schroeder@tomtom.com">Andre Schröder</maintainer>
+  <maintainer email="marcel.zeilinger@ait.ac.at">Marcel Zeilinger</maintainer>
   <license>Apache 2</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
@@ -27,7 +28,7 @@
   <run_depend>libboost-system</run_depend>
 
   <export>
-      <rviz plugin="plugin_description.xml"/>
-      <build_type>ament_cmake</build_type>
+    <rviz plugin="plugin_description.xml"/>
+    <build_type>ament_cmake</build_type>
   </export>
 </package>

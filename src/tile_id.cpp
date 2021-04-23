@@ -12,7 +12,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include "tile_id.h"
+#include <string>
+#include "tile_id.hpp"
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/functional/hash/hash.hpp>

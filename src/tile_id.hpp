@@ -21,7 +21,7 @@ limitations under the License. */
 
 #include <QMetaType>
 
-#include "coordinates.h"
+#include "coordinates.hpp"
 
 /**
  * All information to uniquely identify a tile at a tile server

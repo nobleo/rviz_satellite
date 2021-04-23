@@ -14,6 +14,7 @@ limitations under the License. */
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -25,27 +26,17 @@ limitations under the License. */
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <tf2_ros/buffer.h>
 
-// #include <OgreTexture.h>
+#include "rviz_common/properties/float_property.hpp"
+#include "rviz_common/properties/int_property.hpp"
+#include "rviz_common/properties/status_property.hpp"
+#include "rviz_common/properties/string_property.hpp"
+#include "rviz_common/properties/ros_topic_property.hpp"
+
 #include <OgreMaterial.h>
 #include <OgreVector3.h>
 
-#include "ogre_tile.h"
-#include "tile_cache_delay.h"
-
-namespace Ogre
-{
-class ManualObject;
-}
-
-namespace rviz_common::properties
-{
-class FloatProperty;
-class IntProperty;
-class Property;
-class RosTopicProperty;
-class StringProperty;
-}  // rviz_common::properties
-
+#include "ogre_tile.hpp"
+#include "tile_cache_delay.hpp"
 
 namespace rviz
 {
@@ -146,7 +137,6 @@ protected:
 
     MapObject(Ogre::ManualObject* o, Ogre::MaterialPtr m) : object(o), material(m)
     {
-      assert(material);
     }
   };
 
@@ -186,7 +176,7 @@ protected:
   /// translation of the center-tile w.r.t. the map frame
   Ogre::Vector3 t_centertile_map_{ Ogre::Vector3::ZERO };
   /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
-  std::string static const MAP_FRAME;
+  static char const MAP_FRAME[];
   /// rclcpp node
   rviz_common::ros_integration::RosNodeAbstractionIface::WeakPtr rviz_ros_node_;
   /// qos

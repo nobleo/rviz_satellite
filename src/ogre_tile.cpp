@@ -12,8 +12,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include "ogre_tile.h"
-
+#include "ogre_tile.hpp"
+#include <utility>
 #include <string>
 
 namespace
@@ -42,18 +42,22 @@ std::string uniqueTextureName()
 Ogre::TexturePtr textureFromImage(QImage image)
 {
   Ogre::DataStreamPtr data_stream;
-  data_stream.bind(new Ogre::MemoryDataStream((void*)image.constBits(), image.byteCount()));
+  data_stream.reset(
+    new Ogre::MemoryDataStream(
+      reinterpret_cast<void *>(image.bits()),
+      image.byteCount()));
 
   Ogre::String const res_group = Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME;
-
-  Ogre::TextureManager& texture_manager = Ogre::TextureManager::getSingleton();
+  Ogre::TextureManager & texture_manager = Ogre::TextureManager::getSingleton();
 
   // swap byte order when going from QImage to Ogre
-  return texture_manager.loadRawData(uniqueTextureName(), res_group, data_stream, image.width(), image.height(),
-                                     Ogre::PF_B8G8R8, Ogre::TEX_TYPE_2D, 0);
+  return texture_manager.loadRawData(
+    uniqueTextureName(), res_group, data_stream, image.width(), image.height(),
+    Ogre::PF_B8G8R8, Ogre::TEX_TYPE_2D, 0);
 }
 }  // namespace
 
-OgreTile::OgreTile(QImage image_) : texture(textureFromImage(convertImage(std::move(image_))))
+OgreTile::OgreTile(QImage image_)
+: texture(textureFromImage(convertImage(std::move(image_))))
 {
 }

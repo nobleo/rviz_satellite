@@ -11,8 +11,9 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
-#include "aerialmap_display.h"
+#include "aerialmap_display.hpp"
 
+#include <string>
 #include <iomanip>
 
 #include <OgreManualObject.h>
@@ -22,21 +23,12 @@ limitations under the License. */
 #include <OgreTextureManager.h>
 #include <OgreTechnique.h>
 
-#include "rviz_common/properties/float_property.hpp"
-#include "rviz_common/properties/int_property.hpp"
-#include "rviz_common/properties/status_property.hpp"
-#include "rviz_common/properties/property.hpp"
-#include "rviz_common/properties/quaternion_property.hpp"
-#include "rviz_common/properties/ros_topic_property.hpp"
-#include "rviz_common/properties/vector_property.hpp"
 #include "rviz_common/validate_floats.hpp"
 #include "rviz_common/display_context.hpp"
 #include "rviz_common/logging.hpp"
 
 #include "rviz_default_plugins/transformation/tf_wrapper.hpp"
-
-#include "aerialmap_display.h"
-#include "mercator.h"
+#include "mercator.hpp"
 
 namespace rviz
 {
@@ -52,50 +44,59 @@ namespace rviz
  * Splitting this transform lookup is necessary to mitigate frame jitter.
  */
 
+using rviz_common::properties::Property;
 using rviz_common::properties::FloatProperty;
 using rviz_common::properties::IntProperty;
-using rviz_common::properties::Property;
 using rviz_common::properties::RosTopicProperty;
 using rviz_common::properties::StringProperty;
 using rviz_common::properties::StatusProperty;
 
-std::string const AerialMapDisplay::MAP_FRAME = "map";
+char const AerialMapDisplay::MAP_FRAME[] = "map";
 
-AerialMapDisplay::AerialMapDisplay() : Display()
+AerialMapDisplay::AerialMapDisplay()
+: Display()
 {
-
   topic_property_ =
-      new RosTopicProperty("Topic", "", "",
-                           "sensor_msgs::NavSatFix topic to subscribe to.", this, SLOT(updateTopic()));
+    new RosTopicProperty(
+    "Topic", "", "",
+    "sensor_msgs::NavSatFix topic to subscribe to.", this, SLOT(updateTopic()));
 
   alpha_property_ =
-      new FloatProperty("Alpha", 0.7, "Amount of transparency to apply to the map.", this, SLOT(updateAlpha()));
+    new FloatProperty(
+    "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
+    SLOT(updateAlpha()));
   alpha_property_->setMin(0);
   alpha_property_->setMax(1);
   alpha_property_->setShouldBeSaved(true);
   alpha_ = alpha_property_->getValue().toFloat();
 
-  draw_under_property_ = new Property("Draw Behind", false,
-                                      "Rendering option, controls whether or not the map is always"
-                                      " drawn behind everything else.",
-                                      this, SLOT(updateDrawUnder()));
+  draw_under_property_ = new Property(
+    "Draw Behind", false,
+    "Rendering option, controls whether or not the map is always"
+    " drawn behind everything else.",
+    this, SLOT(updateDrawUnder()));
   draw_under_property_->setShouldBeSaved(true);
   draw_under_ = draw_under_property_->getValue().toBool();
 
   // properties for map
   tile_url_property_ =
-      new StringProperty("Object URI", "", "URL from which to retrieve map tiles.", this, SLOT(updateTileUrl()));
+    new StringProperty(
+    "Object URI", "", "URL from which to retrieve map tiles.", this,
+    SLOT(updateTileUrl()));
   tile_url_property_->setShouldBeSaved(true);
   tile_url_ = tile_url_property_->getStdString();
 
-  QString const zoom_desc = QString::fromStdString("Zoom level (0 - " + std::to_string(MAX_ZOOM) + ")");
+  QString const zoom_desc = QString::fromStdString(
+    "Zoom level (0 - " + std::to_string(
+      MAX_ZOOM) + ")");
   zoom_property_ = new IntProperty("Zoom", 16, zoom_desc, this, SLOT(updateZoom()));
   zoom_property_->setMin(0);
   zoom_property_->setMax(MAX_ZOOM);
   zoom_property_->setShouldBeSaved(true);
   zoom_ = zoom_property_->getInt();
 
-  QString const blocks_desc = QString::fromStdString("Adjacent blocks (0 - " + std::to_string(MAX_BLOCKS) + ")");
+  QString const blocks_desc =
+    QString::fromStdString("Adjacent blocks (0 - " + std::to_string(MAX_BLOCKS) + ")");
   blocks_property_ = new IntProperty("Blocks", 3, blocks_desc, this, SLOT(updateBlocks()));
   blocks_property_->setMin(0);
   blocks_property_->setMax(MAX_BLOCKS);
@@ -122,7 +123,7 @@ void AerialMapDisplay::onEnable()
   auto tf_wrapper = std::dynamic_pointer_cast<rviz_default_plugins::transformation::TFWrapper>(
     context_->getFrameManager()->getConnector().lock());
 
-  if (tf_wrapper) tf_buffer_ = tf_wrapper->getBuffer();
+  if (tf_wrapper) {tf_buffer_ = tf_wrapper->getBuffer();}
 
   createTileObjects();
   subscribe();
@@ -136,13 +137,11 @@ void AerialMapDisplay::onDisable()
 
 void AerialMapDisplay::subscribe()
 {
-  if (!isEnabled())
-  {
+  if (!isEnabled()) {
     return;
   }
 
-  if (!topic_property_->getTopic().isEmpty())
-  {
+  if (!topic_property_->getTopic().isEmpty()) {
     try {
       navsat_fix_sub_ =
         rviz_ros_node_.lock()->get_raw_node()->
@@ -174,15 +173,13 @@ void AerialMapDisplay::updateAlpha()
   //  - update transforms
 
   auto const alpha = alpha_property_->getFloat();
-  if (alpha == alpha_)
-  {
+  if (alpha == alpha_) {
     return;
   }
 
   alpha_ = alpha;
 
-  if (!isEnabled())
-  {
+  if (!isEnabled()) {
     return;
   }
 
@@ -200,15 +197,13 @@ void AerialMapDisplay::updateDrawUnder()
   //  - update transforms
 
   auto const draw_under = draw_under_property_->getValue().toBool();
-  if (draw_under == draw_under_)
-  {
+  if (draw_under == draw_under_) {
     return;
   }
 
   draw_under_ = draw_under;
 
-  if (!isEnabled())
-  {
+  if (!isEnabled()) {
     return;
   }
 
@@ -226,15 +221,13 @@ void AerialMapDisplay::updateTileUrl()
   //  - update transforms
 
   auto const tile_url = tile_url_property_->getStdString();
-  if (tile_url == tile_url_)
-  {
+  if (tile_url == tile_url_) {
     return;
   }
 
   tile_url_ = tile_url;
 
-  if (!isEnabled())
-  {
+  if (!isEnabled()) {
     return;
   }
 
@@ -251,22 +244,19 @@ void AerialMapDisplay::updateZoom()
   //  - update transforms
 
   auto const zoom = zoom_property_->getInt();
-  if (zoom == zoom_)
-  {
+  if (zoom == zoom_) {
     return;
   }
 
   zoom_ = zoom;
 
-  if (!isEnabled())
-  {
+  if (!isEnabled()) {
     return;
   }
 
   createTileObjects();
 
-  if (ref_fix_)
-  {
+  if (ref_fix_) {
     updateCenterTile(ref_fix_);
   }
 }
@@ -282,15 +272,13 @@ void AerialMapDisplay::updateBlocks()
   //  - update transforms
 
   auto const blocks = blocks_property_->getInt();
-  if (blocks == blocks_)
-  {
+  if (blocks == blocks_) {
     return;
   }
 
   blocks_ = blocks;
 
-  if (!isEnabled())
-  {
+  if (!isEnabled()) {
     return;
   }
 
@@ -302,8 +290,7 @@ void AerialMapDisplay::updateTopic()
 {
   // if the NavSat topic changes, we reset everything
 
-  if (!isEnabled())
-  {
+  if (!isEnabled()) {
     return;
   }
 
@@ -324,15 +311,13 @@ void AerialMapDisplay::clearAll()
 
 void AerialMapDisplay::destroyTileObjects()
 {
-  for (MapObject& obj : objects_)
-  {
+  for (MapObject & obj : objects_) {
     // destroy object
     scene_node_->detachObject(obj.object);
     scene_manager_->destroyManualObject(obj.object);
 
     // destroy material
-    if (obj.material)
-    {
+    if (obj.material) {
       Ogre::MaterialManager::getSingleton().remove(obj.material->getName());
     }
   }
@@ -341,13 +326,11 @@ void AerialMapDisplay::destroyTileObjects()
 
 void AerialMapDisplay::createTileObjects()
 {
-  if (not objects_.empty())
-  {
+  if (!objects_.empty()) {
     destroyTileObjects();
   }
 
-  for (int block = 0; block < (2 * blocks_ + 1) * (2 * blocks_ + 1); ++block)
-  {
+  for (int block = 0; block < (2 * blocks_ + 1) * (2 * blocks_ + 1); ++block) {
     // generate an unique name
     static size_t count = 0;
     std::string const name_suffix = std::to_string(count);
@@ -355,7 +338,7 @@ void AerialMapDisplay::createTileObjects()
 
     // one material per texture
     Ogre::MaterialPtr material = Ogre::MaterialManager::getSingleton().create(
-        "satellite_material_" + name_suffix, Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+      "satellite_material_" + name_suffix, Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
     material->setReceiveShadows(false);
     material->getTechnique(0)->setLightingEnabled(false);
     material->setDepthBias(-16.0f, 0.0f);
@@ -363,11 +346,13 @@ void AerialMapDisplay::createTileObjects()
     material->setDepthWriteEnabled(false);
 
     // create texture and initialize it
-    Ogre::TextureUnitState* tex_unit = material->getTechnique(0)->getPass(0)->createTextureUnitState();
+    Ogre::TextureUnitState * tex_unit =
+      material->getTechnique(0)->getPass(0)->createTextureUnitState();
     tex_unit->setTextureFiltering(Ogre::TFO_BILINEAR);
 
     // create an object
-    Ogre::ManualObject* obj = scene_manager_->createManualObject("satellite_object_" + name_suffix);
+    Ogre::ManualObject * obj =
+      scene_manager_->createManualObject("satellite_object_" + name_suffix);
     obj->setVisible(false);
     scene_node_->attachObject(obj);
 
@@ -378,11 +363,9 @@ void AerialMapDisplay::createTileObjects()
 
 void AerialMapDisplay::update(float, float)
 {
-  if (not ref_fix_ or not center_tile_)
-  {
+  if (!ref_fix_ || !center_tile_) {
     return;
   }
-
   // update tiles, if necessary
   assembleScene();
   // transform scene object into fixed frame
@@ -398,19 +381,19 @@ void AerialMapDisplay::navFixCallback(const sensor_msgs::msg::NavSatFix::SharedP
 
 void AerialMapDisplay::updateCenterTile(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
 {
-  if (!isEnabled())
-  {
+  if (!isEnabled()) {
     return;
   }
 
   // check if update is necessary
-  TileCoordinate const tile_coordinates = fromWGSCoordinate<int>({ msg->latitude, msg->longitude }, zoom_);
-  TileId const new_center_tile_id{ tile_url_, tile_coordinates, zoom_ };
+  TileCoordinate const tile_coordinates = fromWGSCoordinate<int>(
+    {msg->latitude, msg->longitude},
+    zoom_);
+  TileId const new_center_tile_id{tile_url_, tile_coordinates, zoom_};
   bool const center_tile_changed = (!center_tile_ || !(new_center_tile_id == *center_tile_));
 
-  if (not center_tile_changed)
-  {
-    // TODO: Maybe we should update the transform here even if the center tile did not change?
+  if (!center_tile_changed) {
+    // TODO(ZeilingerM): Maybe we should update the transform here even if the center tile did not change?
     // The localization might have been updated.
     transformTileToMapFrame();
     return;
@@ -427,31 +410,25 @@ void AerialMapDisplay::updateCenterTile(const sensor_msgs::msg::NavSatFix::Share
 
 void AerialMapDisplay::requestTileTextures()
 {
-  if (!isEnabled())
-  {
+  if (!isEnabled()) {
     return;
   }
 
-  if (tile_url_.empty())
-  {
+  if (tile_url_.empty()) {
     setStatus(StatusProperty::Error, "TileRequest", "Tile URL is not set");
     return;
   }
 
-  if (not center_tile_)
-  {
+  if (!center_tile_) {
     setStatus(StatusProperty::Error, "Message", "No NavSatFix received yet");
     return;
   }
 
-  try
-  {
+  try {
     RVIZ_COMMON_LOG_INFO("Requesting new tile images from the server");
-    tile_cache_.request({ *center_tile_, blocks_ });
+    tile_cache_.request({*center_tile_, blocks_});
     triggerSceneAssembly();
-  }
-  catch (std::exception const& e)
-  {
+  } catch (std::exception const & e) {
     setStatus(StatusProperty::Error, "TileRequest", QString(e.what()));
     return;
   }
@@ -461,17 +438,13 @@ void AerialMapDisplay::checkRequestErrorRate()
 {
   // the following error rate thresholds are randomly chosen
   float const error_rate = tile_cache_.getTileServerErrorRate(tile_url_);
-  if (error_rate > 0.95)
-  {
+  if (error_rate > 0.95) {
     setStatus(StatusProperty::Level::Error, "TileRequest", "Few or no tiles received");
-  }
-  else if (error_rate > 0.3)
-  {
-    setStatus(StatusProperty::Level::Warn, "TileRequest",
-              "Not all requested tiles have been received. Possibly the server is throttling?");
-  }
-  else
-  {
+  } else if (error_rate > 0.3) {
+    setStatus(
+      StatusProperty::Level::Warn, "TileRequest",
+      "Not all requested tiles have been received. Possibly the server is throttling?");
+  } else {
     setStatus(StatusProperty::Level::Ok, "TileRequest", "OK");
   }
 }
@@ -484,17 +457,14 @@ void AerialMapDisplay::triggerSceneAssembly()
 
 void AerialMapDisplay::assembleScene()
 {
-  // TODO: split this function into pieces, and only call the pieces when needed
+  // TODO(ZeilingerM): split this function into pieces, and only call the pieces when needed
   // E.g. into: grid geometry, tile geometry, material/texture (only this is asynchronous and depends on the incoming
   // tiles from the cache/server)
-
-  if (!isEnabled() || !dirty_ || !center_tile_)
-  {
+  if (!isEnabled() || !dirty_ || !center_tile_) {
     return;
   }
 
-  if (objects_.empty())
-  {
+  if (objects_.empty()) {
     // FIXME - Not supported yet
     // RVIZ_COMMON_LOG_ERROR_THROTTLE(std::chrono::seconds(5), "No objects to draw on, call createTileObjects() first!");
     return;
@@ -504,25 +474,18 @@ void AerialMapDisplay::assembleScene()
 
   Area area(*center_tile_, blocks_);
 
-  TileCacheGuard guard(tile_cache_);
-
   bool all_tiles_loaded = true;
 
   auto it = objects_.begin();
-  for (int xx = area.left_top.x; xx <= area.right_bottom.x; ++xx)
-  {
-    for (int yy = area.left_top.y; yy <= area.right_bottom.y; ++yy)
-    {
+  for (int xx = area.left_top.x; xx <= area.right_bottom.x; ++xx) {
+    for (int yy = area.left_top.y; yy <= area.right_bottom.y; ++yy) {
       auto obj = it->object;
-      auto& material = it->material;
-      assert(material);
+      auto & material = it->material;
       ++it;
 
-      TileId const to_find{ center_tile_->tile_server, { xx, yy }, center_tile_->zoom };
-
-      OgreTile const* tile = tile_cache_.ready(to_find);
-      if (!tile)
-      {
+      TileId const to_find{center_tile_->tile_server, {xx, yy}, center_tile_->zoom};
+      OgreTile const * tile = tile_cache_.ready(to_find);
+      if (!tile) {
         // don't show tiles with old textures
         obj->setVisible(false);
         all_tiles_loaded = false;
@@ -532,28 +495,23 @@ void AerialMapDisplay::assembleScene()
       obj->setVisible(true);
 
       // update texture
-      Ogre::TextureUnitState* tex_unit = material->getTechnique(0)->getPass(0)->getTextureUnitState(0);
+      Ogre::TextureUnitState * tex_unit =
+        material->getTechnique(0)->getPass(0)->getTextureUnitState(0);
       tex_unit->setTextureName(tile->texture->getName());
 
       // configure depth & alpha properties
-      if (alpha_ >= 0.9998)
-      {
+      if (alpha_ >= 0.9998) {
         material->setDepthWriteEnabled(!draw_under_);
         material->setSceneBlending(Ogre::SBT_REPLACE);
-      }
-      else
-      {
+      } else {
         material->setSceneBlending(Ogre::SBT_TRANSPARENT_ALPHA);
         material->setDepthWriteEnabled(false);
       }
 
-      if (draw_under_)
-      {
+      if (draw_under_) {
         // render under everything else
         obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_3);
-      }
-      else
-      {
+      } else {
         obj->setRenderQueueGroup(Ogre::RENDER_QUEUE_MAIN);
       }
 
@@ -621,24 +579,19 @@ void AerialMapDisplay::assembleScene()
   }
 
   // since not all tiles were loaded yet, this function has to be called again
-  if (!all_tiles_loaded)
-  {
+  if (!all_tiles_loaded) {
     dirty_ = true;
-  }
-  else
-  {
+  } else {
     RVIZ_COMMON_LOG_INFO("Finished assembling all tiles");
   }
 
-  tile_cache_.purge({ *center_tile_, blocks_ });
-
+  tile_cache_.purge({*center_tile_, blocks_});
   checkRequestErrorRate();
 }
 
 void AerialMapDisplay::transformTileToMapFrame()
 {
-  if (not ref_fix_ or not center_tile_)
-  {
+  if (!ref_fix_ || !center_tile_) {
     // FIXME - Not supported yet
     // RVIZ_COMMON_LOG_FATAL_THROTTLE(std::chrono::seconds(2), "ref_fix_ not set, can't create transforms");
     return;
@@ -657,24 +610,25 @@ void AerialMapDisplay::transformTileToMapFrame()
   // NOTE: due to ENU convention, orientation is not needed, the tiles are rigidly attached to ENU
   Ogre::Vector3 t_navsat_map;
 
-  try
-  {
+  try {
     // Use a real TfBuffer for looking up this transform. The FrameManager only supplies transform to/from the
     // currently selected RViz fixed-frame, which is of no help here.
     auto const tf_navsat_map =
-        tf_buffer_->lookupTransform(MAP_FRAME, ref_fix_->header.frame_id, ref_fix_->header.stamp, tf2::durationFromSec(0.1));
+      tf_buffer_->lookupTransform(
+      MAP_FRAME, ref_fix_->header.frame_id, ref_fix_->header.stamp, tf2::durationFromSec(
+        0.1));
     auto const tf_pos = tf_navsat_map.transform.translation;
     t_navsat_map = Ogre::Vector3(tf_pos.x, tf_pos.y, tf_pos.z);
-  }
-  catch (tf2::TransformException const& ex)
-  {
+  } catch (tf2::TransformException const & ex) {
     setStatus(StatusProperty::Error, "Transform", QString::fromStdString(ex.what()));
     return;
   }
 
   // FIXME: note the <double> template! this is different from center_tile_.coord, otherwise we could just use that
   // since center_tile_ and ref_fix_ are in sync
-  auto const ref_fix_tile_coords = fromWGSCoordinate<double>({ ref_fix_->latitude, ref_fix_->longitude }, zoom_);
+  auto const ref_fix_tile_coords = fromWGSCoordinate<double>(
+    {ref_fix_->latitude,
+      ref_fix_->longitude}, zoom_);
 
   // In assembleScene() we shift the AerialMap so that the center tile's left-bottom corner has the coordinate (0,0).
   // Therefore we can calculate the NavSatFix coordinate (in the AerialMap frame) by just looking at the fractional part
@@ -689,7 +643,7 @@ void AerialMapDisplay::transformTileToMapFrame()
 
   // translation of the center-tile w.r.t. the NavSatFix frame
   auto const t_centertile_navsat =
-      Ogre::Vector3(center_tile_offset_x * tile_w_h_m, center_tile_offset_y * tile_w_h_m, 0);
+    Ogre::Vector3(center_tile_offset_x * tile_w_h_m, center_tile_offset_y * tile_w_h_m, 0);
 
   t_centertile_map_ = t_navsat_map - t_centertile_navsat;
 }
@@ -702,8 +656,7 @@ void AerialMapDisplay::transformMapTileToFixedFrame()
   Ogre::Vector3 t_fixed_map;
 
   // get transform between map-frame and fixed-frame from the FrameManager
-  if (context_->getFrameManager()->getTransform(MAP_FRAME, t_fixed_map, o_fixed_map))
-  {
+  if (context_->getFrameManager()->getTransform(std::string(MAP_FRAME), t_fixed_map, o_fixed_map)) {
     setStatus(::rviz::StatusProperty::Ok, "Transform", "Transform OK");
 
     // the translation of the tile w.r.t. the fixed-frame
@@ -711,20 +664,17 @@ void AerialMapDisplay::transformMapTileToFixedFrame()
 
     scene_node_->setPosition(t_centertile_fixed);
     scene_node_->setOrientation(o_fixed_map);
-  }
-  else
-  {
+  } else {
     // display error
     std::string error;
-    if (context_->getFrameManager()->transformHasProblems(MAP_FRAME, error))
-    {
+    if (context_->getFrameManager()->transformHasProblems(MAP_FRAME, error)) {
       setStatus(::rviz::StatusProperty::Error, "Transform", QString::fromStdString(error));
-    }
-    else
-    {
-      setStatus(::rviz::StatusProperty::Error, "Transform",
-                QString::fromStdString("Could not transform from [" + MAP_FRAME + "] to Fixed Frame [" +
-                                       fixed_frame_.toStdString() + "] for an unknown reason"));
+    } else {
+      setStatus(
+        ::rviz::StatusProperty::Error, "Transform",
+        QString::fromStdString(
+          "Could not transform from [" + std::string(MAP_FRAME) + "] to Fixed Frame [" +
+          fixed_frame_.toStdString() + "] for an unknown reason"));
     }
   }
 }
@@ -732,7 +682,6 @@ void AerialMapDisplay::transformMapTileToFixedFrame()
 void AerialMapDisplay::reset()
 {
   Display::reset();
-  // unsubscribe, clear, resubscribe
   updateTopic();
 }
 

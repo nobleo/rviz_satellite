@@ -18,7 +18,7 @@ limitations under the License. */
 
 #include <QTimer>
 
-#include "tile_cache.h"
+#include "tile_cache.hpp"
 
 template <typename Tile>
 class TileCacheDelay;

@@ -27,7 +27,7 @@ public:
   Ogre::TexturePtr texture;
 
 public:
-  OgreTile(QImage image_);
+  explicit OgreTile(QImage image_);
 
   OgreTile(OgreTile&& other) noexcept
   {
