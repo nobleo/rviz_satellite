@@ -15,174 +15,67 @@ limitations under the License. */
 #pragma once
 
 #include <memory>
-#include <string>
-#include <vector>
-
-#include <boost/optional.hpp>
+#include <unordered_map>
+#include <map>
+#include <utility>
 
 #include <rclcpp/rclcpp.hpp>
-#include <rviz_common/display.hpp>
-#include <rviz_common/ros_integration/ros_node_abstraction_iface.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
-#include <tf2_ros/buffer.h>
+#include <geographic_msgs/msg/geo_point.hpp>
 
 #include "rviz_common/properties/float_property.hpp"
 #include "rviz_common/properties/int_property.hpp"
-#include "rviz_common/properties/status_property.hpp"
 #include "rviz_common/properties/string_property.hpp"
-#include "rviz_common/properties/ros_topic_property.hpp"
+#include <rviz_common/ros_topic_display.hpp>
 
-#include <OgreMaterial.h>
-#include <OgreVector3.h>
+#include "tile.hpp"
+#include "tile_object.hpp"
+#include "tile_client.hpp"
 
-#include "ogre_tile.hpp"
-#include "tile_cache_delay.hpp"
-
-namespace rviz
+namespace rviz_satellite
 {
-/**
- * @brief Displays a satellite map along the XY plane.
- */
 
-class AerialMapDisplay : public rviz_common::Display
+/**
+ * @brief Display a satellite map on the XY plane.
+ */
+class AerialMapDisplay : public rviz_common::RosTopicDisplay<sensor_msgs::msg::NavSatFix>
 {
   Q_OBJECT
 public:
   AerialMapDisplay();
   ~AerialMapDisplay() override;
 
-  // Overrides from Display
   void onInitialize() override;
   void reset() override;
   void update(float, float) override;
 
 protected Q_SLOTS:
   void updateAlpha();
-  void updateTopic();
   void updateDrawUnder();
   void updateTileUrl();
   void updateZoom();
   void updateBlocks();
 
 protected:
-  // overrides from Display
   void onEnable() override;
   void onDisable() override;
 
-  virtual void subscribe();
-  virtual void unsubscribe();
+  void processMessage(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg) override;
 
-  /**
-   * GPS topic callback
-   */
-  void navFixCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg);
+  bool validateMessage(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
 
-  /**
-   * Load images to cache (non-blocking)
-   */
-  void requestTileTextures();
+  void buildObjects(const geographic_msgs::msg::GeoPoint & center);
 
-  /**
-   * Triggers texture update if the center-tile changed w.r.t. the current one
-   */
-  void updateCenterTile(const sensor_msgs::msg::NavSatFix::SharedPtr msg);
-
-  /**
-   * Generates the tile's render geometry and applies the requested textures
-   */
-  void assembleScene();
-
-  /**
-   * Triggers to (re-) assemble the scene
-   */
-  void triggerSceneAssembly();
-
-  /**
-   * Destroys the scene-object and all children and their textures, along with the center-tile memory
-   */
-  void clearAll();
-
-  /**
-   * Destroys the tile scene-objects
-   */
-  void destroyTileObjects();
-
-  /**
-   * Creates the tile scene-objects and their materials
-   */
-  void createTileObjects();
-
-  /**
-   * Transforms the tile objects into the map frame.
-   */
-  void transformTileToMapFrame();
-
-  /**
-   * Transforms the tile objects into the fixed frame.
-   */
-  void transformMapTileToFixedFrame();
-
-  /**
-   * Checks how may tiles were loaded successfully, and sets the status accordingly.
-   */
-  void checkRequestErrorRate();
-
-  /**
-   * Tile with associated Ogre data
-   */
-  struct MapObject
-  {
-    Ogre::ManualObject* object;
-    Ogre::MaterialPtr material;
-
-    MapObject(Ogre::ManualObject* o, Ogre::MaterialPtr m) : object(o), material(m)
-    {
-    }
-  };
-
-  /// the tile scene objects
-  std::vector<MapObject> objects_;
-
-  rclcpp::Subscription< sensor_msgs::msg::NavSatFix >::SharedPtr navsat_fix_sub_;
-
-  // properties
-  rviz_common::properties::RosTopicProperty* topic_property_ = nullptr;
   rviz_common::properties::StringProperty* tile_url_property_ = nullptr;
   rviz_common::properties::IntProperty* zoom_property_ = nullptr;
   rviz_common::properties::IntProperty* blocks_property_ = nullptr;
   rviz_common::properties::FloatProperty* alpha_property_ = nullptr;
   rviz_common::properties::Property* draw_under_property_ = nullptr;
-
-  /// the alpha value of the tile's material
-  float alpha_;
-  /// determines which render queue to use
-  bool draw_under_;
-  /// the URL of the tile server to use
-  std::string tile_url_;
-  /// the zoom to use (Mercator)
-  int zoom_;
-  /// the number of tiles loaded in each direction around the center tile
-  int blocks_;
-
-  // tile management
-  /// whether we need to re-query and re-assemble the tiles
-  bool dirty_{ false };
-  /// the last NavSatFix message that lead to updating the tiles
-  sensor_msgs::msg::NavSatFix::SharedPtr ref_fix_{ nullptr };
-  /// caches tile images, hashed by their fetch URL
-  TileCacheDelay<OgreTile> tile_cache_;
-  /// Last request()ed tile id (which is the center tile)
-  boost::optional<TileId> center_tile_{ boost::none };
-  /// translation of the center-tile w.r.t. the map frame
-  Ogre::Vector3 t_centertile_map_{ Ogre::Vector3::ZERO };
-  /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
-  static char const MAP_FRAME[];
-  /// rclcpp node
-  rviz_common::ros_integration::RosNodeAbstractionIface::WeakPtr rviz_ros_node_;
-  /// qos
-  rclcpp::QoS update_profile_ = rclcpp::SensorDataQoS();
-  /// buffer for tf lookups not related to fixed-frame
-  std::shared_ptr< tf2_ros::Buffer > tf_buffer_;
+  
+  TileClient tile_client_;
+  std::unordered_map<TileId, std::future<QImage>> pending_tiles_;
+  std::map<TileId, TileObject> tiles_;
+  static char const UTM_FRAME[];
 };
 
-}  // namespace rviz
+}  // namespace rviz_satellite

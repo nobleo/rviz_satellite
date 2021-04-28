@@ -13,41 +13,44 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 #pragma once
 
-#include <functional>
-#include <limits>
 #include <string>
-#include <utility>
-
-#include <QCryptographicHash>
-#include <QDir>
-#include <QImage>
-#include <QImageReader>
-#include <QStandardPaths>
-#include <QString>
-#include <QtCore>
+#include <unordered_map>
 #include <QtNetwork>
+#include "tile.hpp"
 
-#include "rviz_common/logging.hpp"
+namespace rviz_satellite
+{
 
-#include "detail/error_rate_manager.hpp"
-#include "tile_id.hpp"
+class tile_request_error : public std::exception
+{
+private:
+  std::string message_;
+
+public:
+  explicit tile_request_error(const std::string & message)
+  : message_(message)
+  {
+  }
+
+  const char * what() const noexcept override
+  {
+    return message_.c_str();
+  }
+};
 
 /**
- * @brief Tile downloader
- *
- * This class encapsulates away all the Qt stuff regarding downloading.
+ * @brief Download slippy tiles from a Tile server.
  */
-class TileDownloader : public QObject
+class TileClient : public QObject
 {
   Q_OBJECT
 
-  QNetworkAccessManager * manager;
-  std::function<void(TileId, QImage)> callback;
+private:
+  QNetworkAccessManager * manager_;
+  std::unordered_map<TileId, std::promise<QImage>> tile_promises_;
 
 public:
-  detail::ErrorRateManager<std::string> error_rates;
-
-  explicit TileDownloader(decltype(callback) callback);
+  TileClient();
 
   /**
    * @brief Load a specific tile
@@ -55,8 +58,10 @@ public:
    * Since QNetworkDiskCache is used, tiles will be loaded from the file system if they have been cached. Otherwise they
    * get downloaded.
    */
-  void loadTile(TileId const & tile_id);
+  std::future<QImage> request(const TileId & tile_id);
 
-public Q_SLOTS:
-  void downloadFinished(QNetworkReply * reply);
+private Q_SLOTS:
+  void request_finished(QNetworkReply * reply);
 };
+
+}  // namespace rviz_satellite

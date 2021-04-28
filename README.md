@@ -1,33 +1,12 @@
 # rviz_satellite
 
-Plugin for rviz for displaying satellite maps loaded from the internet.
+Rviz plugin for displaying satellite maps at the position of a `sensor_msgs/msg/NavSatFix` message.
 
-![Alt text](.screenshot.png?raw=true "Example Image")
-
-In the near future this plugin will not add support for ROS 2.
-For an unofficial ROS 2 fork see [blacksoul000/rviz_satellite](https://github.com/blacksoul000/rviz_satellite/tree/dashing).
-
-In order to use rviz_satellite, add this package to your catkin workspace.
-
-## Demo
-
-The package contains a launch file for demonstration purposes.
-Use it to verify your installation and to get started:
-
-```
-roslaunch rviz_satellite demo.launch
-```
-
-The launch file will fake a GPS position in Philadelphia, USA and display [Wikimedia Maps](https://maps.wikimedia.org) nearby.
-You can edit the longitude and latitude values in `launch/demo.gps` to change the position.
-
-Check the Usage section below to learn how to use the position of your robot and a satellite map.
+![Rviz view with updating aerial map](images/rviz_satellite.png "Rviz view with updating aerial map")
 
 ## Usage
 
-Add an instance of `AerialMapDisplay` to your rviz config.
-
-The `Topic` field must point to a publisher of `sensor_msgs/NavSatFix`.
+Add an instance of `AerialMapDisplay` to your Rviz config and point it to a `sensor_msgs/msg/NavSatFix` topic.
 
 Map tiles will be cached to `$HOME/.cache/rviz_satellite`.
 At present the cache does not expire automatically - you should delete the files in the folder if you want the images to be reloaded.
@@ -58,7 +37,7 @@ Please refer to the respective terms of service and copyrights.
 - `Alpha` is simply the display transparency.
 - `Draw Under` will cause the map to be displayed below all other geometry.
 - `Zoom` is the zoom level of the map. Recommended values are 16-19, as anything smaller is _very_ low resolution. 22 is the current max.
-- `Blocks` number of adjacent blocks to load. rviz_satellite will load the central block, and this many blocks around the center. 8 is the current max.
+- `Blocks` number of adjacent tiles in addition to the center tile to load, 8 maximum.
 
 ## Support and Contributions
 
