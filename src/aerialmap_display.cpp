@@ -155,49 +155,20 @@ void AerialMapDisplay::updateDrawUnder()
 
 void AerialMapDisplay::updateTileUrl()
 {
-  // if the tile url changed, we need to
-  //  - query textures
-  //  - repaint textures
-  // we don't need to
-  //  - re-create tile grid geometry
-  //  - update the center tile
-  //  - update transforms
-  if (!isEnabled()) {
-    return;
-  }
-  // buildObjects();
+  // rebuild on next received message
+  resetMap();
 }
 
 void AerialMapDisplay::updateZoom()
 {
-  // if the zoom changed, we need to
-  //  - re-create tile grid geometry
-  //  - update the center tile
-  //  - query textures
-  //  - repaint textures
-  //  - update transforms
-
-  // auto const zoom = zoom_property_->getInt();
-  // if (zoom == zoom_) {
-  //   return;
-  // }
-  // zoom_ = zoom;
-  // buildObjects();
-  // TODO(ZeilingerM)
+  // rebuild on next received message
+  resetMap();
 }
 
 void AerialMapDisplay::updateBlocks()
 {
-  // if the number of blocks changed, we need to
-  //  - re-create tile grid geometry
-  //  - query textures
-  //  - repaint textures
-  // we don't need to
-  //  - update the center tile
-  //  - update transforms
-  // createTileObjects();
-  // requestTileTextures();
-  // TODO(ZeilingerM)
+  // rebuild on next received message
+  resetMap();
 }
 
 void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
@@ -232,6 +203,8 @@ void AerialMapDisplay::buildObjects(const GeoPoint & center)
       pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
 
       auto size = zoomSize(center.latitude, zoom);
+      double tx = utm_center.easting + x * size;
+      double ty = utm_center.northing + y * size;
       std::stringstream ss;
       ss << tile_id;
       tiles_.emplace(
@@ -239,7 +212,7 @@ void AerialMapDisplay::buildObjects(const GeoPoint & center)
         std::forward_as_tuple(tile_id),
         std::forward_as_tuple(
           scene_manager_, scene_node_,
-          ss.str(), size, utm_center.easting + x * size, utm_center.northing + y * size, false));
+          ss.str(), size, tx, ty, false));
     }
   }
   // set material properties
@@ -253,8 +226,6 @@ void AerialMapDisplay::update(float, float)
     if (it->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
       try {
         auto image = it->second.get();
-        RVIZ_COMMON_LOG_DEBUG_STREAM(
-          "image " << image.width() << " " << image.height() << " " << image.format());
         tiles_.find(it->first)->second.updateData(image);
       } catch (const tile_request_error & e) {
         RVIZ_COMMON_LOG_ERROR(e.what());
@@ -290,11 +261,16 @@ void AerialMapDisplay::update(float, float)
   }
 }
 
+void AerialMapDisplay::resetMap()
+{
+  tiles_.clear();
+  pending_tiles_.clear();
+}
+
 void AerialMapDisplay::reset()
 {
   RTDClass::reset();
-  tiles_.clear();
-  pending_tiles_.clear();
+  resetMap();
 }
 
 }  // namespace rviz_satellite

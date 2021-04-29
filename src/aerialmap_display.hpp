@@ -65,6 +65,8 @@ protected:
   bool validateMessage(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
 
   void buildObjects(const geographic_msgs::msg::GeoPoint & center);
+  
+  void resetMap();
 
   rviz_common::properties::StringProperty* tile_url_property_ = nullptr;
   rviz_common::properties::IntProperty* zoom_property_ = nullptr;
