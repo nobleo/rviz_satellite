@@ -16,8 +16,6 @@ limitations under the License. */
 #include <utility>
 #include <string>
 #include <iomanip>
-#include <geodesy/wgs84.h>
-#include <geodesy/utm.h>
 
 #include <OgreManualObject.h>
 #include <OgreMaterialManager.h>
@@ -57,7 +55,7 @@ using rviz_common::properties::StatusProperty;
 using sensor_msgs::msg::NavSatFix;
 using geographic_msgs::msg::GeoPoint;
 
-char const AerialMapDisplay::UTM_FRAME[] = "utm";
+char const AerialMapDisplay::MAP_FRAME[] = "map";
 
 AerialMapDisplay::AerialMapDisplay()
 : RosTopicDisplay()
@@ -180,21 +178,30 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
   if (!validateMessage(msg)) {
     return;
   }
-  if (tiles_.empty() && !tile_url_property_->getStdString().empty()) {
-    // TODO react to changing center tile
-    buildObjects(geodesy::toMsg(*msg));
+  last_fix_ = msg;
+  if (tile_url_property_->getStdString().empty()) {
+    setStatus(
+      rviz_common::properties::StatusProperty::Warn, "TileServer",
+      "Object URI is required to fetch map tiles");
+    return;
+  }
+  auto zoom = zoom_property_->getInt();
+  auto tile_at_fix = fromWGS(*msg, zoom);
+  if (tiles_.empty()) {
+    buildObjects(tile_at_fix, zoomSize(msg->latitude, zoom), zoom);
+  } else {
+    // rebuild only if center tile changed
+    if (tile_at_fix != centerTile()) {
+      buildObjects(tile_at_fix, zoomSize(msg->latitude, zoom), zoom);
+    }
   }
 }
 
-void AerialMapDisplay::buildObjects(const GeoPoint & center)
+void AerialMapDisplay::buildObjects(TileCoordinate center_tile, double size, int zoom)
 {
   auto tile_server = tile_url_property_->getStdString();
-  auto zoom = zoom_property_->getInt();
   auto tile_url = tile_url_property_->getStdString();
-  auto center_tile = fromWGS(center, zoom);
   auto blocks = blocks_property_->getInt();
-
-  geodesy::UTMPoint utm_center(center);
 
   for (int x = -blocks; x <= blocks; ++x) {
     for (int y = -blocks; y <= blocks; ++y) {
@@ -202,9 +209,9 @@ void AerialMapDisplay::buildObjects(const GeoPoint & center)
       const TileId tile_id{tile_server, {center_tile.x + x, center_tile.y + y, zoom}};
       pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
 
-      auto size = zoomSize(center.latitude, zoom);
-      double tx = utm_center.easting + x * size;
-      double ty = utm_center.northing + y * size;
+      // position of each tile is set so the origin of the aerial map is the center of the middle tile
+      double tx = x * size + size / 2;
+      double ty = y * size + size / 2;
       std::stringstream ss;
       ss << tile_id;
       tiles_.emplace(
@@ -222,6 +229,7 @@ void AerialMapDisplay::buildObjects(const GeoPoint & center)
 
 void AerialMapDisplay::update(float, float)
 {
+  // resolve pending tile requests, and set the received images as textures of their tiles
   for (auto it = pending_tiles_.begin(); it != pending_tiles_.end(); ) {
     if (it->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
       try {
@@ -239,23 +247,36 @@ void AerialMapDisplay::update(float, float)
     }
   }
 
-  Ogre::Vector3 translation;
-  Ogre::Quaternion orientation;
-  // transform the entire satellite map from the UTM frame to the fixed frame
-  if (context_->getFrameManager()->getTransform(std::string(UTM_FRAME), translation, orientation)) {
+  if (!last_fix_) {
+    return;
+  }
+
+  Ogre::Vector3 translation_to_map;
+  Ogre::Quaternion orientation_to_map;
+  // get transformation of fixed frame to map, to set the aerial map orientation to be aligned with ENU
+  if (context_->getFrameManager()->getTransform(
+      std::string(MAP_FRAME), translation_to_map,
+      orientation_to_map))
+  {
     setStatus(rviz_common::properties::StatusProperty::Ok, "Transform", "Transform OK");
-    scene_node_->setPosition(translation);
-    scene_node_->setOrientation(orientation);
+    auto example_tile = tiles_.begin();
+    auto center_tile_offset = tileOffset(*last_fix_, example_tile->first.coord.z);
+    Ogre::Vector3 aerial_map_offset(center_tile_offset.x, center_tile_offset.y, 0.0);
+
+    scene_node_->setPosition(
+      translation_to_map + orientation_to_map *
+      (aerial_map_offset * example_tile->second.tileSize()));
+    scene_node_->setOrientation(orientation_to_map);
     scene_node_->setVisible(true);
   } else {
     std::string error;
     if (context_->getFrameManager()->transformHasProblems(
-        std::string(UTM_FRAME), context_->getClock()->now(), error))
+        std::string(MAP_FRAME), context_->getClock()->now(), error))
     {
       setStatus(
         rviz_common::properties::StatusProperty::Error, "Transform", QString::fromStdString(error));
     } else {
-      setMissingTransformToFixedFrame(std::string(UTM_FRAME));
+      setMissingTransformToFixedFrame(std::string(MAP_FRAME));
     }
     scene_node_->setVisible(false);
   }
@@ -265,6 +286,18 @@ void AerialMapDisplay::resetMap()
 {
   tiles_.clear();
   pending_tiles_.clear();
+}
+
+TileCoordinate AerialMapDisplay::centerTile() const
+{
+  // when calling this function internally, the tiles should be created
+  // they must also always be uneven, since the center tile is surrounded by a field of uneven sides
+  // thus, there is a clear center already
+  assert(!tiles_.empty());
+  assert((tiles_.size() % 2) == 1);
+  auto it = tiles_.begin();
+  std::advance(it, tiles_.size() / 2);
+  return it->first.coord;
 }
 
 void AerialMapDisplay::reset()

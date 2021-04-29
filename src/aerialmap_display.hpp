@@ -64,9 +64,11 @@ protected:
 
   bool validateMessage(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
 
-  void buildObjects(const geographic_msgs::msg::GeoPoint & center);
+  void buildObjects(TileCoordinate center_tile, double size, int zoom);
   
   void resetMap();
+
+  TileCoordinate centerTile() const;
 
   rviz_common::properties::StringProperty* tile_url_property_ = nullptr;
   rviz_common::properties::IntProperty* zoom_property_ = nullptr;
@@ -75,9 +77,13 @@ protected:
   rviz_common::properties::Property* draw_under_property_ = nullptr;
   
   TileClient tile_client_;
+
   std::unordered_map<TileId, std::future<QImage>> pending_tiles_;
   std::map<TileId, TileObject> tiles_;
-  static char const UTM_FRAME[];
+
+  sensor_msgs::msg::NavSatFix::ConstSharedPtr last_fix_;
+
+  static char const MAP_FRAME[];
 };
 
 }  // namespace rviz_satellite

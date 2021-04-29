@@ -75,7 +75,7 @@ TileObject::TileObject(
   Ogre::SceneManager * scene_manager,
   Ogre::SceneNode * parent_scene_node,
   std::string unique_id,
-  Ogre::Real size, Ogre::Real x, Ogre::Real y, bool draw_under)
+  Ogre::Real tile_size, Ogre::Real x, Ogre::Real y, bool draw_under)
 : scene_manager_(scene_manager),
   parent_scene_node_(parent_scene_node),
   unique_id_(unique_id),
@@ -85,7 +85,7 @@ TileObject::TileObject(
   setupSceneNodeWithManualObject();
 
   scene_node_->setPosition(x, y, 0);
-  scene_node_->setScale(size, size, 1.0);
+  scene_node_->setScale(tile_size, tile_size, 1.0);
 
   if (draw_under) {
     manual_object_->setRenderQueueGroup(Ogre::RENDER_QUEUE_4);
@@ -149,6 +149,10 @@ void TileObject::updateData(QImage & image)
 std::string TileObject::objectId() const
 {
   return unique_id_;
+}
+
+Ogre::Real TileObject::tileSize() const {
+  return scene_node_->getScale().x;
 }
 
 void TileObject::setVisible(bool visible)

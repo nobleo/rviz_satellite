@@ -20,13 +20,15 @@ public:
     Ogre::SceneManager * scene_manager,
     Ogre::SceneNode * parent_scene_node,
     std::string unique_id,
-    Ogre::Real size, Ogre::Real x, Ogre::Real y, bool draw_under);
+    Ogre::Real tile_size, Ogre::Real x, Ogre::Real y, bool draw_under);
 
   TileObject() = delete;
 
   ~TileObject();
 
   std::string objectId() const;
+
+  Ogre::Real tileSize() const;
 
   void updateAlpha(float alpha);
 

@@ -18,10 +18,10 @@ limitations under the License. */
 #include <stdexcept>
 #include <string>
 #include <tuple>
-#include <angles/angles.h>
+#include <Ogre.h>
 
 #include <QMetaType>
-#include <geographic_msgs/msg/geo_point.hpp>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/functional/hash/hash.hpp>
@@ -42,6 +42,11 @@ struct TileCoordinate
   bool operator==(const TileCoordinate & other) const
   {
     return std::tie(x, y, z) == std::tie(other.x, other.y, other.z);
+  }
+
+  bool operator!=(const TileCoordinate & other) const
+  {
+    return std::tie(x, y, z) != std::tie(other.x, other.y, other.z);
   }
 
   bool operator<(const TileCoordinate & other) const
@@ -82,14 +87,19 @@ static constexpr int MAX_ZOOM = 22;
  *
  * @see https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Resolution_and_Scale
  */
-float zoomSize(double lat, int zoom);
+double zoomSize(double lat, int zoom);
 
 std::string tileURL(const TileId & tile_id);
 
 /**
  * Convert WGS coordinate to a tile coordinate using the Mercator projection.
  */
-TileCoordinate fromWGS(const geographic_msgs::msg::GeoPoint &, int zoom);
+TileCoordinate fromWGS(const sensor_msgs::msg::NavSatFix &, int zoom);
+
+/**
+ * Get the relative offset (-0.5, 0.5) of the geo point to the center of the tile
+ */
+Ogre::Vector2 tileOffset(const sensor_msgs::msg::NavSatFix &, int zoom);
 
 }  // namespace rviz_satellite
 

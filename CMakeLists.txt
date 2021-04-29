@@ -16,7 +16,6 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(geodesy REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rviz_common REQUIRED)
 find_package(rviz_default_plugins REQUIRED)
@@ -48,8 +47,8 @@ target_link_libraries(${PROJECT_NAME} Boost::system Qt5::Core Qt5::Gui Qt5::Netw
 target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
 set_property(TARGET ${PROJECT_NAME} PROPERTY AUTOMOC ON)
 
-ament_target_dependencies(${PROJECT_NAME} geodesy rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros)
-ament_export_dependencies(geodesy rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros)
+ament_target_dependencies(${PROJECT_NAME} rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros)
+ament_export_dependencies(rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
 
