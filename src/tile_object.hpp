@@ -42,8 +42,6 @@ public:
 
   Ogre::Pass * getTechniquePass();
 
-  std::string getTextureName();
-
 private:
   void setupMaterial();
   void setupSceneNodeWithManualObject();

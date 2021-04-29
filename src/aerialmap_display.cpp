@@ -187,13 +187,25 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
   }
   auto zoom = zoom_property_->getInt();
   auto tile_at_fix = fromWGS(*msg, zoom);
-  if (tiles_.empty()) {
-    buildObjects(tile_at_fix, zoomSize(msg->latitude, zoom), zoom);
-  } else {
-    // rebuild only if center tile changed
-    if (tile_at_fix != centerTile()) {
+  bool tilesCreated = false;
+  {
+    const std::lock_guard<std::mutex> lock(tiles_mutex_);
+    if (tiles_.empty()) {
       buildObjects(tile_at_fix, zoomSize(msg->latitude, zoom), zoom);
+      tilesCreated = true;
+    } else {
+      // rebuild only if center tile changed
+      if (tile_at_fix != centerTile()) {
+        tiles_.clear();
+        buildObjects(tile_at_fix, zoomSize(msg->latitude, zoom), zoom);
+        tilesCreated = true;
+      }
     }
+  }
+  if (tilesCreated) {
+    // set material properties on created tiles
+    updateAlpha();
+    updateDrawUnder();
   }
 }
 
@@ -206,12 +218,15 @@ void AerialMapDisplay::buildObjects(TileCoordinate center_tile, double size, int
   for (int x = -blocks; x <= blocks; ++x) {
     for (int y = -blocks; y <= blocks; ++y) {
 
+      // TODO(ZeilingerM) validate tile range
       const TileId tile_id{tile_server, {center_tile.x + x, center_tile.y + y, zoom}};
       pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
 
       // position of each tile is set so the origin of the aerial map is the center of the middle tile
-      double tx = x * size + size / 2;
-      double ty = y * size + size / 2;
+      double tx = x * size - size / 2;
+      // while tiles follow a east-south coordinate system, the aerial map is displayed in ENU
+      // thus, we invert the y translation
+      double ty = -y * size - size / 2;
       std::stringstream ss;
       ss << tile_id;
       tiles_.emplace(
@@ -222,13 +237,16 @@ void AerialMapDisplay::buildObjects(TileCoordinate center_tile, double size, int
           ss.str(), size, tx, ty, false));
     }
   }
-  // set material properties
-  updateAlpha();
-  updateDrawUnder();
 }
 
 void AerialMapDisplay::update(float, float)
 {
+  std::unique_lock<std::mutex> lock(tiles_mutex_, std::try_to_lock);
+  if (!lock.owns_lock()) {
+    // if tiles are currently written to, just wait until the next update
+    return;
+  }
+
   // resolve pending tile requests, and set the received images as textures of their tiles
   for (auto it = pending_tiles_.begin(); it != pending_tiles_.end(); ) {
     if (it->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
@@ -250,40 +268,73 @@ void AerialMapDisplay::update(float, float)
   if (!last_fix_) {
     return;
   }
+  if (tiles_.empty()) {
+    return;
+  }
 
-  Ogre::Vector3 translation_to_map;
-  Ogre::Quaternion orientation_to_map;
+  Ogre::Vector3 _ignored_translation;
+  Ogre::Quaternion orientation_to_map = Ogre::Quaternion::IDENTITY;
   // get transformation of fixed frame to map, to set the aerial map orientation to be aligned with ENU
   if (context_->getFrameManager()->getTransform(
-      std::string(MAP_FRAME), translation_to_map,
+      std::string(MAP_FRAME), _ignored_translation,
       orientation_to_map))
   {
-    setStatus(rviz_common::properties::StatusProperty::Ok, "Transform", "Transform OK");
-    auto example_tile = tiles_.begin();
-    auto center_tile_offset = tileOffset(*last_fix_, example_tile->first.coord.z);
-    Ogre::Vector3 aerial_map_offset(center_tile_offset.x, center_tile_offset.y, 0.0);
-
-    scene_node_->setPosition(
-      translation_to_map + orientation_to_map *
-      (aerial_map_offset * example_tile->second.tileSize()));
-    scene_node_->setOrientation(orientation_to_map);
-    scene_node_->setVisible(true);
+    setStatus(rviz_common::properties::StatusProperty::Ok, "Orientation", "Map transform OK");
   } else {
     std::string error;
     if (context_->getFrameManager()->transformHasProblems(
-        std::string(MAP_FRAME), context_->getClock()->now(), error))
+        std::string(MAP_FRAME),
+        context_->getFrameManager()->getTime(), error))
+    {
+      setStatus(
+        rviz_common::properties::StatusProperty::Error, "Orientation",
+        QString::fromStdString(error));
+    } else {
+      // This is a perfectly valid case if a map transform is not available.
+      // Since in this case there is no reference to align the aerial map to,
+      // just leave it aligned to the fixed frame.
+      setStatus(
+        rviz_common::properties::StatusProperty::Ok, "Orientation",
+        "Could not transform fixed frame to map for aerial map orientation");
+    }
+  }
+
+  Ogre::Vector3 sensor_translation;
+  Ogre::Quaternion _ignored_orientation;
+  // get transformation of sensor frame
+  if (context_->getFrameManager()->getTransform(
+      last_fix_->header, sensor_translation,
+      _ignored_orientation))
+  {
+    setStatus(rviz_common::properties::StatusProperty::Ok, "Transform", "Transform OK");
+  } else {
+    std::string error;
+    if (context_->getFrameManager()->transformHasProblems(
+        last_fix_->header.frame_id,
+        last_fix_->header.stamp, error))
     {
       setStatus(
         rviz_common::properties::StatusProperty::Error, "Transform", QString::fromStdString(error));
     } else {
-      setMissingTransformToFixedFrame(std::string(MAP_FRAME));
+      setMissingTransformToFixedFrame(last_fix_->header.frame_id);
     }
-    scene_node_->setVisible(false);
+    return;
   }
+
+  // "example tile", since their zoom should be uniform
+  auto example_tile = tiles_.begin();
+  auto center_tile_offset = tileOffset(*last_fix_, example_tile->first.coord.z);
+  Ogre::Vector3 aerial_map_offset(center_tile_offset.x, -center_tile_offset.y, 0.0);
+
+  scene_node_->setPosition(
+    sensor_translation - orientation_to_map *
+    (aerial_map_offset * example_tile->second.tileSize()));
+  scene_node_->setOrientation(-orientation_to_map);
 }
 
 void AerialMapDisplay::resetMap()
 {
+  const std::lock_guard<std::mutex> lock(tiles_mutex_);
   tiles_.clear();
   pending_tiles_.clear();
 }

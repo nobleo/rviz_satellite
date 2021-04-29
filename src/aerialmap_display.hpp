@@ -76,6 +76,7 @@ protected:
   rviz_common::properties::FloatProperty* alpha_property_ = nullptr;
   rviz_common::properties::Property* draw_under_property_ = nullptr;
   
+  std::mutex tiles_mutex_;
   TileClient tile_client_;
 
   std::unordered_map<TileId, std::future<QImage>> pending_tiles_;

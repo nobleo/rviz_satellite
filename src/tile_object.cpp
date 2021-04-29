@@ -95,12 +95,18 @@ TileObject::TileObject(
 TileObject::~TileObject()
 {
   if (texture_) {
-    Ogre::TextureManager::getSingleton().remove(texture_->getName());
+    Ogre::TextureManager::getSingleton().remove(texture_);
   }
   if (material_) {
-    Ogre::MaterialManager::getSingleton().remove(material_->getName());
+    Ogre::MaterialManager::getSingleton().remove(material_);
   }
-  scene_manager_->destroyManualObject(manual_object_);
+  if (manual_object_) {
+    scene_node_->detachObject(manual_object_);
+    scene_manager_->destroyManualObject(manual_object_);
+  }
+  if (scene_node_) {
+    scene_manager_->destroySceneNode(scene_node_);
+  }
 }
 
 void TileObject::updateAlpha(float alpha)
@@ -128,7 +134,7 @@ void TileObject::updateData(QImage & image)
       image.byteCount()));
 
   if (texture_) {
-    Ogre::TextureManager::getSingleton().remove(texture_->getName());
+    Ogre::TextureManager::getSingleton().remove(texture_);
     texture_ = nullptr;
   }
 
@@ -139,7 +145,7 @@ void TileObject::updateData(QImage & image)
     pixel_stream,
     image.width(),
     image.height(),
-    Ogre::PF_B8G8R8, // Ogre::PF_L8, // 
+    Ogre::PF_B8G8R8, // Ogre::PF_L8, //
     Ogre::TEX_TYPE_2D,
     2);
   material_->getTechnique(0)->getPass(0)->getTextureUnitState(0)->setTextureName(
@@ -151,7 +157,8 @@ std::string TileObject::objectId() const
   return unique_id_;
 }
 
-Ogre::Real TileObject::tileSize() const {
+Ogre::Real TileObject::tileSize() const
+{
   return scene_node_->getScale().x;
 }
 
@@ -182,14 +189,6 @@ Ogre::Pass * TileObject::getTechniquePass()
   return nullptr;
 }
 
-std::string TileObject::getTextureName()
-{
-  if (texture_) {
-    return texture_->getName();
-  }
-  return "";
-}
-
 void TileObject::setupMaterial()
 {
   material_ = rviz_rendering::MaterialManager::createMaterialWithNoLighting(objectId());
@@ -203,9 +202,8 @@ void TileObject::setupMaterial()
 void TileObject::setupSceneNodeWithManualObject()
 {
   std::stringstream ss;
-  ss << "rviz_satellite/";
   ss << unique_id_;
-  manual_object_ = scene_manager_->createManualObject(ss.str());
+  manual_object_ = scene_manager_->createManualObject("TileObject/" + ss.str());
   scene_node_ = parent_scene_node_->createChildSceneNode(ss.str());
   scene_node_->attachObject(manual_object_);
   setupSquareManualObject();
