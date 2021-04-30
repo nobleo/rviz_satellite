@@ -63,7 +63,8 @@ std::future<QImage> TileClient::request(TileId const & tile_id)
   std::promise<QImage> tile_promise;
   auto entry = tile_promises_.emplace(tile_id, std::move(tile_promise));
   if (!entry.second) {
-    RVIZ_COMMON_LOG_WARNING_STREAM("Tile request for tile '" << tile_id << "' was already running");
+    RVIZ_COMMON_LOG_WARNING_STREAM("Tile request for tile '" << tile_id << "' is already running");
+    throw tile_request_error("Duplicate tile request");
   } else {
     RVIZ_COMMON_LOG_DEBUG_STREAM("Requesting tile " << request_url.toString().toStdString());
     manager_->get(request);

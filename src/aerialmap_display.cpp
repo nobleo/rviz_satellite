@@ -60,7 +60,7 @@ using geographic_msgs::msg::GeoPoint;
 // disable cpplint: not using string as const char*, declaring as std::string and QString to avoid copies
 const std::string AerialMapDisplay::MAP_FRAME = "map"; // NOLINT
 const QString AerialMapDisplay::MESSAGE_STATUS = "Message"; // NOLINT
-const QString AerialMapDisplay::TILE_REQUEST_STATUS = "Tile request"; // NOLINT
+const QString AerialMapDisplay::TILE_REQUEST_STATUS = "TileRequest"; // NOLINT
 const QString AerialMapDisplay::PROPERTIES_STATUS = "Properties"; // NOLINT
 const QString AerialMapDisplay::ORIENTATION_STATUS = "Orientation"; // NOLINT
 const QString AerialMapDisplay::TRANSFORM_STATUS = "Transform"; // NOLINT
@@ -185,7 +185,7 @@ void AerialMapDisplay::updateDrawUnder()
 void AerialMapDisplay::updateTileUrl()
 {
   // updated tile url may work
-  tile_server_had_errors_ = false;
+  resetTileServerError();
   // rebuild on next received message
   resetMap();
 }
@@ -193,7 +193,7 @@ void AerialMapDisplay::updateTileUrl()
 void AerialMapDisplay::updateZoom()
 {
   // updated zoom may be supported by this tile server
-  tile_server_had_errors_ = false;
+  resetTileServerError();
   // rebuild on next received message
   resetMap();
 }
@@ -257,12 +257,27 @@ void AerialMapDisplay::buildObjects(TileCoordinate center_tile, double size, int
   auto tile_url = tile_url_property_->getStdString();
   auto blocks = blocks_property_->getInt();
 
+  size_t number_of_tiles_per_dim = 1 << zoom;
+
   for (int x = -blocks; x <= blocks; ++x) {
     for (int y = -blocks; y <= blocks; ++y) {
+      int tile_x = center_tile.x + x;
+      int tile_y = center_tile.y + y;
 
-      // TODO(ZeilingerM) validate tile range
-      const TileId tile_id{tile_server, {center_tile.x + x, center_tile.y + y, zoom}};
-      pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
+      if (tile_x < 0 || tile_x >= number_of_tiles_per_dim) {
+        continue;
+      }
+      if (tile_y < 0 || tile_y >= number_of_tiles_per_dim) {
+        continue;
+      }
+      const TileId tile_id{tile_server, {tile_x, tile_y, zoom}};
+      try {
+        pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
+      } catch (const tile_request_error & e) {
+        tile_server_had_errors_ = true;
+        setStatus(rviz_common::properties::StatusProperty::Error, TILE_REQUEST_STATUS, e.what());
+        return;
+      }
 
       // position of each tile is set so the origin of the aerial map is the center of the middle tile
       double tx = x * size - size / 2;
@@ -337,7 +352,7 @@ void AerialMapDisplay::update(float, float)
     std::string error;
     if (context_->getFrameManager()->transformHasProblems(std::string(MAP_FRAME), t, error)) {
       setStatus(
-        rviz_common::properties::StatusProperty::Error, ORIENTATION_STATUS,
+        rviz_common::properties::StatusProperty::Warn, ORIENTATION_STATUS,
         QString::fromStdString(error));
     } else {
       // This is a perfectly valid case if a map transform is not available.
@@ -391,6 +406,14 @@ void AerialMapDisplay::resetMap()
   const std::lock_guard<std::mutex> lock(tiles_mutex_);
   tiles_.clear();
   pending_tiles_.clear();
+}
+
+void AerialMapDisplay::resetTileServerError()
+{
+  tile_server_had_errors_ = false;
+  setStatus(
+    rviz_common::properties::StatusProperty::Ok, TILE_REQUEST_STATUS,
+    "Last tile request OK");
 }
 
 void AerialMapDisplay::updateAlpha(const rclcpp::Time & t)

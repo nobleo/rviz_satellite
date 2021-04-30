@@ -71,6 +71,8 @@ protected:
 
   void resetMap();
 
+  void resetTileServerError();
+
   void updateAlpha(const rclcpp::Time & t);
 
   TileCoordinate centerTile() const;
