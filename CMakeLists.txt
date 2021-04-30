@@ -52,6 +52,10 @@ ament_export_dependencies(rclcpp pluginlib rviz_common rviz_default_plugins sens
 ament_export_libraries(${PROJECT_NAME})
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
 
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/icons"
+  DESTINATION "share/${PROJECT_NAME}")
+
 install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib

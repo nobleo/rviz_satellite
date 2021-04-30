@@ -44,3 +44,7 @@ Please refer to the respective terms of service and copyrights.
 In case of questions or problems, do not hesitate to open an issue.
 
 Contributions are welcomed. Please add a summary of your changes to the [changelog](CHANGELOG.rst) under the section Forthcoming.
+
+## Icon copyright
+
+The icon was downloaded and edited from [svgrepo](https://www.svgrepo.com/svg/118507/satellite), originally licensed under CC0.
