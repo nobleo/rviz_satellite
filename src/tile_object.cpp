@@ -49,28 +49,6 @@
 namespace rviz_satellite
 {
 
-// Helper class to set alpha parameter on all renderables.
-class AlphaSetter : public Ogre::Renderable::Visitor
-{
-public:
-  explicit AlphaSetter(float alpha)
-  : alpha_vec_(alpha, alpha, alpha, alpha)
-  {}
-
-  void
-  visit(Ogre::Renderable * rend, Ogre::ushort lodIndex, bool isDebug, Ogre::Any * pAny) override
-  {
-    (void) lodIndex;
-    (void) isDebug;
-    (void) pAny;
-
-    rend->setCustomParameter(RVIZ_RENDERING_ALPHA_PARAMETER, alpha_vec_);
-  }
-
-private:
-  Ogre::Vector4 alpha_vec_;
-};
-
 TileObject::TileObject(
   Ogre::SceneManager * scene_manager,
   Ogre::SceneNode * parent_scene_node,
@@ -112,17 +90,14 @@ TileObject::~TileObject()
 void TileObject::updateAlpha(float alpha)
 {
   if (alpha > 0.998f) {
-    // TODO use !drawUnder instead to disable writes in this case)
     material_->setDepthWriteEnabled(true);
     material_->setSceneBlending(Ogre::SBT_REPLACE);
   } else {
     material_->setDepthWriteEnabled(false);
     material_->setSceneBlending(Ogre::SBT_TRANSPARENT_ALPHA);
   }
-  if (manual_object_) {
-    AlphaSetter alpha_setter(alpha);
-    manual_object_->visitRenderables(&alpha_setter);
-  }
+  auto texture_unit = material_->getTechnique(0)->getPass(0)->getTextureUnitState(0);
+  texture_unit->setAlphaOperation(Ogre::LBX_SOURCE1, Ogre::LBS_MANUAL, Ogre::LBS_CURRENT, alpha);
 }
 
 void TileObject::updateData(QImage & image)

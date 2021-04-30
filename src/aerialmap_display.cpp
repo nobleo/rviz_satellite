@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 #include "aerialmap_display.hpp"
 
+#include <limits>
+#include <algorithm>
 #include <utility>
 #include <string>
 #include <iomanip>
@@ -102,6 +104,14 @@ AerialMapDisplay::AerialMapDisplay()
   blocks_property_->setMin(0);
   blocks_property_->setMax(MAX_BLOCKS);
   blocks_property_->setShouldBeSaved(true);
+
+  timeout_property_ =
+    new FloatProperty(
+    "Timeout", 3.0,
+    "Message header timestamp timeout in seconds. Will start to fade out at half time, ignored if 0.",
+    this);
+  timeout_property_->setMin(0.0);
+  timeout_property_->setShouldBeSaved(true);
 }
 
 AerialMapDisplay::~AerialMapDisplay()
@@ -131,7 +141,13 @@ bool AerialMapDisplay::validateMessage(const NavSatFix::ConstSharedPtr message)
   {
     setStatus(
       rviz_common::properties::StatusProperty::Error, MESSAGE_STATUS,
-      "Message contained invalid floating point values (nans or infs)");
+      "Message contains invalid floating point values (nans or infs)");
+    message_is_valid = false;
+  }
+  if (message->status.status == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
+    setStatus(
+      rviz_common::properties::StatusProperty::Error, MESSAGE_STATUS,
+      "NavSatFix status NO_FIX");
     message_is_valid = false;
   }
   return message_is_valid;
@@ -150,10 +166,8 @@ bool AerialMapDisplay::validateProperties()
 
 void AerialMapDisplay::updateAlpha()
 {
-  auto alpha = alpha_property_->getFloat();
-  for (auto & object : tiles_) {
-    object.second.updateAlpha(alpha);
-  }
+  auto t = rviz_ros_node_.lock()->get_raw_node()->get_clock()->now();
+  updateAlpha(t);
 }
 
 void AerialMapDisplay::updateDrawUnder()
@@ -198,6 +212,10 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
   }
   if (!validateMessage(msg)) {
     return;
+  } else {
+    setStatus(
+      rviz_common::properties::StatusProperty::Ok, MESSAGE_STATUS,
+      "Message OK");
   }
   if (tile_server_had_errors_) {
     return;
@@ -228,7 +246,7 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
   }
   if (tilesCreated) {
     // set material properties on created tiles
-    updateAlpha();
+    updateAlpha(last_fix_->header.stamp);
     updateDrawUnder();
   }
 }
@@ -305,6 +323,8 @@ void AerialMapDisplay::update(float, float)
     return;
   }
 
+  auto t = context_->getFrameManager()->getTime();
+
   Ogre::Vector3 _ignored_translation;
   Ogre::Quaternion orientation_to_map = Ogre::Quaternion::IDENTITY;
   // get transformation of fixed frame to map, to set the aerial map orientation to be aligned with ENU
@@ -315,10 +335,7 @@ void AerialMapDisplay::update(float, float)
     setStatus(rviz_common::properties::StatusProperty::Ok, ORIENTATION_STATUS, "Map transform OK");
   } else {
     std::string error;
-    if (context_->getFrameManager()->transformHasProblems(
-        std::string(MAP_FRAME),
-        context_->getFrameManager()->getTime(), error))
-    {
+    if (context_->getFrameManager()->transformHasProblems(std::string(MAP_FRAME), t, error)) {
       setStatus(
         rviz_common::properties::StatusProperty::Error, ORIENTATION_STATUS,
         QString::fromStdString(error));
@@ -347,7 +364,8 @@ void AerialMapDisplay::update(float, float)
         last_fix_->header.stamp, error))
     {
       setStatus(
-        rviz_common::properties::StatusProperty::Error, TRANSFORM_STATUS, QString::fromStdString(error));
+        rviz_common::properties::StatusProperty::Error, TRANSFORM_STATUS,
+        QString::fromStdString(error));
     } else {
       setMissingTransformToFixedFrame(last_fix_->header.frame_id);
     }
@@ -363,6 +381,9 @@ void AerialMapDisplay::update(float, float)
     sensor_translation - orientation_to_map *
     (aerial_map_offset * example_tile->second.tileSize()));
   scene_node_->setOrientation(-orientation_to_map);
+
+  // update alpha here to account for changing age
+  updateAlpha(t);
 }
 
 void AerialMapDisplay::resetMap()
@@ -370,6 +391,32 @@ void AerialMapDisplay::resetMap()
   const std::lock_guard<std::mutex> lock(tiles_mutex_);
   tiles_.clear();
   pending_tiles_.clear();
+}
+
+void AerialMapDisplay::updateAlpha(const rclcpp::Time & t)
+{
+  auto max_alpha = alpha_property_->getFloat();
+  float alpha = max_alpha;
+  if (last_fix_) {
+    // if message is displayed, fade it out according to configured timeout by reducing alpha
+    auto timeout_s = timeout_property_->getFloat();
+    if (std::abs(timeout_s) < std::numeric_limits<float>::epsilon()) {
+      alpha = max_alpha;
+    } else {
+      auto timeout = rclcpp::Duration(std::chrono::duration<double>(timeout_s));
+      auto age = t - last_fix_->header.stamp;
+      // age ratio is a value from 0 to 1, where 1 means timeout is reached
+      auto age_ratio = std::min(
+        1.0,
+        age.nanoseconds() / static_cast<double>(timeout.nanoseconds()));
+      // only start fading out from ratio 0.5 to 1
+      age_ratio = std::max(0.0, age_ratio - 0.5) * 2;
+      alpha = max_alpha * (1.0 - age_ratio);
+    }
+  }
+  for (auto & tile : tiles_) {
+    tile.second.updateAlpha(alpha);
+  }
 }
 
 TileCoordinate AerialMapDisplay::centerTile() const
@@ -388,6 +435,7 @@ void AerialMapDisplay::reset()
 {
   RTDClass::reset();
   resetMap();
+  last_fix_.reset();
   // updated tile url may work
   tile_server_had_errors_ = false;
 }

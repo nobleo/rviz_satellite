@@ -71,12 +71,15 @@ protected:
 
   void resetMap();
 
+  void updateAlpha(const rclcpp::Time & t);
+
   TileCoordinate centerTile() const;
 
   rviz_common::properties::StringProperty * tile_url_property_ = nullptr;
   rviz_common::properties::IntProperty * zoom_property_ = nullptr;
   rviz_common::properties::IntProperty * blocks_property_ = nullptr;
   rviz_common::properties::FloatProperty * alpha_property_ = nullptr;
+  rviz_common::properties::FloatProperty * timeout_property_ = nullptr;
   rviz_common::properties::Property * draw_under_property_ = nullptr;
 
   std::mutex tiles_mutex_;
