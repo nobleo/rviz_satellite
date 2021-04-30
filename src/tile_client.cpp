@@ -109,7 +109,7 @@ void TileClient::request_finished(QNetworkReply * reply)
       "Failed to decode image at " << reply->request().url().toString().toStdString());
     return;
   }
-  promise_it->second.set_value(reader.read().convertToFormat(QImage::Format_RGB888).mirrored());
+  promise_it->second.set_value(reader.read().mirrored());
   tile_promises_.erase(promise_it);
   reply->deleteLater();
 }

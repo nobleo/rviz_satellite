@@ -102,6 +102,12 @@ void TileObject::updateAlpha(float alpha)
 
 void TileObject::updateData(QImage & image)
 {
+  auto ogre_format = Ogre::PF_B8G8R8;
+  if (QImage::Format_Grayscale8 == image.format()) {
+    ogre_format = Ogre::PF_L8;
+  } else {
+    image = image.convertToFormat(QImage::Format_RGB888);
+  }
   Ogre::DataStreamPtr pixel_stream;
   pixel_stream.reset(
     new Ogre::MemoryDataStream(
@@ -120,7 +126,7 @@ void TileObject::updateData(QImage & image)
     pixel_stream,
     image.width(),
     image.height(),
-    Ogre::PF_B8G8R8, // Ogre::PF_L8, //
+    ogre_format,
     Ogre::TEX_TYPE_2D,
     2);
   material_->getTechnique(0)->getPass(0)->getTextureUnitState(0)->setTextureName(
