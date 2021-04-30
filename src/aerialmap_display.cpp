@@ -55,7 +55,13 @@ using rviz_common::properties::StatusProperty;
 using sensor_msgs::msg::NavSatFix;
 using geographic_msgs::msg::GeoPoint;
 
-char const AerialMapDisplay::MAP_FRAME[] = "map";
+// disable cpplint: not using string as const char*, declaring as std::string and QString to avoid copies
+const std::string AerialMapDisplay::MAP_FRAME = "map"; // NOLINT
+const QString AerialMapDisplay::MESSAGE_STATUS = "Message"; // NOLINT
+const QString AerialMapDisplay::TILE_REQUEST_STATUS = "Tile request"; // NOLINT
+const QString AerialMapDisplay::PROPERTIES_STATUS = "Properties"; // NOLINT
+const QString AerialMapDisplay::ORIENTATION_STATUS = "Orientation"; // NOLINT
+const QString AerialMapDisplay::TRANSFORM_STATUS = "Transform"; // NOLINT
 
 AerialMapDisplay::AerialMapDisplay()
 : RosTopicDisplay()
@@ -124,11 +130,22 @@ bool AerialMapDisplay::validateMessage(const NavSatFix::ConstSharedPtr message)
     !rviz_common::validateFloats(message->longitude))
   {
     setStatus(
-      rviz_common::properties::StatusProperty::Error, "Message",
+      rviz_common::properties::StatusProperty::Error, MESSAGE_STATUS,
       "Message contained invalid floating point values (nans or infs)");
     message_is_valid = false;
   }
   return message_is_valid;
+}
+
+bool AerialMapDisplay::validateProperties()
+{
+  if (tile_url_property_->getStdString().empty()) {
+    setStatus(
+      rviz_common::properties::StatusProperty::Warn, PROPERTIES_STATUS,
+      "Object URI is required to fetch map tiles");
+    return false;
+  }
+  return true;
 }
 
 void AerialMapDisplay::updateAlpha()
@@ -153,12 +170,16 @@ void AerialMapDisplay::updateDrawUnder()
 
 void AerialMapDisplay::updateTileUrl()
 {
+  // updated tile url may work
+  tile_server_had_errors_ = false;
   // rebuild on next received message
   resetMap();
 }
 
 void AerialMapDisplay::updateZoom()
 {
+  // updated zoom may be supported by this tile server
+  tile_server_had_errors_ = false;
   // rebuild on next received message
   resetMap();
 }
@@ -178,16 +199,19 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
   if (!validateMessage(msg)) {
     return;
   }
-  last_fix_ = msg;
-  if (tile_url_property_->getStdString().empty()) {
-    setStatus(
-      rviz_common::properties::StatusProperty::Warn, "TileServer",
-      "Object URI is required to fetch map tiles");
+  if (tile_server_had_errors_) {
     return;
+  }
+  last_fix_ = msg;
+  if (!validateProperties()) {
+    return;
+  } else {
+    deleteStatus(PROPERTIES_STATUS);
   }
   auto zoom = zoom_property_->getInt();
   auto tile_at_fix = fromWGS(*msg, zoom);
   bool tilesCreated = false;
+
   {
     const std::lock_guard<std::mutex> lock(tiles_mutex_);
     if (tiles_.empty()) {
@@ -253,16 +277,25 @@ void AerialMapDisplay::update(float, float)
       try {
         auto image = it->second.get();
         tiles_.find(it->first)->second.updateData(image);
+        // remove from pending requests
+        it = pending_tiles_.erase(it);
       } catch (const tile_request_error & e) {
-        RVIZ_COMMON_LOG_ERROR(e.what());
-        setStatus(rviz_common::properties::StatusProperty::Error, "TileRequest", e.what());
+        // log error and abort requests
+        RVIZ_COMMON_LOG_ERROR_STREAM("Tile request failed: " << e.what());
+        it = pending_tiles_.end();
+        setStatus(rviz_common::properties::StatusProperty::Error, TILE_REQUEST_STATUS, e.what());
+        // disable requests until tile server relevant properties change
+        tile_server_had_errors_ = true;
       }
-      // remove from pending requests
-      it = pending_tiles_.erase(it);
     } else {
       // check next request
       ++it;
     }
+  }
+  // if an error was just discovered
+  if (tile_server_had_errors_) {
+    pending_tiles_.clear();
+    tiles_.clear();
   }
 
   if (!last_fix_) {
@@ -279,7 +312,7 @@ void AerialMapDisplay::update(float, float)
       std::string(MAP_FRAME), _ignored_translation,
       orientation_to_map))
   {
-    setStatus(rviz_common::properties::StatusProperty::Ok, "Orientation", "Map transform OK");
+    setStatus(rviz_common::properties::StatusProperty::Ok, ORIENTATION_STATUS, "Map transform OK");
   } else {
     std::string error;
     if (context_->getFrameManager()->transformHasProblems(
@@ -287,14 +320,14 @@ void AerialMapDisplay::update(float, float)
         context_->getFrameManager()->getTime(), error))
     {
       setStatus(
-        rviz_common::properties::StatusProperty::Error, "Orientation",
+        rviz_common::properties::StatusProperty::Error, ORIENTATION_STATUS,
         QString::fromStdString(error));
     } else {
       // This is a perfectly valid case if a map transform is not available.
       // Since in this case there is no reference to align the aerial map to,
       // just leave it aligned to the fixed frame.
       setStatus(
-        rviz_common::properties::StatusProperty::Ok, "Orientation",
+        rviz_common::properties::StatusProperty::Ok, ORIENTATION_STATUS,
         "Could not transform fixed frame to map for aerial map orientation");
     }
   }
@@ -306,7 +339,7 @@ void AerialMapDisplay::update(float, float)
       last_fix_->header, sensor_translation,
       _ignored_orientation))
   {
-    setStatus(rviz_common::properties::StatusProperty::Ok, "Transform", "Transform OK");
+    setStatus(rviz_common::properties::StatusProperty::Ok, TRANSFORM_STATUS, "Transform OK");
   } else {
     std::string error;
     if (context_->getFrameManager()->transformHasProblems(
@@ -314,7 +347,7 @@ void AerialMapDisplay::update(float, float)
         last_fix_->header.stamp, error))
     {
       setStatus(
-        rviz_common::properties::StatusProperty::Error, "Transform", QString::fromStdString(error));
+        rviz_common::properties::StatusProperty::Error, TRANSFORM_STATUS, QString::fromStdString(error));
     } else {
       setMissingTransformToFixedFrame(last_fix_->header.frame_id);
     }
@@ -341,9 +374,9 @@ void AerialMapDisplay::resetMap()
 
 TileCoordinate AerialMapDisplay::centerTile() const
 {
-  // when calling this function internally, the tiles should be created
-  // they must also always be uneven, since the center tile is surrounded by a field of uneven sides
-  // thus, there is a clear center already
+  // when calling this function internally, the tiles must already be created
+  // they must also always have an uneven count, since the center tile is surrounded by a field of
+  // an uneven number of sides; thus, there is a clear center tile
   assert(!tiles_.empty());
   assert((tiles_.size() % 2) == 1);
   auto it = tiles_.begin();
@@ -355,6 +388,8 @@ void AerialMapDisplay::reset()
 {
   RTDClass::reset();
   resetMap();
+  // updated tile url may work
+  tile_server_had_errors_ = false;
 }
 
 }  // namespace rviz_satellite

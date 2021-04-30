@@ -14,6 +14,7 @@ limitations under the License. */
 
 #pragma once
 
+#include <string>
 #include <memory>
 #include <unordered_map>
 #include <map>
@@ -64,18 +65,20 @@ protected:
 
   bool validateMessage(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
 
+  bool validateProperties();
+
   void buildObjects(TileCoordinate center_tile, double size, int zoom);
-  
+
   void resetMap();
 
   TileCoordinate centerTile() const;
 
-  rviz_common::properties::StringProperty* tile_url_property_ = nullptr;
-  rviz_common::properties::IntProperty* zoom_property_ = nullptr;
-  rviz_common::properties::IntProperty* blocks_property_ = nullptr;
-  rviz_common::properties::FloatProperty* alpha_property_ = nullptr;
-  rviz_common::properties::Property* draw_under_property_ = nullptr;
-  
+  rviz_common::properties::StringProperty * tile_url_property_ = nullptr;
+  rviz_common::properties::IntProperty * zoom_property_ = nullptr;
+  rviz_common::properties::IntProperty * blocks_property_ = nullptr;
+  rviz_common::properties::FloatProperty * alpha_property_ = nullptr;
+  rviz_common::properties::Property * draw_under_property_ = nullptr;
+
   std::mutex tiles_mutex_;
   TileClient tile_client_;
 
@@ -83,8 +86,14 @@ protected:
   std::map<TileId, TileObject> tiles_;
 
   sensor_msgs::msg::NavSatFix::ConstSharedPtr last_fix_;
+  bool tile_server_had_errors_ {false};
 
-  static char const MAP_FRAME[];
+  static const std::string MAP_FRAME;
+  static const QString MESSAGE_STATUS;
+  static const QString TILE_REQUEST_STATUS;
+  static const QString PROPERTIES_STATUS;
+  static const QString ORIENTATION_STATUS;
+  static const QString TRANSFORM_STATUS;
 };
 
 }  // namespace rviz_satellite

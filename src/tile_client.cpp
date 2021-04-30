@@ -87,8 +87,7 @@ void TileClient::request_finished(QNetworkReply * reply)
   if (reply->error()) {
     promise_it->second.set_exception(
       std::make_exception_ptr(
-        tile_request_error(
-          "Failed to load tile")));
+        tile_request_error(reply->errorString().toStdString())));
     return;
   }
 
