@@ -204,6 +204,13 @@ void AerialMapDisplay::updateBlocks()
   resetMap();
 }
 
+// https://stackoverflow.com/questions/1903954/is-there-a-standard-sign-function-signum-sgn-in-c-c
+template<typename T>
+int signum(T val)
+{
+  return (T(0) < val) - (val < T(0));
+}
+
 void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
 {
   if (!isEnabled()) {
@@ -228,72 +235,111 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
   }
   auto zoom = zoom_property_->getInt();
   auto tile_at_fix = fromWGS(*msg, zoom);
-  bool tilesCreated = false;
-
   {
     const std::lock_guard<std::mutex> lock(tiles_mutex_);
+    double tile_size_m = zoomSize(msg->latitude, zoom);
     if (tiles_.empty()) {
-      buildObjects(tile_at_fix, zoomSize(msg->latitude, zoom), zoom);
-      tilesCreated = true;
+      // create whole map initially
+      buildMap(tile_at_fix, tile_size_m);
     } else {
-      // rebuild only if center tile changed
-      if (tile_at_fix != centerTile()) {
-        tiles_.clear();
-        buildObjects(tile_at_fix, zoomSize(msg->latitude, zoom), zoom);
-        tilesCreated = true;
+      auto center = centerTile();
+      int delta_x = tile_at_fix.x - center.x;
+      int delta_y = tile_at_fix.y - center.y;
+      // if center tile changed to some index direction, create only the missing tiles
+      if (blocks_property_->getInt() > 0 && (delta_x != 0 || delta_y != 0)) {
+        if (std::abs(delta_x) == 1 && std::abs(delta_y) == 0) {
+          shiftMap(center, Ogre::Vector2i(delta_x, delta_y), tile_size_m);
+        } else {
+          tiles_.clear();
+          buildMap(tile_at_fix, tile_size_m);
+        }
       }
     }
   }
-  if (tilesCreated) {
-    // set material properties on created tiles
-    updateAlpha(last_fix_->header.stamp);
-    updateDrawUnder();
+  // set material properties on created tiles
+  updateAlpha(last_fix_->header.stamp);
+  updateDrawUnder();
+}
+
+
+void AerialMapDisplay::shiftMap(TileCoordinate center, Ogre::Vector2i offset, double tile_size_m)
+{
+  int delta_x = offset.data[0];
+  int delta_y = offset.data[1];
+
+  // TODO(ZeilingerM) validate map borders
+  int blocks = blocks_property_->getInt();
+  auto tile_url = tile_url_property_->getStdString();
+
+  // remove tiles on the far end
+  int x_far = center.x - signum(delta_x) * blocks;
+  for (int y_far = center.y - blocks; y_far <= center.y + blocks; ++y_far) {
+    const TileCoordinate coordinate_to_delete{x_far, y_far, center.z};
+    const TileId tile_to_delete{tile_url, coordinate_to_delete};
+    assert(tiles_.erase(tile_to_delete) == 1);
+  }
+
+  // shift existing tiles to new center
+  Ogre::Vector3 translation(-delta_x * tile_size_m, -delta_y * tile_size_m, 0.0);
+  for (auto & tile : tiles_) {
+    tile.second.translate(translation);
+  }
+
+  // create tiles on the near end
+  int x_near = center.x + signum(delta_x) * blocks + signum(delta_x);
+  for (int y = -blocks; y <= blocks; ++y) {
+    int y_near = center.y + y;
+    TileCoordinate new_coordinate{x_near, y_near, center.z};
+    Ogre::Vector2i new_offset(signum(delta_x) * blocks, y);
+    buildTile(new_coordinate, new_offset, tile_size_m);
   }
 }
 
-void AerialMapDisplay::buildObjects(TileCoordinate center_tile, double size, int zoom)
+void AerialMapDisplay::buildMap(TileCoordinate center_tile, double size)
 {
-  auto tile_server = tile_url_property_->getStdString();
-  auto tile_url = tile_url_property_->getStdString();
+  int zoom = center_tile.z;
+  int number_of_tiles_per_dim = 1 << zoom;
   auto blocks = blocks_property_->getInt();
-
-  size_t number_of_tiles_per_dim = 1 << zoom;
-
   for (int x = -blocks; x <= blocks; ++x) {
     for (int y = -blocks; y <= blocks; ++y) {
       int tile_x = center_tile.x + x;
       int tile_y = center_tile.y + y;
-
       if (tile_x < 0 || tile_x >= number_of_tiles_per_dim) {
         continue;
       }
       if (tile_y < 0 || tile_y >= number_of_tiles_per_dim) {
         continue;
       }
-      const TileId tile_id{tile_server, {tile_x, tile_y, zoom}};
-      try {
-        pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
-      } catch (const tile_request_error & e) {
-        tile_server_had_errors_ = true;
-        setStatus(rviz_common::properties::StatusProperty::Error, TILE_REQUEST_STATUS, e.what());
-        return;
-      }
-
-      // position of each tile is set so the origin of the aerial map is the center of the middle tile
-      double tx = x * size - size / 2;
-      // while tiles follow a east-south coordinate system, the aerial map is displayed in ENU
-      // thus, we invert the y translation
-      double ty = -y * size - size / 2;
-      std::stringstream ss;
-      ss << tile_id;
-      tiles_.emplace(
-        std::piecewise_construct,
-        std::forward_as_tuple(tile_id),
-        std::forward_as_tuple(
-          scene_manager_, scene_node_,
-          ss.str(), size, tx, ty, false));
+      buildTile({tile_x, tile_y, zoom}, Ogre::Vector2i(x, y), size);
     }
   }
+}
+
+void AerialMapDisplay::buildTile(TileCoordinate coordinate, Ogre::Vector2i offset, double size)
+{
+  auto tile_url = tile_url_property_->getStdString();
+  const TileId tile_id{tile_url, coordinate};
+  try {
+    pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
+  } catch (const tile_request_error & e) {
+    tile_server_had_errors_ = true;
+    setStatus(rviz_common::properties::StatusProperty::Error, TILE_REQUEST_STATUS, e.what());
+    return;
+  }
+
+  // position of each tile is set so the origin of the aerial map is the center of the middle tile
+  double tx = offset.data[0] * size - size / 2;
+  // while tiles follow a east-south coordinate system, the aerial map is displayed in ENU
+  // thus, we invert the y translation
+  double ty = -offset.data[1] * size - size / 2;
+  std::stringstream ss;
+  ss << tile_id;
+  tiles_.emplace(
+    std::piecewise_construct,
+    std::forward_as_tuple(tile_id),
+    std::forward_as_tuple(
+      scene_manager_, scene_node_,
+      ss.str(), size, tx, ty, false));
 }
 
 void AerialMapDisplay::update(float, float)

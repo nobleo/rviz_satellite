@@ -67,7 +67,11 @@ protected:
 
   bool validateProperties();
 
-  void buildObjects(TileCoordinate center_tile, double size, int zoom);
+  void shiftMap(TileCoordinate center_tile, Ogre::Vector2i offset, double size);
+
+  void buildMap(TileCoordinate center_tile, double size);
+
+  void buildTile(TileCoordinate coordinate, Ogre::Vector2i offset, double size);
 
   void resetMap();
 

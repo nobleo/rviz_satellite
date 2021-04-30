@@ -36,6 +36,8 @@ public:
 
   void setVisible(bool visible);
 
+  void translate(Ogre::Vector3);
+
   void setRenderQueueGroup(uint8_t group);
 
   void setDepthWriteEnabled(bool depth_write_enabled);

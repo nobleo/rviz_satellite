@@ -148,6 +148,11 @@ void TileObject::setVisible(bool visible)
   scene_node_->setVisible(visible);
 }
 
+void TileObject::translate(Ogre::Vector3 d)
+{
+  scene_node_->translate(d);
+}
+
 void TileObject::setRenderQueueGroup(uint8_t group)
 {
   if (manual_object_) {
