@@ -2,17 +2,27 @@
 
 Rviz plugin for displaying satellite maps at the position of a `sensor_msgs/msg/NavSatFix` message.
 
-![Rviz view with updating aerial map](images/rviz_satellite.png "Rviz view with updating aerial map")
-
 ## Usage
 
-Add an instance of `AerialMapDisplay` to your Rviz config and point it to a `sensor_msgs/msg/NavSatFix` topic.
+Add an instance of `AerialMap` to your Rviz config and point it to a `sensor_msgs/msg/NavSatFix` topic.
 
 Map tiles will be cached to `$HOME/.cache/rviz_satellite`.
 At present the cache does not expire automatically - you should delete the files in the folder if you want the images to be reloaded.
 
-Currently, we only support the [OpenStreetMap](http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames) convention for tile URLs.
+Currently, the [OpenStreetMap](http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames) convention for tile URLs is supported.
 This e.g. implies that only raster tiles (no vector tiles) are supported.
+
+To try a demo, run the following commands to make Rviz circle around a geo point you define.
+
+```bash
+rviz2 -d $(ros2 pkg prefix --share rviz_satellite)/launch/demo.rviz
+$(ros2 pkg prefix --share rviz_satellite)/launch/publish_demo_data.py LATITUDE LONGITUDE
+```
+
+You should see a view like the following.
+Here, the coordinates are 48.211486, 16.383982 (Vienna), using OpenStreetMap tiles.
+
+![Rviz view with updating aerial map](images/rviz_satellite.gif "Rviz view with updating aerial map")
 
 ## Tile servers
 
@@ -38,6 +48,7 @@ Please refer to the respective terms of service and copyrights.
 - `Draw Under` will cause the map to be displayed below all other geometry.
 - `Zoom` is the zoom level of the map. Recommended values are 16-19, as anything smaller is _very_ low resolution. 22 is the current max.
 - `Blocks` number of adjacent tiles in addition to the center tile to load, 8 maximum.
+- `Timeout` specifies a timeout since the last received message timestamp, after which the map will be faded out; disable by setting to 0.
 
 ## Support and Contributions
 

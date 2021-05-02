@@ -24,7 +24,6 @@ find_package(tf2_ros REQUIRED)
 find_package(pluginlib REQUIRED)
 
 find_package(Qt5 COMPONENTS Core Gui Network Concurrent Widgets REQUIRED)
-set(QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Network Qt5::Concurrent Qt5::Widgets)
 
 add_library(${PROJECT_NAME} SHARED
   src/aerialmap_display.cpp
