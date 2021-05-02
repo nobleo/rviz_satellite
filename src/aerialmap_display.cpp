@@ -255,7 +255,7 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
             // create only the missing tiles
             shiftMap(center, offset, tile_size_m);
           } else {
-            // if more tiles than block are skipped, recreate the entire map
+            // if more tiles than blocks are skipped, recreate the entire map
             pending_tiles_.clear();
             tiles_.clear();
             buildMap(tile_at_fix, tile_size_m);
@@ -305,6 +305,8 @@ static std::vector<Ogre::Vector2i> nearEndOffsets(int blocks, Ogre::Vector2i off
   std::vector<Ogre::Vector2i> result;
   auto offset_x = offset.data[0];
   auto offset_y = offset.data[1];
+  assert(std::abs(offset_x) <= blocks);
+  assert(std::abs(offset_y) <= blocks);
   for (int x = 1; x <= std::abs(offset_x); ++x) {
     for (int y = -blocks; y <= blocks; ++y) {
       auto curr_offset_x = signum(offset_x) * blocks + signum(offset_x) * x;
@@ -335,8 +337,9 @@ void AerialMapDisplay::shiftMap(TileCoordinate center, Ogre::Vector2i offset, do
     int y = center.y + far_offset.data[1];
     const TileCoordinate coordinate_to_delete{x, y, center.z};
     const TileId tile_to_delete{tile_url, coordinate_to_delete};
+    auto erased = tiles_.erase(tile_to_delete);
     // TODO(ZeilingerM) assertion is not correct on border of map
-    assert(tiles_.erase(tile_to_delete) == 1);
+    assert(erased == 1);
   }
 
   // shift existing tiles to new center
@@ -379,7 +382,8 @@ void AerialMapDisplay::buildTile(TileCoordinate coordinate, Ogre::Vector2i offse
 {
   auto tile_url = tile_url_property_->getStdString();
   const TileId tile_id{tile_url, coordinate};
-  pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
+  auto pending_emplace_result = pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
+  assert(pending_emplace_result.second);
 
   // position of each tile is set so the origin of the aerial map is the center of the middle tile
   double tx = offset.data[0] * size - size / 2;
@@ -388,12 +392,14 @@ void AerialMapDisplay::buildTile(TileCoordinate coordinate, Ogre::Vector2i offse
   double ty = -offset.data[1] * size - size / 2;
   std::stringstream ss;
   ss << tile_id;
-  tiles_.emplace(
+  auto tile_emplace_result =
+    tiles_.emplace(
     std::piecewise_construct,
     std::forward_as_tuple(tile_id),
     std::forward_as_tuple(
       scene_manager_, scene_node_,
       ss.str(), size, tx, ty, false));
+  assert(tile_emplace_result.second);
 }
 
 void AerialMapDisplay::update(float, float)
