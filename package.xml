@@ -10,22 +10,15 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <build_depend>qtbase5-dev</build_depend>
-  <build_depend>libboost-system-dev</build_depend>
-  <build_depend>rclcpp</build_depend>
-  <build_depend>rviz_common</build_depend>
-  <build_depend>rviz_default_plugins</build_depend>
-  <build_depend>sensor_msgs</build_depend>
-  <build_depend>libboost-system-dev</build_depend>
+  <depend>rclcpp</depend>
+  <depend>rcpputils</depend>
+  <depend>rviz_common</depend>
+  <depend>rviz_default_plugins</depend>
+  <depend>sensor_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>angles</depend>
 
-  <run_depend>libboost-system</run_depend>
-  <run_depend>rclcpp</run_depend>
-  <run_depend>rviz_common</run_depend>
-  <run_depend>rviz_default_plugins</run_depend>
-  <run_depend>nav_msgs</run_depend>
-  <run_depend>sensor_msgs</run_depend>
-  <run_depend>tf2_ros</run_depend>
-  <run_depend>libboost-system</run_depend>
+  <build_depend>qtbase5-dev</build_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

@@ -82,6 +82,7 @@ void TileClient::request_finished(QNetworkReply * reply)
   if (promise_it == tile_promises_.end()) {
     RVIZ_COMMON_LOG_ERROR_STREAM(
       "Tile request promise was removed before the network reply finished");
+    return;
   }
 
   const QUrl url = reply->url();

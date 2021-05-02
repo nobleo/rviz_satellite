@@ -22,7 +22,6 @@ find_package(rviz_default_plugins REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(pluginlib REQUIRED)
-find_package(Boost REQUIRED COMPONENTS system)
 
 find_package(Qt5 COMPONENTS Core Gui Network Concurrent Widgets REQUIRED)
 set(QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Network Qt5::Concurrent Qt5::Widgets)
@@ -41,7 +40,7 @@ target_compile_options(
   "-DRVIZ_SATELLITE_VERSION=\"${rviz_satellite_VERSION}\"")
 
 target_include_directories(${PROJECT_NAME} PRIVATE src)
-target_link_libraries(${PROJECT_NAME} Boost::system Qt5::Core Qt5::Gui Qt5::Network Qt5::Concurrent Qt5::Widgets)
+target_link_libraries(${PROJECT_NAME} Qt5::Core Qt5::Gui Qt5::Network Qt5::Concurrent Qt5::Widgets)
 
 # prevent pluginlib from using boost
 target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")

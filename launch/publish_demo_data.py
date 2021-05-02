@@ -24,23 +24,25 @@ class CircularTranslate():
 
 class ApplyNoise():
     """Translate fix position using gaussian noise"""
+    def __init__(self, stddev):
+        self.stddev = stddev
 
     def update(self, t, fix):
-        stddev = 0.01
-        noise = np.random.normal(0, stddev, 2)
+        noise = np.random.normal(0, self.stddev, 2)
         fix.latitude += noise[0]
         fix.longitude += noise[1]
 
 
 class LooseFix():
     """Set NavSatFix status to NO_FIX periodically"""
+    def __init__(self, phase, period):
+        self.phase = phase
+        self.period = period
 
     def update(self, t, fix):
-        no_fix_in_phase = 0.2
-        no_fix_period = 5.0
         t_sec = t.nanoseconds / CONVERSION_CONSTANT
-        no_fix_current_phase = math.fmod(t_sec, no_fix_period) / no_fix_period
-        if no_fix_current_phase < no_fix_in_phase:
+        phase_0_to_1 = math.fmod(t_sec, self.period) / self.period
+        if phase_0_to_1 < self.phase:
             fix.status.status = NavSatStatus.STATUS_NO_FIX
         else:
             fix.status.status = NavSatStatus.STATUS_FIX
@@ -50,6 +52,9 @@ def main():
     parser = ArgumentParser('Periodically create and publish NavSatFix')
     parser.add_argument('latitude', type=float)
     parser.add_argument('longitude', type=float)
+    parser.add_argument('--noise', type=float)
+    parser.add_argument('--no-fix-phase', type=float)
+    parser.add_argument('--no-fix-period', default=1.0, type=float)
     args = parser.parse_args()
 
     rclpy.init()
@@ -60,7 +65,11 @@ def main():
     origin.latitude = args.latitude
     origin.longitude = args.longitude
 
-    updaters = [CircularTranslate(), LooseFix()]
+    updaters = [CircularTranslate()]
+    if args.noise:
+        updaters.append(ApplyNoise(args.noise))
+    if args.no_fix_phase:
+        updaters.append(LooseFix(args.no_fix_phase, args.no_fix_period))
 
     def timer_callback():
         fix = NavSatFix()

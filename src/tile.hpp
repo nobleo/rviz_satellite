@@ -23,9 +23,6 @@ limitations under the License. */
 #include <QMetaType>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/functional/hash/hash.hpp>
-
 namespace rviz_satellite
 {
 
@@ -104,24 +101,6 @@ Ogre::Vector2 tileOffset(const sensor_msgs::msg::NavSatFix &, int zoom);
 }  // namespace rviz_satellite
 
 std::ostream & operator<<(std::ostream & os, const rviz_satellite::TileId & tile_id);
-
-namespace std
-{
-template<>
-struct hash<rviz_satellite::TileId>
-{
-public:
-  size_t operator()(rviz_satellite::TileId const & tile_id) const
-  {
-    size_t seed{};
-    boost::hash_combine(seed, tile_id.server_url);
-    boost::hash_combine(seed, tile_id.coord.x);
-    boost::hash_combine(seed, tile_id.coord.y);
-    boost::hash_combine(seed, tile_id.coord.z);
-    return seed;
-  }
-};
-}  // namespace std
 
 // Make type available for QVariant, which is required to use it as network request data
 Q_DECLARE_METATYPE(rviz_satellite::TileId)

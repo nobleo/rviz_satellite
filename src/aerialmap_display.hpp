@@ -16,7 +16,6 @@ limitations under the License. */
 
 #include <string>
 #include <memory>
-#include <unordered_map>
 #include <map>
 #include <utility>
 
@@ -92,7 +91,7 @@ protected:
   std::mutex tiles_mutex_;
   TileClient tile_client_;
 
-  std::unordered_map<TileId, std::future<QImage>> pending_tiles_;
+  std::map<TileId, std::future<QImage>> pending_tiles_;
   std::map<TileId, TileObject> tiles_;
 
   sensor_msgs::msg::NavSatFix::ConstSharedPtr last_fix_;

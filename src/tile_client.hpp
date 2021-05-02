@@ -14,7 +14,7 @@ limitations under the License. */
 #pragma once
 
 #include <string>
-#include <unordered_map>
+#include <map>
 #include <QtNetwork>
 #include "tile.hpp"
 
@@ -47,7 +47,7 @@ class TileClient : public QObject
 
 private:
   QNetworkAccessManager * manager_;
-  std::unordered_map<TileId, std::promise<QImage>> tile_promises_;
+  std::map<TileId, std::promise<QImage>> tile_promises_;
 
 public:
   TileClient();

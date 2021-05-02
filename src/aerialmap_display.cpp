@@ -18,7 +18,6 @@ limitations under the License. */
 #include <algorithm>
 #include <utility>
 #include <string>
-#include <iomanip>
 
 #include <OgreManualObject.h>
 #include <OgreMaterialManager.h>
@@ -27,6 +26,7 @@ limitations under the License. */
 #include <OgreTextureManager.h>
 #include <OgreTechnique.h>
 
+#include <rcpputils/asserts.hpp>
 #include "rviz_common/validate_floats.hpp"
 #include "rviz_common/display_context.hpp"
 #include "rviz_common/logging.hpp"
@@ -285,7 +285,7 @@ void AerialMapDisplay::shiftMap(TileCoordinate center, Ogre::Vector2i offset, do
     const TileId tile_to_delete{tile_url, coordinate_to_delete};
     auto erased = tiles_.erase(tile_to_delete);
     // TODO(ZeilingerM) assertion is not correct on border of map
-    assert(erased == 1);
+    rcpputils::assert_true(erased == 1, "failed to erase tile at far end");
   }
 
   // shift existing tiles to new center
@@ -329,7 +329,7 @@ void AerialMapDisplay::buildTile(TileCoordinate coordinate, Ogre::Vector2i offse
   auto tile_url = tile_url_property_->getStdString();
   const TileId tile_id{tile_url, coordinate};
   auto pending_emplace_result = pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
-  assert(pending_emplace_result.second);
+  rcpputils::assert_true(pending_emplace_result.second, "failed to store tile request");
 
   // position of each tile is set so the origin of the aerial map is the center of the middle tile
   double tx = offset.data[0] * size - size / 2;
@@ -347,7 +347,7 @@ void AerialMapDisplay::buildTile(TileCoordinate coordinate, Ogre::Vector2i offse
       ss.str(), size, tx, ty, false));
   // hide until the tile request was completed
   tile_emplace_result.first->second.setVisible(false);
-  assert(tile_emplace_result.second);
+  rcpputils::assert_true(tile_emplace_result.second, "failed to store tile object");
 }
 
 void AerialMapDisplay::update(float, float)
@@ -418,7 +418,7 @@ void AerialMapDisplay::update(float, float)
     std::string error;
     if (context_->getFrameManager()->transformHasProblems(std::string(MAP_FRAME), t, error)) {
       setStatus(
-        rviz_common::properties::StatusProperty::Warn, ORIENTATION_STATUS,
+        rviz_common::properties::StatusProperty::Ok, ORIENTATION_STATUS,
         QString::fromStdString(error));
     } else {
       // This is a perfectly valid case if a map transform is not available.

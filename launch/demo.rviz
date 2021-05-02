@@ -5,9 +5,8 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /10m1
+        - /Status1
         - /AerialMap1
-        - /AerialMap1/Status1
       Splitter Ratio: 0.5
     Tree Height: 787
   - Class: rviz_common/Selection
@@ -70,7 +69,7 @@ Visualization Manager:
       Reference Frame: <Fixed Frame>
       Value: true
     - Alpha: 0.699999988079071
-      Blocks: 1
+      Blocks: 3
       Class: rviz_satellite/AerialMap
       Draw Behind: true
       Enabled: true
@@ -137,7 +136,7 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 6.329613208770752
+      Scale: 2.003185987472534
       Target Frame: <Fixed Frame>
       Value: TopDownOrtho (rviz_default_plugins)
       X: 10.910120010375977

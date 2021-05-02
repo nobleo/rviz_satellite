@@ -1,6 +1,7 @@
 #include "tile.hpp"
 #include <angles/angles.h>
 #include <string>
+#include <rcpputils/find_and_replace.hpp>
 
 namespace rviz_satellite
 {
@@ -14,9 +15,9 @@ double zoomSize(double lat, int zoom)
 std::string tileURL(const TileId & tile_id)
 {
   auto url = tile_id.server_url;
-  boost::replace_all(url, "{x}", std::to_string(tile_id.coord.x));
-  boost::replace_all(url, "{y}", std::to_string(tile_id.coord.y));
-  boost::replace_all(url, "{z}", std::to_string(tile_id.coord.z));
+  url = rcpputils::find_and_replace(url, "{x}", std::to_string(tile_id.coord.x));
+  url = rcpputils::find_and_replace(url, "{y}", std::to_string(tile_id.coord.y));
+  url = rcpputils::find_and_replace(url, "{z}", std::to_string(tile_id.coord.z));
   return url;
 }
 
