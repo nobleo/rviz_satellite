@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 #include "aerialmap_display.hpp"
 
+#include <vector>
 #include <limits>
 #include <algorithm>
 #include <utility>
@@ -237,23 +238,35 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
   auto tile_at_fix = fromWGS(*msg, zoom);
   {
     const std::lock_guard<std::mutex> lock(tiles_mutex_);
-    double tile_size_m = zoomSize(msg->latitude, zoom);
-    if (tiles_.empty()) {
-      // create whole map initially
-      buildMap(tile_at_fix, tile_size_m);
-    } else {
-      auto center = centerTile();
-      int delta_x = tile_at_fix.x - center.x;
-      int delta_y = tile_at_fix.y - center.y;
-      // if center tile changed to some index direction, create only the missing tiles
-      if (blocks_property_->getInt() > 0 && (delta_x != 0 || delta_y != 0)) {
-        if (std::abs(delta_x) == 1 && std::abs(delta_y) == 0) {
-          shiftMap(center, Ogre::Vector2i(delta_x, delta_y), tile_size_m);
-        } else {
-          tiles_.clear();
-          buildMap(tile_at_fix, tile_size_m);
+    try {
+      double tile_size_m = zoomSize(msg->latitude, zoom);
+      if (tiles_.empty()) {
+        // create whole map initially
+        buildMap(tile_at_fix, tile_size_m);
+      } else {
+        auto center = centerTile();
+        auto offset = Ogre::Vector2i(tile_at_fix.x - center.x, tile_at_fix.y - center.y);
+        if (!offset.isZeroLength()) {
+          auto blocks = blocks_property_->getInt();
+          if (blocks > 0 && std::abs(offset.data[0]) <= blocks &&
+            std::abs(offset.data[1]) <= blocks)
+          {
+            // if center tile changed to some index direction, within the bounds of the surrounding blocks,
+            // create only the missing tiles
+            shiftMap(center, offset, tile_size_m);
+          } else {
+            // if more tiles than block are skipped, recreate the entire map
+            pending_tiles_.clear();
+            tiles_.clear();
+            buildMap(tile_at_fix, tile_size_m);
+          }
         }
       }
+    } catch (const tile_request_error & e) {
+      tile_server_had_errors_ = true;
+      pending_tiles_.clear();
+      tiles_.clear();
+      setStatus(rviz_common::properties::StatusProperty::Error, TILE_REQUEST_STATUS, e.what());
     }
   }
   // set material properties on created tiles
@@ -261,6 +274,51 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
   updateDrawUnder();
 }
 
+// compute list of offsets on the far end of a field with side length (blocks * 2 + 1), when moving
+// in the direction of the given offset
+static std::vector<Ogre::Vector2i> farEndOffsets(int blocks, Ogre::Vector2i offset)
+{
+  assert(blocks > 0);
+  std::vector<Ogre::Vector2i> result;
+  auto offset_x = offset.data[0];
+  auto offset_y = offset.data[1];
+  for (int x = 0; x < std::abs(offset_x); ++x) {
+    for (int y = -blocks; y <= blocks; ++y) {
+      auto curr_offset_x = -signum(offset_x) * blocks - signum(offset_x) * x;
+      result.push_back(Ogre::Vector2i(curr_offset_x, y));
+    }
+  }
+  for (int y = 0; y < std::abs(offset_y); ++y) {
+    for (int x = -blocks; x <= blocks; ++x) {
+      auto curr_offset_y = -signum(offset_y) * blocks - signum(offset_y) * y;
+      result.push_back(Ogre::Vector2i(x, curr_offset_y));
+    }
+  }
+  return result;
+}
+
+// compute list of offsets on the near end of a field with side length (blocks * 2 + 1), when moving
+// in the direction of the given offset
+static std::vector<Ogre::Vector2i> nearEndOffsets(int blocks, Ogre::Vector2i offset)
+{
+  assert(blocks > 0);
+  std::vector<Ogre::Vector2i> result;
+  auto offset_x = offset.data[0];
+  auto offset_y = offset.data[1];
+  for (int x = 1; x <= std::abs(offset_x); ++x) {
+    for (int y = -blocks; y <= blocks; ++y) {
+      auto curr_offset_x = signum(offset_x) * blocks + signum(offset_x) * x;
+      result.push_back(Ogre::Vector2i(curr_offset_x, y));
+    }
+  }
+  for (int y = 1; y <= std::abs(offset_y); ++y) {
+    for (int x = -blocks; x <= blocks; ++x) {
+      auto curr_offset_y = signum(offset_y) * blocks + signum(offset_y) * y;
+      result.push_back(Ogre::Vector2i(x, curr_offset_y));
+    }
+  }
+  return result;
+}
 
 void AerialMapDisplay::shiftMap(TileCoordinate center, Ogre::Vector2i offset, double tile_size_m)
 {
@@ -272,26 +330,28 @@ void AerialMapDisplay::shiftMap(TileCoordinate center, Ogre::Vector2i offset, do
   auto tile_url = tile_url_property_->getStdString();
 
   // remove tiles on the far end
-  int x_far = center.x - signum(delta_x) * blocks;
-  for (int y_far = center.y - blocks; y_far <= center.y + blocks; ++y_far) {
-    const TileCoordinate coordinate_to_delete{x_far, y_far, center.z};
+  for (auto far_offset : farEndOffsets(blocks, offset)) {
+    int x = center.x + far_offset.data[0];
+    int y = center.y + far_offset.data[1];
+    const TileCoordinate coordinate_to_delete{x, y, center.z};
     const TileId tile_to_delete{tile_url, coordinate_to_delete};
+    // TODO(ZeilingerM) assertion is not correct on border of map
     assert(tiles_.erase(tile_to_delete) == 1);
   }
 
   // shift existing tiles to new center
-  Ogre::Vector3 translation(-delta_x * tile_size_m, -delta_y * tile_size_m, 0.0);
+  Ogre::Vector3 translation(-delta_x * tile_size_m, delta_y * tile_size_m, 0.0);
   for (auto & tile : tiles_) {
     tile.second.translate(translation);
   }
 
   // create tiles on the near end
-  int x_near = center.x + signum(delta_x) * blocks + signum(delta_x);
-  for (int y = -blocks; y <= blocks; ++y) {
-    int y_near = center.y + y;
-    TileCoordinate new_coordinate{x_near, y_near, center.z};
-    Ogre::Vector2i new_offset(signum(delta_x) * blocks, y);
-    buildTile(new_coordinate, new_offset, tile_size_m);
+  for (auto near_offset : nearEndOffsets(blocks, offset)) {
+    int x = center.x + near_offset.data[0];
+    int y = center.y + near_offset.data[1];
+    TileCoordinate new_coordinate{x, y, center.z};
+    // set tile offset with the assumption of a new center
+    buildTile(new_coordinate, near_offset - offset, tile_size_m);
   }
 }
 
@@ -319,13 +379,7 @@ void AerialMapDisplay::buildTile(TileCoordinate coordinate, Ogre::Vector2i offse
 {
   auto tile_url = tile_url_property_->getStdString();
   const TileId tile_id{tile_url, coordinate};
-  try {
-    pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
-  } catch (const tile_request_error & e) {
-    tile_server_had_errors_ = true;
-    setStatus(rviz_common::properties::StatusProperty::Error, TILE_REQUEST_STATUS, e.what());
-    return;
-  }
+  pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
 
   // position of each tile is set so the origin of the aerial map is the center of the middle tile
   double tx = offset.data[0] * size - size / 2;
@@ -352,23 +406,33 @@ void AerialMapDisplay::update(float, float)
 
   // resolve pending tile requests, and set the received images as textures of their tiles
   for (auto it = pending_tiles_.begin(); it != pending_tiles_.end(); ) {
-    if (it->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-      try {
-        auto image = it->second.get();
-        tiles_.find(it->first)->second.updateData(image);
-        // remove from pending requests
-        it = pending_tiles_.erase(it);
-      } catch (const tile_request_error & e) {
-        // log error and abort requests
-        RVIZ_COMMON_LOG_ERROR_STREAM("Tile request failed: " << e.what());
-        it = pending_tiles_.end();
-        setStatus(rviz_common::properties::StatusProperty::Error, TILE_REQUEST_STATUS, e.what());
-        // disable requests until tile server relevant properties change
-        tile_server_had_errors_ = true;
+    try {
+      if (it->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        try {
+          auto image = it->second.get();
+          auto tile_to_update = tiles_.find(it->first);
+          if (tile_to_update == tiles_.end()) {
+            // request was cleared since it was issued
+            continue;
+          }
+          tile_to_update->second.updateData(image);
+          // remove from pending requests
+          it = pending_tiles_.erase(it);
+        } catch (const tile_request_error & e) {
+          // log error and abort requests
+          RVIZ_COMMON_LOG_ERROR_STREAM("Tile request failed: " << e.what());
+          it = pending_tiles_.end();
+          setStatus(rviz_common::properties::StatusProperty::Error, TILE_REQUEST_STATUS, e.what());
+          // disable requests until tile server relevant properties change
+          tile_server_had_errors_ = true;
+        }
+      } else {
+        // check next request
+        ++it;
       }
-    } else {
-      // check next request
-      ++it;
+    } catch (const std::future_error & e) {
+      RVIZ_COMMON_LOG_DEBUG_STREAM("Tile request destroyed before resolved: " << e.what());
+      it = pending_tiles_.erase(it);
     }
   }
   // if an error was just discovered
