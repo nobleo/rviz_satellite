@@ -56,7 +56,6 @@ using rviz_common::properties::StringProperty;
 using rviz_common::properties::StatusProperty;
 
 using sensor_msgs::msg::NavSatFix;
-using geographic_msgs::msg::GeoPoint;
 
 // disable cpplint: not using string as const char*
 // declaring as std::string and QString to avoid copies

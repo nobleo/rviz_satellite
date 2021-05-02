@@ -21,7 +21,6 @@ limitations under the License. */
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
-#include <geographic_msgs/msg/geo_point.hpp>
 
 #include "rviz_common/properties/float_property.hpp"
 #include "rviz_common/properties/int_property.hpp"
