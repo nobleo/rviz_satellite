@@ -42,6 +42,7 @@ namespace rviz_satellite
 class AerialMapDisplay : public rviz_common::RosTopicDisplay<sensor_msgs::msg::NavSatFix>
 {
   Q_OBJECT
+
 public:
   AerialMapDisplay();
   ~AerialMapDisplay() override;

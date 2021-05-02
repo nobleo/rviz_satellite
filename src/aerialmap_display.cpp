@@ -12,8 +12,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 #include "aerialmap_display.hpp"
+#include "field.hpp"
 
-#include <vector>
 #include <limits>
 #include <algorithm>
 #include <utility>
@@ -58,7 +58,8 @@ using rviz_common::properties::StatusProperty;
 using sensor_msgs::msg::NavSatFix;
 using geographic_msgs::msg::GeoPoint;
 
-// disable cpplint: not using string as const char*, declaring as std::string and QString to avoid copies
+// disable cpplint: not using string as const char*
+// declaring as std::string and QString to avoid copies
 const std::string AerialMapDisplay::MAP_FRAME = "map"; // NOLINT
 const QString AerialMapDisplay::MESSAGE_STATUS = "Message"; // NOLINT
 const QString AerialMapDisplay::TILE_REQUEST_STATUS = "TileRequest"; // NOLINT
@@ -205,13 +206,6 @@ void AerialMapDisplay::updateBlocks()
   resetMap();
 }
 
-// https://stackoverflow.com/questions/1903954/is-there-a-standard-sign-function-signum-sgn-in-c-c
-template<typename T>
-int signum(T val)
-{
-  return (T(0) < val) - (val < T(0));
-}
-
 void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
 {
   if (!isEnabled()) {
@@ -272,54 +266,6 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
   // set material properties on created tiles
   updateAlpha(last_fix_->header.stamp);
   updateDrawUnder();
-}
-
-// compute list of offsets on the far end of a field with side length (blocks * 2 + 1), when moving
-// in the direction of the given offset
-static std::vector<Ogre::Vector2i> farEndOffsets(int blocks, Ogre::Vector2i offset)
-{
-  assert(blocks > 0);
-  std::vector<Ogre::Vector2i> result;
-  auto offset_x = offset.data[0];
-  auto offset_y = offset.data[1];
-  for (int x = 0; x < std::abs(offset_x); ++x) {
-    for (int y = -blocks; y <= blocks; ++y) {
-      auto curr_offset_x = -signum(offset_x) * blocks - signum(offset_x) * x;
-      result.push_back(Ogre::Vector2i(curr_offset_x, y));
-    }
-  }
-  for (int y = 0; y < std::abs(offset_y); ++y) {
-    for (int x = -blocks; x <= blocks; ++x) {
-      auto curr_offset_y = -signum(offset_y) * blocks - signum(offset_y) * y;
-      result.push_back(Ogre::Vector2i(x, curr_offset_y));
-    }
-  }
-  return result;
-}
-
-// compute list of offsets on the near end of a field with side length (blocks * 2 + 1), when moving
-// in the direction of the given offset
-static std::vector<Ogre::Vector2i> nearEndOffsets(int blocks, Ogre::Vector2i offset)
-{
-  assert(blocks > 0);
-  std::vector<Ogre::Vector2i> result;
-  auto offset_x = offset.data[0];
-  auto offset_y = offset.data[1];
-  assert(std::abs(offset_x) <= blocks);
-  assert(std::abs(offset_y) <= blocks);
-  for (int x = 1; x <= std::abs(offset_x); ++x) {
-    for (int y = -blocks; y <= blocks; ++y) {
-      auto curr_offset_x = signum(offset_x) * blocks + signum(offset_x) * x;
-      result.push_back(Ogre::Vector2i(curr_offset_x, y));
-    }
-  }
-  for (int y = 1; y <= std::abs(offset_y); ++y) {
-    for (int x = -blocks; x <= blocks; ++x) {
-      auto curr_offset_y = signum(offset_y) * blocks + signum(offset_y) * y;
-      result.push_back(Ogre::Vector2i(x, curr_offset_y));
-    }
-  }
-  return result;
 }
 
 void AerialMapDisplay::shiftMap(TileCoordinate center, Ogre::Vector2i offset, double tile_size_m)
