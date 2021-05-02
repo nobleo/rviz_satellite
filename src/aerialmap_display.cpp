@@ -399,6 +399,8 @@ void AerialMapDisplay::buildTile(TileCoordinate coordinate, Ogre::Vector2i offse
     std::forward_as_tuple(
       scene_manager_, scene_node_,
       ss.str(), size, tx, ty, false));
+  // hide until the tile request was completed
+  tile_emplace_result.first->second.setVisible(false);
   assert(tile_emplace_result.second);
 }
 
@@ -421,7 +423,9 @@ void AerialMapDisplay::update(float, float)
             // request was cleared since it was issued
             continue;
           }
-          tile_to_update->second.updateData(image);
+          auto & tile_object = tile_to_update->second;
+          tile_object.updateData(image);
+          tile_object.setVisible(true);
           // remove from pending requests
           it = pending_tiles_.erase(it);
         } catch (const tile_request_error & e) {
