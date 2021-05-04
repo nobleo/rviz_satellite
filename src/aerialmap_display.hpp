@@ -78,6 +78,8 @@ protected:
 
   void updateAlpha(const rclcpp::Time & t);
 
+  rclcpp::Duration tf_tolerance() const;
+
   TileCoordinate centerTile() const;
 
   rviz_common::properties::StringProperty * tile_url_property_ = nullptr;
@@ -85,6 +87,7 @@ protected:
   rviz_common::properties::IntProperty * blocks_property_ = nullptr;
   rviz_common::properties::FloatProperty * alpha_property_ = nullptr;
   rviz_common::properties::FloatProperty * timeout_property_ = nullptr;
+  rviz_common::properties::FloatProperty * tf_tolerance_property_ = nullptr;
   rviz_common::properties::Property * draw_under_property_ = nullptr;
 
   std::mutex tiles_mutex_;

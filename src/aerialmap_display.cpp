@@ -30,6 +30,7 @@ limitations under the License. */
 #include "rviz_common/validate_floats.hpp"
 #include "rviz_common/display_context.hpp"
 #include "rviz_common/logging.hpp"
+#include "rviz_common/msg_conversions.hpp"
 
 #include "rviz_default_plugins/transformation/tf_wrapper.hpp"
 
@@ -113,6 +114,14 @@ AerialMapDisplay::AerialMapDisplay()
     this);
   timeout_property_->setMin(0.0);
   timeout_property_->setShouldBeSaved(true);
+
+  tf_tolerance_property_ =
+    new FloatProperty(
+    "TF tolerance", 0.1,
+    "Maximum allowed age of latest transformation looked up from TF.",
+    this);
+  tf_tolerance_property_->setMin(0.0);
+  tf_tolerance_property_->setShouldBeSaved(true);
 }
 
 AerialMapDisplay::~AerialMapDisplay()
@@ -351,6 +360,43 @@ void AerialMapDisplay::buildTile(TileCoordinate coordinate, Ogre::Vector2i offse
   rcpputils::assert_true(tile_emplace_result.second, "failed to store tile object");
 }
 
+// Try to get transform to fixed frame at given time, fallback to latest time within tolerance otherwise
+static void get_fixed_frame_transform_fallback_to_latest(
+  rviz_common::FrameManagerIface * frame_manager,
+  const std::string & frame_id,
+  const rclcpp::Time & t,
+  const rclcpp::Duration & tolerance,
+  Ogre::Vector3 & position,
+  Ogre::Quaternion & orientation)
+{
+  position = Ogre::Vector3::ZERO;
+  orientation = Ogre::Quaternion::IDENTITY;
+
+  // identity pose
+  geometry_msgs::msg::PoseStamped pose_in;
+  pose_in.header.stamp = t;
+  pose_in.header.frame_id = frame_id;
+
+  auto fixed_frame = frame_manager->getFixedFrame();
+  auto transformer = frame_manager->getTransformer();
+  geometry_msgs::msg::PoseStamped pose_out;
+  try {
+    pose_out = transformer->transform(pose_in, fixed_frame);
+  } catch (const rviz_common::transformation::FrameTransformerException & exception) {
+    pose_in.header.stamp = rclcpp::Time(0);
+    pose_out = transformer->transform(pose_in, fixed_frame);
+    rclcpp::Time latest_stamp = pose_out.header.stamp;
+    if (tolerance != rclcpp::Duration(0)) {
+      if (latest_stamp < (t - tolerance)) {
+        throw;
+      }
+    }
+  }
+
+  position = rviz_common::pointMsgToOgre(pose_out.pose.position);
+  orientation = rviz_common::quaternionMsgToOgre(pose_out.pose.orientation);
+}
+
 void AerialMapDisplay::update(float, float)
 {
   std::unique_lock<std::mutex> lock(tiles_mutex_, std::try_to_lock);
@@ -409,48 +455,31 @@ void AerialMapDisplay::update(float, float)
 
   Ogre::Vector3 _ignored_translation;
   Ogre::Quaternion orientation_to_map = Ogre::Quaternion::IDENTITY;
-  // get transformation of fixed frame to map, to set the aerial map orientation to be aligned with ENU
-  if (context_->getFrameManager()->getTransform(
-      std::string(MAP_FRAME), _ignored_translation,
-      orientation_to_map))
-  {
-    setStatus(rviz_common::properties::StatusProperty::Ok, ORIENTATION_STATUS, "Map transform OK");
-  } else {
-    std::string error;
-    if (context_->getFrameManager()->transformHasProblems(std::string(MAP_FRAME), t, error)) {
-      setStatus(
-        rviz_common::properties::StatusProperty::Ok, ORIENTATION_STATUS,
-        QString::fromStdString(error));
-    } else {
-      // This is a perfectly valid case if a map transform is not available.
-      // Since in this case there is no reference to align the aerial map to,
-      // just leave it aligned to the fixed frame.
-      setStatus(
-        rviz_common::properties::StatusProperty::Ok, ORIENTATION_STATUS,
-        "Could not transform fixed frame to map for aerial map orientation");
-    }
+  try {
+    // get transformation of fixed frame to map, to set the aerial map orientation to be aligned with ENU
+    get_fixed_frame_transform_fallback_to_latest(
+      context_->getFrameManager(), MAP_FRAME, t, tf_tolerance(), _ignored_translation,
+      orientation_to_map);
+    setStatus(
+      rviz_common::properties::StatusProperty::Ok, ORIENTATION_STATUS,
+      "Map transform OK");
+  } catch (const rviz_common::transformation::FrameTransformerException & e) {
+    setStatus(
+      rviz_common::properties::StatusProperty::Ok, TRANSFORM_STATUS, e.what());
   }
 
   Ogre::Vector3 sensor_translation;
   Ogre::Quaternion _ignored_orientation;
-  // get transformation of sensor frame
-  if (context_->getFrameManager()->getTransform(
-      last_fix_->header, sensor_translation,
-      _ignored_orientation))
-  {
+  try {
+    // get transformation of sensor frame
+    get_fixed_frame_transform_fallback_to_latest(
+      context_->getFrameManager(),
+      last_fix_->header.frame_id, t, tf_tolerance(), sensor_translation,
+      _ignored_orientation);
     setStatus(rviz_common::properties::StatusProperty::Ok, TRANSFORM_STATUS, "Transform OK");
-  } else {
-    std::string error;
-    if (context_->getFrameManager()->transformHasProblems(
-        last_fix_->header.frame_id,
-        last_fix_->header.stamp, error))
-    {
-      setStatus(
-        rviz_common::properties::StatusProperty::Error, TRANSFORM_STATUS,
-        QString::fromStdString(error));
-    } else {
-      setMissingTransformToFixedFrame(last_fix_->header.frame_id);
-    }
+  } catch (const rviz_common::transformation::FrameTransformerException & e) {
+    setStatus(
+      rviz_common::properties::StatusProperty::Error, TRANSFORM_STATUS, e.what());
     return;
   }
 
@@ -507,6 +536,11 @@ void AerialMapDisplay::updateAlpha(const rclcpp::Time & t)
   for (auto & tile : tiles_) {
     tile.second.updateAlpha(alpha);
   }
+}
+
+rclcpp::Duration AerialMapDisplay::tf_tolerance() const {
+  auto tf_tolerance_sec = tf_tolerance_property_->getFloat();
+  return rclcpp::Duration(std::chrono::duration<double>(tf_tolerance_sec));
 }
 
 TileCoordinate AerialMapDisplay::centerTile() const
