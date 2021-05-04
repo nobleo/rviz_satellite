@@ -62,7 +62,7 @@ TileObject::TileObject(
   setupMaterial();
   setupSceneNodeWithManualObject();
 
-  scene_node_->setPosition(x, y, 0);
+  scene_node_->setPosition(x, y, -1.0);
   scene_node_->setScale(tile_size, tile_size, 1.0);
 
   if (draw_under) {
