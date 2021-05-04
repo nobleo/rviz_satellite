@@ -132,6 +132,8 @@ void AerialMapDisplay::onEnable()
 void AerialMapDisplay::onDisable()
 {
   scene_node_->setVisible(false);
+  resetTileServerError();
+  resetMap();
 }
 
 bool AerialMapDisplay::validateMessage(const NavSatFix::ConstSharedPtr message)
@@ -524,8 +526,7 @@ void AerialMapDisplay::reset()
   RTDClass::reset();
   resetMap();
   last_fix_.reset();
-  // updated tile url may work
-  tile_server_had_errors_ = false;
+  resetTileServerError();
 }
 
 }  // namespace rviz_satellite
