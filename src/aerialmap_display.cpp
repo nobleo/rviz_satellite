@@ -386,7 +386,7 @@ static void get_fixed_frame_transform_fallback_to_latest(
     pose_in.header.stamp = rclcpp::Time(0);
     pose_out = transformer->transform(pose_in, fixed_frame);
     rclcpp::Time latest_stamp = pose_out.header.stamp;
-    if (tolerance != rclcpp::Duration(0)) {
+    if (tolerance != rclcpp::Duration::from_nanoseconds(0)) {
       if (latest_stamp < (t - tolerance)) {
         throw;
       }
