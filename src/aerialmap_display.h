@@ -43,6 +43,17 @@ class IntProperty;
 class Property;
 class RosTopicProperty;
 class StringProperty;
+class EnumProperty;
+
+/**
+ * @brief Whether the tiles should be transformed via an intermediate map frame,
+ * or directly via a UTM frame.
+ */
+enum class MapTransformType
+{
+  VIA_MAP_FRAME,
+  VIA_UTM_FRAME,
+};
 
 /**
  * @brief Displays a satellite map along the XY plane.
@@ -65,12 +76,16 @@ protected Q_SLOTS:
   void updateTileUrl();
   void updateZoom();
   void updateBlocks();
+  void updateMapTransformType();
   void updateMapFrame();
+  void updateUtmFrame();
+  void updateUtmZone();
 
 protected:
   // overrides from Display
   void onEnable() override;
   void onDisable() override;
+  void onInitialize() override;
 
   virtual void subscribe();
   virtual void unsubscribe();
@@ -157,7 +172,10 @@ protected:
   IntProperty* blocks_property_;
   FloatProperty* alpha_property_;
   Property* draw_under_property_;
+  EnumProperty* map_transform_type_property_;
   StringProperty* map_frame_property_;
+  StringProperty* utm_frame_property_;
+  IntProperty* utm_zone_property_;
 
   /// the alpha value of the tile's material
   float alpha_;
@@ -169,8 +187,14 @@ protected:
   int zoom_;
   /// the number of tiles loaded in each direction around the center tile
   int blocks_;
+  /// Whether the tiles should be transformed via an intermediate map frame, or directly via a UTM frame.
+  MapTransformType map_transform_type_;
   /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
   std::string map_frame_;
+  /// the utm frame, representing a UTM coordinate frame in a chosen zone
+  std::string utm_frame_;
+  /// UTM zone to work in
+  int utm_zone_;
 
   // tile management
   /// whether we need to re-query and re-assemble the tiles

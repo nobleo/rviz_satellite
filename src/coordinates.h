@@ -74,6 +74,21 @@ TileCoordinateGeneric<NumericType> fromWGSCoordinate(WGSCoordinate coord, int zo
   return ret;
 }
 
+/**
+ * Convert tile coordinate to lat/lon.
+ *
+ * @see https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames for explanation of these calculations.
+ */
+template <typename NumericType = int>
+WGSCoordinate toWGSCoordinate(TileCoordinateGeneric<NumericType> coord, int zoom)
+{
+  WGSCoordinate ret{ 0, 0 };
+  ret.lon = coord.x / std::pow(2.0, zoom) * 360.0 - 180;
+  double n = M_PI - 2.0 * M_PI * (1 + coord.y) / std::pow(2.0, zoom);
+  ret.lat = 180.0 / M_PI * std::atan(0.5 * (std::exp(n) - std::exp(-n)));
+  return ret;
+}
+
 template <typename NumericType>
 bool operator==(TileCoordinateGeneric<NumericType> self, TileCoordinateGeneric<NumericType> other)
 {

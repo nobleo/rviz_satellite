@@ -18,6 +18,10 @@ catkin_package(
 find_package(Qt5 ${rviz_QT_VERSION} EXACT REQUIRED Core Gui Network REQUIRED)
 set(QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Network)
 
+# Ubuntu libgeographic-dev package installs into non-standard location
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};/usr/share/cmake/geographiclib")
+find_package(GeographicLib REQUIRED)
+
 
 ## BUILD ##
 
@@ -62,6 +66,7 @@ target_link_libraries(
   ${PROJECT_NAME}
   ${QT_LIBRARIES}
   ${catkin_LIBRARIES}
+  ${GeographicLib_LIBRARIES}
 )
 
 
