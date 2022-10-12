@@ -30,6 +30,9 @@ limitations under the License. */
 #include "rviz/properties/ros_topic_property.h"
 #include "rviz/properties/string_property.h"
 
+#include <tf2/LinearMath/Vector3.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+
 #include "aerialmap_display.h"
 #include "mercator.h"
 
@@ -59,6 +62,8 @@ std::unordered_map<MapTransformType, QString> mapTransformTypeStrings =
 
 AerialMapDisplay::AerialMapDisplay() : Display()
 {
+  center_tile_pose_.pose.orientation.w = 1;
+
   topic_property_ =
       new RosTopicProperty("Topic", "", QString::fromStdString(ros::message_traits::datatype<sensor_msgs::NavSatFix>()),
                            "sensor_msgs::NavSatFix topic to subscribe to.", this, SLOT(updateTopic()));
@@ -369,6 +374,11 @@ void AerialMapDisplay::updateMapTransformType()
       break;
   }
 
+  if (map_transform_type_ != MapTransformType::VIA_UTM_FRAME)
+  {
+    deleteStatus("UTM");
+  }
+
   createTileObjects();
   center_tile_ = boost::none;
   
@@ -579,7 +589,7 @@ void AerialMapDisplay::updateCenterTile(sensor_msgs::NavSatFixConstPtr const& ms
   ref_fix_ = msg;
 
   requestTileTextures();
-  transformTileToMapFrame();
+  transformTileToReferenceFrame();
 }
 
 void AerialMapDisplay::requestTileTextures()
@@ -791,13 +801,21 @@ void AerialMapDisplay::assembleScene()
   checkRequestErrorRate();
 }
 
+void AerialMapDisplay::transformTileToReferenceFrame()
+{
+  switch (map_transform_type_)
+  {
+    case MapTransformType::VIA_MAP_FRAME:
+      transformTileToMapFrame();
+      break;
+    case MapTransformType::VIA_UTM_FRAME:
+      transformTileToUtmFrame();
+      break;
+  }
+}
+
 void AerialMapDisplay::transformTileToMapFrame()
 {
-  if (map_transform_type_ != MapTransformType::VIA_MAP_FRAME)
-  {
-    return;
-  }
-  
   if (!ref_fix_ or !center_tile_)
   {
     ROS_FATAL_THROTTLE_NAMED(2, "rviz_satellite", "ref_fix_ not set, can't create transforms");
@@ -815,7 +833,7 @@ void AerialMapDisplay::transformTileToMapFrame()
 
   // translation of NavSatFix frame w.r.t. the map frame
   // NOTE: due to ENU convention, orientation is not needed, the tiles are rigidly attached to ENU
-  Ogre::Vector3 t_navsat_map;
+  tf2::Vector3 t_navsat_map;
 
   try
   {
@@ -823,8 +841,7 @@ void AerialMapDisplay::transformTileToMapFrame()
     // currently selected RViz fixed-frame, which is of no help here.
     auto const tf_navsat_map =
         tf_buffer_->lookupTransform(map_frame_, ref_fix_->header.frame_id, ref_fix_->header.stamp, ros::Duration(0.1));
-    auto const tf_pos = tf_navsat_map.transform.translation;
-    t_navsat_map = Ogre::Vector3(tf_pos.x, tf_pos.y, tf_pos.z);
+    tf2::fromMsg(tf_navsat_map.transform.translation, t_navsat_map);
   }
   catch (tf2::TransformException const& ex)
   {
@@ -848,98 +865,87 @@ void AerialMapDisplay::transformTileToMapFrame()
   ROS_DEBUG_NAMED("rviz_satellite", "Tile resolution is %.1fm", tile_w_h_m);
 
   // translation of the center-tile w.r.t. the NavSatFix frame
-  auto const t_centertile_navsat =
-      Ogre::Vector3(center_tile_offset_x * tile_w_h_m, center_tile_offset_y * tile_w_h_m, 0);
+  tf2::Vector3 t_centertile_navsat = { center_tile_offset_x * tile_w_h_m, center_tile_offset_y * tile_w_h_m, 0 };
 
-  t_centertile_map_ = t_navsat_map - t_centertile_navsat;
+  center_tile_pose_.header.frame_id = map_frame_;
+  center_tile_pose_.header.stamp = ref_fix_->header.stamp;
+  tf2::toMsg(t_navsat_map - t_centertile_navsat, center_tile_pose_.pose.position);
+}
+
+void AerialMapDisplay::transformTileToUtmFrame()
+{
+  if (!ref_fix_ or !center_tile_)
+  {
+    ROS_FATAL_THROTTLE_NAMED(2, "rviz_satellite", "ref_fix_ not set, can't create transforms");
+    return;
+  }
+  
+  // tile ID (integer x/y/zoom) corresponding to the downloaded tile / navsat message
+  auto const tile = fromWGSCoordinate<int>({ ref_fix_->latitude, ref_fix_->longitude }, zoom_);
+  
+  // Latitude and longitude of this tile's origin
+  auto const tileWGS = toWGSCoordinate<int>(tile, zoom_);
+
+  // Tile's origin in UTM coordinates
+  double northing, easting;
+  int utm_zone;
+  bool northp;
+
+  try
+  {
+    GeographicLib::UTMUPS::Forward(tileWGS.lat, tileWGS.lon, utm_zone, northp, easting, northing, utm_zone_);
+  }
+  catch (GeographicLib::GeographicErr& err)
+  {
+    ROS_ERROR_THROTTLE(2.0, "Error transforming lat-lon to UTM: %s", err.what());
+    if (utm_zone_ != GeographicLib::UTMUPS::STANDARD)
+    {
+      try
+      {
+        GeographicLib::UTMUPS::Forward(tileWGS.lat, tileWGS.lon, utm_zone, northp, easting, northing,
+                                       GeographicLib::UTMUPS::STANDARD);
+        ROS_INFO_THROTTLE(2.0, "Trying to autodetect UTM zone instead of using zone %i", utm_zone_);
+      }
+      catch (GeographicLib::GeographicErr& err)
+      {
+        setStatus(::rviz::StatusProperty::Error, "UTM", QString::fromStdString(err.what()));
+        return;
+      }
+    }
+  }
+  
+  setStatus(::rviz::StatusProperty::Ok, "UTM", "Conversion from lat/lon to UTM is OK.");
+
+  if (utm_zone != utm_zone_)
+  {
+    utm_zone_property_->setInt(utm_zone);
+  }
+
+  center_tile_pose_.header.stamp = ref_fix_->header.stamp;
+  center_tile_pose_.header.frame_id = utm_frame_;
+  center_tile_pose_.pose.position.x = easting;
+  center_tile_pose_.pose.position.y = northing;
+  center_tile_pose_.pose.position.z = ref_fix_->altitude;
 }
 
 void AerialMapDisplay::transformMapTileToFixedFrame()
 {
   // orientation of the tile w.r.t. the fixed-frame
-  Ogre::Quaternion orientation;
+  Ogre::Quaternion o_centertile_fixed;
   // translation of the tile w.r.t. the fixed-frame
-  Ogre::Vector3 translation;
-  // Whether transformation to fixed frame succeeded
-  bool succeeded {false};
-  // Name of the frame from which transformation is done
-  std::string frame_name;
+  Ogre::Vector3 t_centertile_fixed;
 
-  switch (map_transform_type_)
-  {
-    case MapTransformType::VIA_MAP_FRAME:
-    {
-      // orientation of the fixed-frame w.r.t. the map-frame
-      Ogre::Quaternion o_fixed_map;
-      // translation of the fixed-frame w.r.t. the map-frame
-      Ogre::Vector3 t_fixed_map;
-      
-      // get transform between map-frame and fixed-frame from the FrameManager
-      succeeded = context_->getFrameManager()->getTransform(map_frame_, ros::Time(), t_fixed_map, o_fixed_map);
-      
-      if (succeeded)
-      {
-        translation = t_fixed_map + o_fixed_map * t_centertile_map_;
-        orientation = o_fixed_map;
-      }
-      break;
-    }
-    case MapTransformType::VIA_UTM_FRAME: {
-      frame_name = utm_frame_;
-
-      // tile ID (integer x/y/zoom) corresponding to the downloaded tile / navsat message
-      auto const tile = fromWGSCoordinate<int>({ ref_fix_->latitude, ref_fix_->longitude }, zoom_);
-
-      // Latitude and longitude of this tile's origin
-      auto const tileWGS = toWGSCoordinate<int>(tile, zoom_);
-
-      // Tile's origin in UTM coordinates
-      double northing, easting;
-      int utm_zone;
-      bool northp;
-      
-      try
-      {
-        GeographicLib::UTMUPS::Forward(tileWGS.lat, tileWGS.lon, utm_zone, northp, easting, northing, utm_zone_);
-      }
-      catch (GeographicLib::GeographicErr& err)
-      {
-        ROS_ERROR_THROTTLE(2.0, "Error transforming lat-lon to UTM: %s", err.what());
-        if (utm_zone_ != GeographicLib::UTMUPS::STANDARD)
-        {
-          try
-          {
-            GeographicLib::UTMUPS::Forward(tileWGS.lat, tileWGS.lon, utm_zone, northp, easting, northing,
-                                           GeographicLib::UTMUPS::STANDARD);
-            ROS_INFO_THROTTLE(2.0, "Trying to autodetect UTM zone instead of using zone %i", utm_zone_);
-          }
-          catch (GeographicLib::GeographicErr& err)
-          {
-            break;
-          }
-        }
-      }
-
-      utm_zone_property_->setInt(utm_zone);
-
-      // Origin of the tile in utm coordinates
-      geometry_msgs::Pose origin;
-      origin.position.x = easting;
-      origin.position.y = northing;
-      origin.position.z = ref_fix_->altitude;
-      origin.orientation.w = 1;
-
-      succeeded = context_->getFrameManager()->transform(utm_frame_, ros::Time(), origin, translation, orientation);
-      break;
-    }
-  }
+  auto header = center_tile_pose_.header;
+  header.stamp = ros::Time::now();
+  const auto& frame_name = header.frame_id;
   
-  if (succeeded)
+  // transform the tile origin to fixed frame
+  if (context_->getFrameManager()->transform(header, center_tile_pose_.pose, t_centertile_fixed, o_centertile_fixed))
   {
     setStatus(::rviz::StatusProperty::Ok, "Transform", "Transform OK");
 
-    scene_node_->setPosition(translation);
-    scene_node_->setOrientation(orientation);
+    scene_node_->setPosition(t_centertile_fixed);
+    scene_node_->setOrientation(o_centertile_fixed);
   }
   else
   {

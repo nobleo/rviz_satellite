@@ -6,6 +6,8 @@ find_package(catkin REQUIRED
     roscpp
     rviz
     sensor_msgs
+    tf2
+    tf2_geometry_msgs
 )
 
 catkin_package(
@@ -13,6 +15,7 @@ catkin_package(
     roscpp
     rviz
     sensor_msgs
+    tf2
 )
 
 find_package(Qt5 ${rviz_QT_VERSION} EXACT REQUIRED Core Gui Network REQUIRED)

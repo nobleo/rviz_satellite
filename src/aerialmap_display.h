@@ -19,6 +19,7 @@ limitations under the License. */
 
 #include <boost/optional.hpp>
 
+#include <geometry_msgs/PoseStamped.h>
 #include <ros/ros.h>
 #include <ros/time.h>
 #include <rviz/display.h>
@@ -131,6 +132,16 @@ protected:
   void createTileObjects();
 
   /**
+   * Transforms the tile objects into the reference (map/utm) frame.
+   */
+  void transformTileToReferenceFrame();
+
+  /**
+   * Transforms the tile objects into the UTM frame.
+   */
+  void transformTileToUtmFrame();
+
+  /**
    * Transforms the tile objects into the map frame.
    */
   void transformTileToMapFrame();
@@ -205,8 +216,8 @@ protected:
   TileCacheDelay<OgreTile> tile_cache_;
   /// Last request()ed tile id (which is the center tile)
   boost::optional<TileId> center_tile_{ boost::none };
-  /// translation of the center-tile w.r.t. the map frame
-  Ogre::Vector3 t_centertile_map_{ Ogre::Vector3::ZERO };
+  /// translation of the center-tile w.r.t. the map/utm frame
+  geometry_msgs::PoseStamped center_tile_pose_;
 
   /// buffer for tf lookups not related to fixed-frame
   std::shared_ptr<tf2_ros::Buffer const> tf_buffer_{ nullptr };
