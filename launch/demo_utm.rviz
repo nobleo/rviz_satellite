@@ -46,7 +46,7 @@ Visualization Manager:
       Object URI: https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png
       Topic: /gps/fix
       Value: true
-      Map transform type: Via UTM frame
+      Map transform type: Explicit UTM Frame
       Zoom: 18
     - Class: rviz/TF
       Enabled: true

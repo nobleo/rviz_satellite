@@ -34,6 +34,7 @@ limitations under the License. */
 #include "mercator.h"
 
 #include <regex>
+#include <unordered_map>
 
 
 namespace rviz
@@ -50,6 +51,12 @@ namespace rviz
  * Splitting this transform lookup is necessary to mitigate frame jitter.
  */
 
+std::unordered_map<MapTransformType, QString> mapTransformTypeStrings =
+{
+  {MapTransformType::VIA_MAP_FRAME, "NavSatFix Messages and Map Frame"},
+  {MapTransformType::VIA_UTM_FRAME, "Explicit UTM Frame"},
+};
+
 AerialMapDisplay::AerialMapDisplay() : Display()
 {
   topic_property_ =
@@ -57,11 +64,13 @@ AerialMapDisplay::AerialMapDisplay() : Display()
                            "sensor_msgs::NavSatFix topic to subscribe to.", this, SLOT(updateTopic()));
 
   map_transform_type_property_ =
-      new EnumProperty("Map transform type", "Via map frame",
-                       "Whether to transform tiles via map frame or via UTM frame",
+      new EnumProperty("Map transform type", mapTransformTypeStrings[MapTransformType::VIA_MAP_FRAME],
+                       "Whether to transform tiles via map frame and fix messages or via UTM frame",
                        this, SLOT(updateMapTransformType()));
-  map_transform_type_property_->addOptionStd("Via map frame", static_cast<int>(MapTransformType::VIA_MAP_FRAME));
-  map_transform_type_property_->addOptionStd("Via UTM frame", static_cast<int>(MapTransformType::VIA_UTM_FRAME));
+  map_transform_type_property_->addOption(mapTransformTypeStrings[MapTransformType::VIA_MAP_FRAME],
+                                          static_cast<int>(MapTransformType::VIA_MAP_FRAME));
+  map_transform_type_property_->addOption(mapTransformTypeStrings[MapTransformType::VIA_UTM_FRAME],
+                                          static_cast<int>(MapTransformType::VIA_UTM_FRAME));
   map_transform_type_property_->setShouldBeSaved(true);
   map_transform_type_ = static_cast<MapTransformType>(map_transform_type_property_->getOptionInt());
   
