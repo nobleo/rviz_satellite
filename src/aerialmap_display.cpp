@@ -29,6 +29,7 @@ limitations under the License. */
 #include "rviz/properties/property.h"
 #include "rviz/properties/ros_topic_property.h"
 #include "rviz/properties/string_property.h"
+#include "rviz/properties/tf_frame_property.h"
 
 #include <tf2/LinearMath/Vector3.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
@@ -79,15 +80,15 @@ AerialMapDisplay::AerialMapDisplay() : Display()
   map_transform_type_property_->setShouldBeSaved(true);
   map_transform_type_ = static_cast<MapTransformType>(map_transform_type_property_->getOptionInt());
   
-  map_frame_property_ =
-      new StringProperty("Map Frame", "map", "Frame ID of the map.", this, SLOT(updateMapFrame()));
+  map_frame_property_ = new TfFrameProperty(
+      "Map Frame", "map", "Frame ID of the map.", this, nullptr, false, SLOT(updateMapFrame()));
   map_frame_property_->setShouldBeSaved(true);
-  map_frame_ = map_frame_property_->getStdString();
+  map_frame_ = map_frame_property_->getFrameStd();
   
-  utm_frame_property_ =
-      new StringProperty("UTM Frame", "utm", "Frame ID of the UTM frame.", this, SLOT(updateUtmFrame()));
+  utm_frame_property_ = new TfFrameProperty(
+      "UTM Frame", "utm", "Frame ID of the UTM frame.", this, nullptr, false, SLOT(updateUtmFrame()));
   utm_frame_property_->setShouldBeSaved(true);
-  utm_frame_ = utm_frame_property_->getStdString();
+  utm_frame_ = utm_frame_property_->getFrameStd();
   
   utm_zone_property_ =
       new IntProperty("UTM Zone", GeographicLib::UTMUPS::STANDARD, "UTM zone (-1 means autodetect).",
@@ -141,6 +142,8 @@ AerialMapDisplay::~AerialMapDisplay()
 void AerialMapDisplay::onInitialize()
 {
   tf_buffer_ = context_->getFrameManager()->getTF2BufferPtr();
+  map_frame_property_->setFrameManager(context_->getFrameManager());
+  utm_frame_property_->setFrameManager(context_->getFrameManager());
   updateMapTransformType();
 }
 
@@ -397,7 +400,7 @@ void AerialMapDisplay::updateMapFrame()
   //  - reset and update the center tile
   //  - update transforms
 
-  auto const map_frame = map_frame_property_->getStdString();
+  auto const map_frame = map_frame_property_->getFrameStd();
   if (map_frame == map_frame_)
   {
     return;
@@ -428,7 +431,7 @@ void AerialMapDisplay::updateUtmFrame()
   //  - reset and update the center tile
   //  - update transforms
 
-  auto const utm_frame = utm_frame_property_->getStdString();
+  auto const utm_frame = utm_frame_property_->getFrameStd();
   if (utm_frame == utm_frame_)
   {
     return;

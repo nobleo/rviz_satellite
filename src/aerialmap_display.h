@@ -39,12 +39,13 @@ class ManualObject;
 
 namespace rviz
 {
+class EnumProperty;
 class FloatProperty;
 class IntProperty;
 class Property;
 class RosTopicProperty;
 class StringProperty;
-class EnumProperty;
+class TfFrameProperty;
 
 /**
  * @brief Whether the tiles should be transformed via an intermediate map frame,
@@ -184,8 +185,8 @@ protected:
   FloatProperty* alpha_property_;
   Property* draw_under_property_;
   EnumProperty* map_transform_type_property_;
-  StringProperty* map_frame_property_;
-  StringProperty* utm_frame_property_;
+  TfFrameProperty* map_frame_property_;
+  TfFrameProperty* utm_frame_property_;
   IntProperty* utm_zone_property_;
 
   /// the alpha value of the tile's material
