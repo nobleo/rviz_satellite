@@ -55,6 +55,7 @@ Please refer to the respective terms of service and copyrights.
 ## Options
 
 - `Topic` is the topic of the GPS measurements.
+- `Map Frame` is the map frame rigidly attached to the world with ENU convention. 
 - `Alpha` is simply the display transparency.
 - `Draw Under` will cause the map to be displayed below all other geometry.
 - `Zoom` is the zoom level of the map. Recommended values are 16-19, as anything smaller is _very_ low resolution. 22 is the current max.

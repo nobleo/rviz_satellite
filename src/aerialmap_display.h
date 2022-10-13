@@ -65,6 +65,7 @@ protected Q_SLOTS:
   void updateTileUrl();
   void updateZoom();
   void updateBlocks();
+  void updateMapFrame();
 
 protected:
   // overrides from Display
@@ -156,6 +157,7 @@ protected:
   IntProperty* blocks_property_;
   FloatProperty* alpha_property_;
   Property* draw_under_property_;
+  StringProperty* map_frame_property_;
 
   /// the alpha value of the tile's material
   float alpha_;
@@ -167,6 +169,8 @@ protected:
   int zoom_;
   /// the number of tiles loaded in each direction around the center tile
   int blocks_;
+  /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
+  std::string map_frame_;
 
   // tile management
   /// whether we need to re-query and re-assemble the tiles
@@ -179,8 +183,6 @@ protected:
   boost::optional<TileId> center_tile_{ boost::none };
   /// translation of the center-tile w.r.t. the map frame
   Ogre::Vector3 t_centertile_map_{ Ogre::Vector3::ZERO };
-  /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
-  std::string static const MAP_FRAME;
 
   /// buffer for tf lookups not related to fixed-frame
   std::shared_ptr<tf2_ros::Buffer const> tf_buffer_{ nullptr };
