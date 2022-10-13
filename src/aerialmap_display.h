@@ -29,7 +29,9 @@ limitations under the License. */
 #include <OGRE/OgreMaterial.h>
 #include <OGRE/OgreVector3.h>
 
+#include "coordinates.h"
 #include "ogre_tile.h"
+#include "position_reference.h"
 #include "tile_cache_delay.h"
 
 namespace Ogre
@@ -42,6 +44,7 @@ namespace rviz
 class EnumProperty;
 class FloatProperty;
 class IntProperty;
+class PositionReferenceProperty;
 class Property;
 class RosTopicProperty;
 class StringProperty;
@@ -82,6 +85,9 @@ protected Q_SLOTS:
   void updateMapFrame();
   void updateUtmFrame();
   void updateUtmZone();
+  void updateXYReference();
+  void updateZReference();
+  void updateZOffset();
 
 protected:
   // overrides from Display
@@ -103,9 +109,10 @@ protected:
   void requestTileTextures();
 
   /**
-   * Triggers texture update if the center-tile changed w.r.t. the current one
+   * Triggers texture update if the center-tile changed w.r.t. the current one.
+   * Returns true if the tile has been actually updated.
    */
-  void updateCenterTile(sensor_msgs::NavSatFixConstPtr const& msg);
+  bool updateCenterTile(sensor_msgs::NavSatFixConstPtr const& msg);
 
   /**
    * Generates the tile's render geometry and applies the requested textures
@@ -156,6 +163,11 @@ protected:
    * Checks how may tiles were loaded successfully, and sets the status accordingly.
    */
   void checkRequestErrorRate();
+  
+  /**
+   * Called periodically to update TF_FRAME position references. 
+   */
+  void tfReferencePeriodicUpdate(const ros::TimerEvent&);
 
   /**
    * Tile with associated Ogre data
@@ -188,6 +200,9 @@ protected:
   TfFrameProperty* map_frame_property_;
   TfFrameProperty* utm_frame_property_;
   IntProperty* utm_zone_property_;
+  PositionReferenceProperty* xy_reference_property_;
+  PositionReferenceProperty* z_reference_property_;
+  FloatProperty* z_offset_property_;
 
   /// the alpha value of the tile's material
   float alpha_;
@@ -207,12 +222,24 @@ protected:
   std::string utm_frame_;
   /// UTM zone to work in
   int utm_zone_;
+  /// Type of XY position reference
+  PositionReferenceType xy_reference_type_;
+  /// XY position reference TF frame (if TF_FRAME type is used)
+  std::string xy_reference_frame_;
+  /// Type of Z position reference
+  PositionReferenceType z_reference_type_;
+  /// Z position reference TF frame (if TF_FRAME type is used)
+  std::string z_reference_frame_;
+  /// Offset of the tiles in Z axis (relative to map/utm)
+  double z_offset_;
 
   // tile management
   /// whether we need to re-query and re-assemble the tiles
   bool dirty_{ false };
   /// the last NavSatFix message that lead to updating the tiles
   sensor_msgs::NavSatFixConstPtr ref_fix_{ nullptr };
+  /// lat/lon of the reference position that lead to updating the tiles
+  boost::optional<WGSCoordinate> ref_coords_;
   /// caches tile images, hashed by their fetch URL
   TileCacheDelay<OgreTile> tile_cache_;
   /// Last request()ed tile id (which is the center tile)
@@ -222,6 +249,11 @@ protected:
 
   /// buffer for tf lookups not related to fixed-frame
   std::shared_ptr<tf2_ros::Buffer const> tf_buffer_{ nullptr };
+  
+  /// timeout for periodic TF_FRAME reference update
+  ros::Duration tf_reference_update_duration_;
+  /// timer that updates the reference position when using TF_FRAME references
+  ros::Timer tf_reference_update_timer_;
 };
 
 }  // namespace rviz

@@ -31,12 +31,14 @@ find_package(GeographicLib REQUIRED)
 set(${PROJECT_NAME}_SOURCES
   src/aerialmap_display.cpp
   src/ogre_tile.cpp
+  src/position_reference_property.cpp
   src/tile_id.cpp
 )
 
 set(${PROJECT_NAME}_HEADERS
   src/aerialmap_display.h
   src/detail/tile_downloader.h
+  src/position_reference_property.h
 )
 
 # invoke MOC and UI/ include Qt headers/ link Qt libraries - alternatively, see CMAKE_AUTOMOC
