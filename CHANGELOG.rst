@@ -2,6 +2,11 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Added support for UTM frame transforms
+* Added support for specifying a custom map frame
+
 3.0.3 (2021-01-19)
 ------------------
 * Pragmatic URI check

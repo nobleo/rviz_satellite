@@ -23,6 +23,8 @@ You can edit the longitude and latitude values in `launch/demo.gps` to change th
 
 Check the Usage section below to learn how to use the position of your robot and a satellite map.
 
+See demo file `launch/demo_utm.launch` for an example of using this plugin in the `UTM frame` mode (see below).
+
 ## Usage
 
 Add an instance of `AerialMapDisplay` to your rviz config.
@@ -34,6 +36,16 @@ At present the cache does not expire automatically - you should delete the files
 
 Currently, we only support the [OpenStreetMap](http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames) convention for tile URLs.
 This e.g. implies that only raster tiles (no vector tiles) are supported.
+
+Transformation of tiles to RViz fixed frame can be done in two ways that are configured using `Map Transform Type` option:
+
+1. Specify a `Map frame`, which is an ENU-oriented frame in which your robot localizes. This mode expects that the frame
+   of the subscribed `NavSatFix` messages is consistent with the measured latitude/longitude in this map frame.
+   In this mode, the tiles go through an intermediate transform to the map frame.
+2. Specify `UTM frame` (and possibly `UTM zone`). In this mode, no map frame is required and the tiles are directly 
+   placed on their UTM positions. This mode expects UTM frame is represented in your transform tree. The subscribed
+   `NavSatFix` messages are only used to determine the tiles to download, so small inconsistencies between the
+   `NavSatFix` frame and the measured latitude/longitude is not a big problem.
 
 ## Tile servers
 
@@ -55,7 +67,11 @@ Please refer to the respective terms of service and copyrights.
 ## Options
 
 - `Topic` is the topic of the GPS measurements.
+- `Map Transform Type` selects between the `Map frame` mode and `UTM frame` mode (see section `Usage`).
 - `Map Frame` is the map frame rigidly attached to the world with ENU convention. 
+- `UTM Frame` is the frame that represents UTM coordinate frame.
+- `UTM Zone` is the zone used by the `UTM frame`. Value `-1` triggers autodetection of zone and this property is then
+  overridden with the autodetected zone.
 - `Alpha` is simply the display transparency.
 - `Draw Under` will cause the map to be displayed below all other geometry.
 - `Zoom` is the zoom level of the map. Recommended values are 16-19, as anything smaller is _very_ low resolution. 22 is the current max.

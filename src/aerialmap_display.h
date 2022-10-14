@@ -19,6 +19,7 @@ limitations under the License. */
 
 #include <boost/optional.hpp>
 
+#include <geometry_msgs/PoseStamped.h>
 #include <ros/ros.h>
 #include <ros/time.h>
 #include <rviz/display.h>
@@ -38,11 +39,23 @@ class ManualObject;
 
 namespace rviz
 {
+class EnumProperty;
 class FloatProperty;
 class IntProperty;
 class Property;
 class RosTopicProperty;
 class StringProperty;
+class TfFrameProperty;
+
+/**
+ * @brief Whether the tiles should be transformed via an intermediate map frame,
+ * or directly via a UTM frame.
+ */
+enum class MapTransformType
+{
+  VIA_MAP_FRAME,
+  VIA_UTM_FRAME,
+};
 
 /**
  * @brief Displays a satellite map along the XY plane.
@@ -65,12 +78,16 @@ protected Q_SLOTS:
   void updateTileUrl();
   void updateZoom();
   void updateBlocks();
+  void updateMapTransformType();
   void updateMapFrame();
+  void updateUtmFrame();
+  void updateUtmZone();
 
 protected:
   // overrides from Display
   void onEnable() override;
   void onDisable() override;
+  void onInitialize() override;
 
   virtual void subscribe();
   virtual void unsubscribe();
@@ -116,6 +133,16 @@ protected:
   void createTileObjects();
 
   /**
+   * Transforms the tile objects into the reference (map/utm) frame.
+   */
+  void transformTileToReferenceFrame();
+
+  /**
+   * Transforms the tile objects into the UTM frame.
+   */
+  void transformTileToUtmFrame();
+
+  /**
    * Transforms the tile objects into the map frame.
    */
   void transformTileToMapFrame();
@@ -157,7 +184,10 @@ protected:
   IntProperty* blocks_property_;
   FloatProperty* alpha_property_;
   Property* draw_under_property_;
-  StringProperty* map_frame_property_;
+  EnumProperty* map_transform_type_property_;
+  TfFrameProperty* map_frame_property_;
+  TfFrameProperty* utm_frame_property_;
+  IntProperty* utm_zone_property_;
 
   /// the alpha value of the tile's material
   float alpha_;
@@ -169,8 +199,14 @@ protected:
   int zoom_;
   /// the number of tiles loaded in each direction around the center tile
   int blocks_;
+  /// Whether the tiles should be transformed via an intermediate map frame, or directly via a UTM frame.
+  MapTransformType map_transform_type_;
   /// the map frame, rigidly attached to the world with ENU convention - see https://www.ros.org/reps/rep-0105.html#map
   std::string map_frame_;
+  /// the utm frame, representing a UTM coordinate frame in a chosen zone
+  std::string utm_frame_;
+  /// UTM zone to work in
+  int utm_zone_;
 
   // tile management
   /// whether we need to re-query and re-assemble the tiles
@@ -181,8 +217,8 @@ protected:
   TileCacheDelay<OgreTile> tile_cache_;
   /// Last request()ed tile id (which is the center tile)
   boost::optional<TileId> center_tile_{ boost::none };
-  /// translation of the center-tile w.r.t. the map frame
-  Ogre::Vector3 t_centertile_map_{ Ogre::Vector3::ZERO };
+  /// translation of the center-tile w.r.t. the map/utm frame
+  geometry_msgs::PoseStamped center_tile_pose_;
 
   /// buffer for tf lookups not related to fixed-frame
   std::shared_ptr<tf2_ros::Buffer const> tf_buffer_{ nullptr };
