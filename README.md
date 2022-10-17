@@ -53,8 +53,7 @@ Transformation of tiles to RViz fixed frame can be done in two ways that are con
 
 You must provide a tile URL (Object URI) from which the satellite images are loaded.
 The URL should have the form `http://server.tld/{z}/{x}/{y}.jpg`.
-Where the tokens `{z}`, `{x}`, `{y}` represent the zoom level, x coordinate, and y coordinate respectively.
-These will automatically be substituted by rviz_satellite when making HTTP requests.
+Where the tokens `{z}`, `{x}`, `{y}` represent the zoom level, x coordinate, and y coordinate respectively. If your API requires a pair of latitude and longitude values instead of x and y tile coordinates, use an URL of the form `http://server.tld/{z}/{lat}/{lon}.jpg`, where `{lat}` and `{lon}` represent the latitude and longitude values of the requested location. All these will automatically be substituted by rviz_satellite when making HTTP requests.
 
 rviz_satellite doesn't come with any preconfigured tile URL.
 For example, you could use one of the following tile servers:
@@ -62,6 +61,8 @@ For example, you could use one of the following tile servers:
 * OpenStreetMap: https://tile.openstreetmap.org/{z}/{x}/{y}.png
 * TomTom: https://api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?tileSize=512&key=[TOKEN]
 * Mapbox: https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}?access_token=[TOKEN]
+* GoogleMaps: https://maps.googleapis.com/maps/api/staticmap?maptype=satellite&center={lat},{lon}&zoom={z}&size=256x256&key=[TOKEN]
+
 
 For some of these, you have to request an access token first.
 Please refer to the respective terms of service and copyrights.

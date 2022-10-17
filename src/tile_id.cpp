@@ -19,10 +19,20 @@ limitations under the License. */
 
 std::string tileURL(TileId const& tile_id)
 {
-  auto url = tile_id.tile_server;
+  auto url = tile_id.tile_server;  
+
+  // compute latitude and longitude from tile coordinates
+  float n = pow(2, tile_id.zoom);
+  float lon_deg = float(tile_id.coord.x) / float(n) * 360.0f - 180.0f;
+  float lat_deg = 180.0f / M_PI * atan(sinh(M_PI * (1 - 2 * tile_id.coord.y / n)));
+
+  // substitute placeholders
+  boost::replace_all(url, "{lat}", std::to_string(lat_deg));
+  boost::replace_all(url, "{lon}", std::to_string(lon_deg));
   boost::replace_all(url, "{x}", std::to_string(tile_id.coord.x));
   boost::replace_all(url, "{y}", std::to_string(tile_id.coord.y));
   boost::replace_all(url, "{z}", std::to_string(tile_id.zoom));
+  
   return url;
 }
 
