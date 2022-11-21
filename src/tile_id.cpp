@@ -16,7 +16,22 @@ limitations under the License. */
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/functional/hash/hash.hpp>
-
+namespace
+{
+/**
+ * \brief Locale-independent conversion of doubles to strings.
+ * \param[in] num The number.
+ * \return The string.
+ */
+std::string toString(double num)
+{
+  std::stringstream ss;
+  ss.imbue(std::locale::classic());
+  ss.precision(6);
+  ss << std::fixed << num;
+  return ss.str();
+}
+}
 std::string tileURL(TileId const& tile_id)
 {
   auto url = tile_id.tile_server;  
