@@ -288,9 +288,9 @@ void AerialMapDisplay::updateTileUrl()
     ROS_ERROR("Invalid Object URI: %s", tile_url.c_str());
     // Still setting the url since keeping the old is probably unexpected
   }
-  else if (!std::regex_match(tile_url, std::regex(R"(.*\{[xyz]\}.*)")))
+  else if (!std::regex_match(tile_url, std::regex(R"(.*\{([xyz]|lat|lon)\}.*)")))
   {
-    ROS_ERROR("No coordinates ({x}, {y} or {z}) found in URI: %s", tile_url.c_str());
+    ROS_ERROR("No coordinates ({lat}, {lon} or {x}, {y}, {z}) found in URI: %s", tile_url.c_str());
   }
 
   tile_url_ = tile_url;
