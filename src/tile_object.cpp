@@ -112,7 +112,7 @@ void TileObject::updateData(QImage & image)
   pixel_stream.reset(
     new Ogre::MemoryDataStream(
       reinterpret_cast<void *>(image.bits()),
-      image.byteCount()));
+      image.sizeInBytes()));
 
   if (texture_) {
     Ogre::TextureManager::getSingleton().remove(texture_);

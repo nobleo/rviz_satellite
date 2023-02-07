@@ -16,6 +16,7 @@ find_package(rviz_default_plugins REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(angles REQUIRED)
 
 find_package(Qt5 COMPONENTS Core Gui Network Concurrent Widgets REQUIRED)
 
@@ -50,7 +51,7 @@ if(BUILD_TESTING)
   target_include_directories(test_field PRIVATE src)
 endif()
 
-ament_target_dependencies(${PROJECT_NAME} rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros)
+ament_target_dependencies(${PROJECT_NAME} angles rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros)
 ament_export_dependencies(rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
