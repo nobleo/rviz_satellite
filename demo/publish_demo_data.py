@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 """
 Periodically publish gps positions in a circle around a given origin as NavSatFix messages.
 """
@@ -59,7 +59,7 @@ def main():
 
     rclpy.init()
     node = rclpy.create_node('publish_demo_data')
-    publisher = node.create_publisher(NavSatFix, '/fix', 2)
+    publisher = node.create_publisher(NavSatFix, 'fix', 1)
 
     origin = NavSatFix()
     origin.latitude = args.latitude
