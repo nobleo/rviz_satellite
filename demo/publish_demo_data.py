@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Periodically publish gps positions in a circle around a given origin as NavSatFix messages.
 """

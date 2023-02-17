@@ -16,7 +16,7 @@ To try a demo, run the following commands to make Rviz circle around a geo point
 
 ```bash
 rviz2 -d $(ros2 pkg prefix --share rviz_satellite)/launch/demo.rviz
-$(ros2 pkg prefix --share rviz_satellite)/launch/publish_demo_data.py LATITUDE LONGITUDE
+ros2 run rviz_satellite publish_demo_data.py LATITUDE LONGITUDE
 ```
 
 You should see a view like the following.

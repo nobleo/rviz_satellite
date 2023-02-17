@@ -63,6 +63,11 @@ install(
 install(DIRECTORY launch
   DESTINATION "share/${PROJECT_NAME}")
 
+install(PROGRAMS
+  demo/publish_demo_data.py
+  DESTINATION lib/${PROJECT_NAME}
+  )
+
 install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
