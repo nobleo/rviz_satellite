@@ -18,7 +18,7 @@ find_package(tf2_ros REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(angles REQUIRED)
 
-find_package(Qt5 COMPONENTS Core Gui Network Concurrent Widgets REQUIRED)
+find_package(Qt5 COMPONENTS Network REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
   src/aerialmap_display.cpp
@@ -34,7 +34,7 @@ target_compile_options(
   "-DRVIZ_SATELLITE_VERSION=\"${rviz_satellite_VERSION}\"")
 
 target_include_directories(${PROJECT_NAME} PRIVATE src)
-target_link_libraries(${PROJECT_NAME} Qt5::Core Qt5::Gui Qt5::Network Qt5::Concurrent Qt5::Widgets)
+target_link_libraries(${PROJECT_NAME} Qt5::Network)
 
 # prevent pluginlib from using boost
 target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
