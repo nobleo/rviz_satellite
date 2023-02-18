@@ -60,9 +60,6 @@ install(
   DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/icons"
   DESTINATION "share/${PROJECT_NAME}")
 
-install(DIRECTORY launch
-  DESTINATION "share/${PROJECT_NAME}")
-
 install(PROGRAMS
   demo/publish_demo_data.py
   DESTINATION lib/${PROJECT_NAME}
