@@ -2,8 +2,8 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+3.1.0 (2023-02-20)
+------------------
 * Add possibility to specify TF frames as position reference in UTM mode.
 * Turn map and UTM selection UI into TfFrameProperty.
 * Simplify UTM frame mode integration.
