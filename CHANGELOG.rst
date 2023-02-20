@@ -2,8 +2,8 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.0.0 (2023-02-20)
+------------------
 * ROS2 support!
 * Contributors: Lee Hicks, Marcel Zeilinger, Tim Clephas, Vitaliy Bondar, ceranit
 
