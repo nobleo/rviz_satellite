@@ -15,8 +15,7 @@ This e.g. implies that only raster tiles (no vector tiles) are supported.
 To try a demo, run the following commands to make Rviz circle around a geo point you define.
 
 ```bash
-rviz2 -d $(ros2 pkg prefix --share rviz_satellite)/launch/demo.rviz
-ros2 run rviz_satellite publish_demo_data.py LATITUDE LONGITUDE
+ros2 launch rviz_satellite demo.launch.xml
 ```
 
 You should see a view like the following.

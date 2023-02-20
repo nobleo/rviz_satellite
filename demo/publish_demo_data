@@ -55,7 +55,7 @@ def main():
     parser.add_argument('--noise', type=float)
     parser.add_argument('--no-fix-phase', type=float)
     parser.add_argument('--no-fix-period', default=1.0, type=float)
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
     rclpy.init()
     node = rclpy.create_node('publish_demo_data')
@@ -84,7 +84,7 @@ def main():
             f'Publishing NavSatFix at ({fix.latitude:.5f}, {fix.longitude:.5f})')
         publisher.publish(fix)
 
-    timer = node.create_timer(0.1, timer_callback)
+    node.create_timer(0.1, timer_callback)
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()

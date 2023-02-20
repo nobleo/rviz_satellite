@@ -60,16 +60,17 @@ install(
   DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/icons"
   DESTINATION "share/${PROJECT_NAME}")
 
-install(PROGRAMS
-  demo/publish_demo_data.py
-  DESTINATION lib/${PROJECT_NAME}
-  )
-
 install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
+
+# Install demo
+install(FILES demo/demo.launch.xml
+  DESTINATION share/${PROJECT_NAME}/launch)
+install(PROGRAMS demo/publish_demo_data
+  DESTINATION lib/${PROJECT_NAME})
 
 pluginlib_export_plugin_description_file(rviz_common plugin_description.xml)
 ament_package()
