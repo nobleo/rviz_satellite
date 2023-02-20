@@ -2,10 +2,10 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-3.0.3 (2023-02-07)
-------------------
-* Fix `angles` dependency Cmake issue for proper compiling
-* Update function to using updated due to deprecation
+Forthcoming
+-----------
+* ROS2 support!
+* Contributors: Lee Hicks, Marcel Zeilinger, Tim Clephas, Vitaliy Bondar, ceranit
 
 3.0.2 (2020-10-13)
 ------------------
