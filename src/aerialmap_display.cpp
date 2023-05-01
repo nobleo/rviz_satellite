@@ -1211,7 +1211,7 @@ void AerialMapDisplay::transformMapTileToFixedFrame()
   Ogre::Vector3 t_centertile_fixed;
 
   auto header = center_tile_pose_.header;
-  header.stamp = ros::Time::now();
+  header.stamp = ros::Time();  // ros::Time::now() would be wrong, see the discussion in #105
   const auto& frame_name = header.frame_id;
   
   auto tile_pose = center_tile_pose_.pose;
