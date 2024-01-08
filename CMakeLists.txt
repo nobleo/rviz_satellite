@@ -51,7 +51,7 @@ if(BUILD_TESTING)
   target_include_directories(test_field PRIVATE src)
 endif()
 
-ament_target_dependencies(${PROJECT_NAME} angles rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros)
+ament_target_dependencies(${PROJECT_NAME} SYSTEM angles rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros)
 ament_export_dependencies(rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
