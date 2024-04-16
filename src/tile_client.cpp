@@ -20,6 +20,7 @@ limitations under the License. */
 #include <QtCore>
 #include <QtNetwork>
 #include <utility>
+#include <regex>
 
 #include "rviz_common/logging.hpp"
 #include "tile_client.hpp"
@@ -47,6 +48,16 @@ TileClient::TileClient()
  */
 std::future<QImage> TileClient::request(TileId const & tile_id)
 {
+  if (tile_id.server_url.find("file://") != std::string::npos) {
+    return request_local(tile_id);
+  } else {
+    return request_remote(tile_id);
+  }
+
+}
+
+std::future<QImage> TileClient::request_remote(TileId const & tile_id)
+{
   // see https://foundation.wikimedia.org/wiki/Maps_Terms_of_Use#Using_maps_in_third-party_services
   auto const request_url = QUrl(QString::fromStdString(tileURL(tile_id)));
   QNetworkRequest request(request_url);
@@ -70,6 +81,34 @@ std::future<QImage> TileClient::request(TileId const & tile_id)
     manager_->get(request);
   }
   return entry.first->second.get_future();
+}
+
+std::future<QImage> TileClient::request_local(TileId const & tile_id)
+{
+  std::future<QImage> f = std::async(std::launch::async, [tile_id]{
+    auto const filename_uri = tileURL(tile_id);
+
+    auto filename = std::regex_replace(filename_uri, std::regex("file://"), "");
+
+    QImageReader reader(QString::fromStdString(filename));
+
+    if (!reader.canRead())
+    {
+      RVIZ_COMMON_LOG_DEBUG_STREAM("Unable to decode image at " << filename);
+      return QImage{ };
+    }
+
+    auto image = reader.read().mirrored();
+
+    if (image.isNull())
+    {
+      RVIZ_COMMON_LOG_DEBUG_STREAM("QImageReader able to decode but read failed for " << filename);
+    }
+
+    return image;
+  });
+
+  return f;
 }
 
 void TileClient::request_finished(QNetworkReply * reply)

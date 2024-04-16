@@ -411,6 +411,10 @@ void AerialMapDisplay::update(float, float)
       if (it->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
         try {
           auto image = it->second.get();
+          if (image.isNull()) {
+            // failed to read file, e.g., from filesystem
+            continue;
+          }
           auto tile_to_update = tiles_.find(it->first);
           if (tile_to_update == tiles_.end()) {
             // request was cleared since it was issued
