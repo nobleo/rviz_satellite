@@ -77,8 +77,6 @@ public:
    */
   std::future<QImage> request_remote(const TileId & tile_id);
 
-
-
 private Q_SLOTS:
   void request_finished(QNetworkReply * reply);
 };

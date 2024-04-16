@@ -53,7 +53,6 @@ std::future<QImage> TileClient::request(TileId const & tile_id)
   } else {
     return request_remote(tile_id);
   }
-
 }
 
 std::future<QImage> TileClient::request_remote(TileId const & tile_id)
