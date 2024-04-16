@@ -57,8 +57,25 @@ public:
    *
    * Since QNetworkDiskCache is used, tiles will be loaded from the file system if they have been cached. Otherwise they
    * get downloaded.
+   *
+   * If server url contains "file://", local filesystem will be used.
+   *
    */
   std::future<QImage> request(const TileId & tile_id);
+
+  /**
+   * @brief Load a specific tile from filesystem
+   *
+   */
+  std::future<QImage> request_local(const TileId & tile_id);
+
+  /**
+   * @brief Load a specific tile from internet
+   *
+   * Since QNetworkDiskCache is used, tiles will be loaded from the file system if they have been cached. Otherwise they
+   * get downloaded.
+   */
+  std::future<QImage> request_remote(const TileId & tile_id);
 
 private Q_SLOTS:
   void request_finished(QNetworkReply * reply);

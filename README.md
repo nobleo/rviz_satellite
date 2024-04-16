@@ -30,6 +30,10 @@ The URL should have the form `http://server.tld/{z}/{x}/{y}.jpg`.
 Where the tokens `{z}`, `{x}`, `{y}` represent the zoom level, x coordinate, and y coordinate respectively.
 These will automatically be substituted by rviz_satellite when making HTTP requests.
 
+Tiles can optionally be loaded from a local filesystem if downloaded beforehand
+for cases where robots do not have internet access. For example, the file URI
+`file:///tmp/tile/{z}/{y}/{x}.jpg` can be used to load files from the `/tmp/tile` directory.
+
 rviz_satellite doesn't come with any preconfigured tile URL.
 For example, you could use one of the following tile servers:
 
