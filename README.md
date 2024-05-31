@@ -2,6 +2,8 @@
 
 Rviz plugin for displaying satellite maps at the position of a `sensor_msgs/msg/NavSatFix` message.
 
+> **_NOTE:_**  Looking for the ROS1 version? Checkout the ros1 branch!
+
 ## Usage
 
 Add an instance of `AerialMap` to your Rviz config and point it to a `sensor_msgs/msg/NavSatFix` topic.
