@@ -2,6 +2,13 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Fix tile map not moving
+* tiles: Add support for reading tiles from filesystem. (`#121 <https://github.com/nobleo/rviz_satellite/issues/121>`_)
+* Fix Demo
+* Contributors: Jack Geissinger, Ramon Wijnands, Tim Clephas, Karl Schulz
+
 4.0.0 (2023-02-20)
 ------------------
 * ROS2 support!
