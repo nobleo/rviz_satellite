@@ -58,3 +58,5 @@ Q_DECLARE_METATYPE(TileId)
  * Generate the URL to download a tile from
  */
 std::string tileURL(TileId const& tile_id);
+
+std::string TilesToQuadkey(int x, int y, int z);
