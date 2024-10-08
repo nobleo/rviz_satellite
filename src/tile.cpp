@@ -66,12 +66,12 @@ Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, i
   
   // according to : OpenGIS® Web Map Tile Service Implementation Standard, page 8-9
   // and WMTSCapabilities.xml from NRW DOP
-  double const scale_denominator_at_0 = 17471320.750897426
-  double const tile_width_height = 256.0;
-  double const pixel_size = 0.00028;
+  const double scale_denominator_at_0 = 17471320.750897426;
+  const double tile_width_height = 256.0;
+  const double pixel_size = 0.00028;
 
-  double const tile_matrix_x_min = -46133.17;
-  double const tile_matrix_y_max = 6301219.54;
+  const double tile_matrix_x_min = -46133.17;
+  const double tile_matrix_y_max = 6301219.54;
 
   double scale_denominator = scale_denominator_at_0 / (1 << zoom);
   double pixel_span = scale_denominator * pixel_size;
