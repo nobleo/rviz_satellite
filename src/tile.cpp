@@ -15,6 +15,7 @@ limitations under the License. */
 #include <angles/angles.h>
 #include <string>
 #include <rcpputils/find_and_replace.hpp>
+#include <GeographicLib/UTMUPS.hpp>
 
 namespace rviz_satellite
 {
@@ -57,10 +58,28 @@ Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, i
     throw std::invalid_argument("Longitude " + std::to_string(point.longitude) + " invalid");
   }
 
-  const double lat = angles::from_degrees(point.latitude);
-  const int n = 1 << zoom;
-  const double x = n * ((point.longitude + 180) / 360.0);
-  const double y = n * (1 - (std::log(std::tan(lat) + 1 / std::cos(lat)) / M_PI)) / 2;
+  // according to : OpenGIS® Web Map Tile Service Implementation Standard, page 8-9
+  // and WMTSCapabilities.xml from NRW DOP
+  double const scale_denominator = 266.5911979812214;
+  double const tileWidthHeight = 256.0;
+  double const pixel_size = 0.00028;
+
+  double const tileMatrixMinX = -46133.17;      // TopLeftCorner zoom 16
+  double const tileMatrixMaxY = 6301219.54;     // TopLeftCorner zoom 16
+
+  double pixelSpan = scale_denominator * pixel_size;
+  double tileSpan = tileWidthHeight * pixelSpan;
+
+  // get utm coordinates
+  double utm_x, utm_y;
+  int zone;
+  bool northp;
+  GeographicLib::UTMUPS::Forward(angles::from_degrees(point.latitude), angles::from_degrees(point.longitude), zone, northp, utm_x, utm_y);
+
+  // according to : OpenGIS® Web Map Tile Service Implementation Standard, Annex H
+  const double x = (utm_x - tileMatrixMinX) / tileSpan;
+  const double y = (tileMatrixMaxY - utm_y) / tileSpan;
+
   return {x, y};
 }
 

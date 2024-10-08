@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(rviz_satellite)
 
+include(${PROJECT_NAME}-extras.cmake)
+
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif()
@@ -18,6 +20,7 @@ find_package(tf2_ros REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(angles REQUIRED)
 
+find_package(GeographicLib REQUIRED)
 find_package(Qt5 COMPONENTS Network REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
@@ -34,7 +37,7 @@ target_compile_options(
   "-DRVIZ_SATELLITE_VERSION=\"${rviz_satellite_VERSION}\"")
 
 target_include_directories(${PROJECT_NAME} PRIVATE src)
-target_link_libraries(${PROJECT_NAME} Qt5::Network)
+target_link_libraries(${PROJECT_NAME} ${GeographicLib_TARGETS} Qt5::Network)
 
 # prevent pluginlib from using boost
 target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
@@ -51,8 +54,8 @@ if(BUILD_TESTING)
   target_include_directories(test_field PRIVATE src)
 endif()
 
-ament_target_dependencies(${PROJECT_NAME} SYSTEM angles rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros)
-ament_export_dependencies(rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros)
+ament_target_dependencies(${PROJECT_NAME} SYSTEM angles rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros, GeographicLib)
+ament_export_dependencies(rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs tf2_ros GeographicLib)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
 
