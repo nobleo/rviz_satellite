@@ -80,6 +80,9 @@ Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, i
   // according to : OpenGIS® Web Map Tile Service Implementation Standard, Annex H
   const double x = (utm_x - tile_matrix_x_min) / tile_span;
   const double y = (tile_matrix_y_max - utm_y) / tile_span;
+  
+  std::cout << "lat: " << point.latitude << " lon: " << point.longitude << std::endl;
+  std::cout << "utm_x: " << utm_x << " utm_y: " << utm_y << " x: " << x << " y: " << y << std::endl;
 
   return {x, y};
 }
