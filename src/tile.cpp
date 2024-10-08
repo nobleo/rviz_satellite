@@ -58,27 +58,28 @@ Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, i
     throw std::invalid_argument("Longitude " + std::to_string(point.longitude) + " invalid");
   }
 
-  // according to : OpenGIS® Web Map Tile Service Implementation Standard, page 8-9
-  // and WMTSCapabilities.xml from NRW DOP
-  double const scale_denominator = 266.5911979812214;
-  double const tileWidthHeight = 256.0;
-  double const pixel_size = 0.00028;
-
-  double const tileMatrixMinX = -46133.17;      // TopLeftCorner zoom 16
-  double const tileMatrixMaxY = 6301219.54;     // TopLeftCorner zoom 16
-
-  double pixelSpan = scale_denominator * pixel_size;
-  double tileSpan = tileWidthHeight * pixelSpan;
-
-  // get utm coordinates
+  // convert lat lon to utm coordinates
   double utm_x, utm_y;
   int zone;
   bool northp;
   GeographicLib::UTMUPS::Forward(angles::from_degrees(point.latitude), angles::from_degrees(point.longitude), zone, northp, utm_x, utm_y);
+  
+  // according to : OpenGIS® Web Map Tile Service Implementation Standard, page 8-9
+  // and WMTSCapabilities.xml from NRW DOP
+  double const scale_denominator_at_0 = 17471320.750897426
+  double const tile_width_height = 256.0;
+  double const pixel_size = 0.00028;
+
+  double const tile_matrix_x_min = -46133.17;
+  double const tile_matrix_y_max = 6301219.54;
+
+  double scale_denominator = scale_denominator_at_0 / (1 << zoom);
+  double pixel_span = scale_denominator * pixel_size;
+  double tile_span = tile_width_height * pixel_span;
 
   // according to : OpenGIS® Web Map Tile Service Implementation Standard, Annex H
-  const double x = (utm_x - tileMatrixMinX) / tileSpan;
-  const double y = (tileMatrixMaxY - utm_y) / tileSpan;
+  const double x = (utm_x - tile_matrix_x_min) / tile_span;
+  const double y = (tile_matrix_y_max - utm_y) / tile_span;
 
   return {x, y};
 }
