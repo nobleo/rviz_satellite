@@ -16,7 +16,7 @@ limitations under the License. */
 #include <string>
 #include <rcpputils/find_and_replace.hpp>
 #include <GeographicLib/UTMUPS.hpp>
-
+#include "rviz_common/logging.hpp"
 namespace rviz_satellite
 {
 
@@ -62,7 +62,7 @@ Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, i
   double utm_x, utm_y;
   int zone;
   bool northp;
-  GeographicLib::UTMUPS::Forward(angles::from_degrees(point.latitude), angles::from_degrees(point.longitude), zone, northp, utm_x, utm_y);
+  GeographicLib::UTMUPS::Forward(point.latitude, point.longitude, zone, northp, utm_x, utm_y);
   
   // according to : OpenGIS® Web Map Tile Service Implementation Standard, page 8-9
   // and WMTSCapabilities.xml from NRW DOP
@@ -81,8 +81,9 @@ Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, i
   const double x = (utm_x - tile_matrix_x_min) / tile_span;
   const double y = (tile_matrix_y_max - utm_y) / tile_span;
   
-  std::cout << "lat: " << point.latitude << " lon: " << point.longitude << std::endl;
-  std::cout << "utm_x: " << utm_x << " utm_y: " << utm_y << " x: " << x << " y: " << y << std::endl;
+  RVIZ_COMMON_LOG_WARNING_STREAM("Latitude: " << point.latitude << " Longitude: " << point.longitude);
+  RVIZ_COMMON_LOG_WARNING_STREAM("UTM X: " << utm_x << " UTM Y: " << utm_y);
+  RVIZ_COMMON_LOG_WARNING_STREAM("X: " << x << " Y: " << y);
 
   return {x, y};
 }
