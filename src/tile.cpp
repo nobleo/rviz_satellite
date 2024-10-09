@@ -22,8 +22,15 @@ namespace rviz_satellite
 
 double zoomSize(double lat, int zoom)
 {
-  double constexpr METER_PER_PIXEL_ZOOM_0 = 156543.034;
-  return METER_PER_PIXEL_ZOOM_0 * 256 * std::cos(angles::from_degrees(lat)) / (1 << zoom);
+  // according to https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+  // and Open Geospatial Consortium Inc: Web Map Tile Service Implementation Standard
+  // and WMTSCapabilities.xml from NRW DOP 
+  int constexpr tile_w_h_px = 256;
+  double const  pixel_size = 0.00028;
+  double const scale_denominator_at_0 = 17471320.750897426;
+  double scale_denominator = scale_denominator_at_0 / (1 << zoom);
+  
+  return tile_w_h_px * scale_denominator * pixel_size;
 }
 
 std::string tileURL(const TileId & tile_id)
