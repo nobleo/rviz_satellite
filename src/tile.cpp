@@ -16,7 +16,6 @@ limitations under the License. */
 #include <string>
 #include <rcpputils/find_and_replace.hpp>
 #include <GeographicLib/UTMUPS.hpp>
-#include "rviz_common/logging.hpp"
 namespace rviz_satellite
 {
 
@@ -88,10 +87,6 @@ Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, i
   const double x = (utm_x - tile_matrix_x_min) / tile_span;
   const double y = (tile_matrix_y_max - utm_y) / tile_span;
   
-  RVIZ_COMMON_LOG_WARNING_STREAM("Latitude: " << point.latitude << " Longitude: " << point.longitude);
-  RVIZ_COMMON_LOG_WARNING_STREAM("UTM X: " << utm_x << " UTM Y: " << utm_y);
-  RVIZ_COMMON_LOG_WARNING_STREAM("X: " << x << " Y: " << y);
-
   return {x, y};
 }
 
