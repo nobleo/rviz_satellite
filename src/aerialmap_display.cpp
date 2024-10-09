@@ -408,7 +408,7 @@ void AerialMapDisplay::update(float, float)
   // resolve pending tile requests, and set the received images as textures of their tiles
   for (auto it = pending_tiles_.begin(); it != pending_tiles_.end(); ) {
     try {
-      if (it->second.wait_for(std::chrono::milliseconds(50)) == std::future_status::ready) {
+      if (it->second.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
         try {
           auto image = it->second.get();
           if (image.isNull()) {
