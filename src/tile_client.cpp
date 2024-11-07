@@ -76,7 +76,7 @@ std::future<QImage> TileClient::request_remote(TileId const & tile_id)
     RVIZ_COMMON_LOG_WARNING_STREAM("Tile request for tile '" << tile_id << "' is already running");
     throw tile_request_error("Duplicate tile request");
   } else {
-    RVIZ_COMMON_LOG_WARNING_STREAM("Requesting tile " << request_url.toString().toStdString());
+    RVIZ_COMMON_LOG_DEBUG_STREAM("Requesting tile " << request_url.toString().toStdString());
     manager_->get(request);
   }
   return entry.first->second.get_future();
