@@ -126,14 +126,14 @@ AerialMapDisplay::AerialMapDisplay()
   local_map_property_ = new BoolProperty(
     "Use Local Map", false,
     "Defines wether the map is bounded to a local region",
-    this, SLOT(updateLocalMap));
+    this, SLOT(updateLocalMap()));
   local_map_property_->setShouldBeSaved(true);
 
   local_meter_per_pixel_zoom_0_property_ =
     new FloatProperty(
     "Meter per Pixel (Zoom 0)", 4891.96981025,
     "Defines the meter per pixel at zoom level 0",
-    local_map_property_, SLOT(updateLocalMap));
+    local_map_property_, SLOT(updateLocalMap()));
   local_meter_per_pixel_zoom_0_property_->setMin(0.0);
   local_meter_per_pixel_zoom_0_property_->setShouldBeSaved(true);
 
@@ -141,21 +141,21 @@ AerialMapDisplay::AerialMapDisplay()
     new StringProperty(
     "Origin CRS", "EPSG_25832_16", 
     "Defines the CRS of the local origin", local_map_property_,
-    SLOT(updateLocalMap));
+    SLOT(updateLocalMap()));
   local_origin_crs_property_->setShouldBeSaved(true);
 
   local_origin_x_property_ =
     new FloatProperty(
     "Origin X ", -46133.17,
     "Defines the local origin in given CRS system",
-    local_map_property_, SLOT(updateLocalMap));
+    local_map_property_, SLOT(updateLocalMap()));
   local_origin_x_property_->setShouldBeSaved(true);
 
   local_origin_y_property_ =
     new FloatProperty(
     "Origin Y ", 6301219.54,
     "Defines the local origin in given CRS system",
-    local_map_property_, SLOT(updateLocalMap));
+    local_map_property_, SLOT(updateLocalMap()));
   local_origin_y_property_->setShouldBeSaved(true);
 }
 
@@ -257,17 +257,15 @@ void AerialMapDisplay::updateLocalMap()
   local_meter_per_pixel_zoom_0_ = local_meter_per_pixel_zoom_0_property_->getFloat();
   local_origin_x_ = local_origin_x_property_->getFloat();
   local_origin_y_ = local_origin_y_property_->getFloat();
-
-  if (!local_map_) return;
-
-  // initialize the PROJ context
-  PJ_CONTEXT *local_map_context_ = proj_context_create();
   const char * targetCRS = local_origin_crs_property_->getStdString().c_str();
 
-  // Create a transformation object between the source and target CRS
-  PJ* local_map_transformation_ = proj_create_crs_to_crs(local_map_context_, "EPSG:4326", targetCRS, NULL);
-  if (local_map_transformation_ == nullptr) {
-    std::cerr << "Error: could not create transformation from 'EPSG:4326' to " << targetCRS << std::endl;
+  if (local_map_) 
+  {
+    local_map_context_ = proj_context_create();
+    local_map_transformation_ = proj_create_crs_to_crs(local_map_context_, "EPSG:4326", targetCRS, NULL);
+    if (local_map_transformation_ == nullptr) {
+      std::cerr << "Error: could not create transformation from 'EPSG:4326' to " << targetCRS << std::endl;
+    }
   }
 }
 
