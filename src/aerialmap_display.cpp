@@ -123,39 +123,39 @@ AerialMapDisplay::AerialMapDisplay()
   tf_tolerance_property_->setMin(0.0);
   tf_tolerance_property_->setShouldBeSaved(true);
 
-  local_map_property_ = new Property(
-    "Local Map", false,
+  local_map_property_ = new BoolProperty(
+    "Use Local Map", false,
     "Defines wether the map is bounded to a local region",
     this, SLOT(updateLocalMap));
   local_map_property_->setShouldBeSaved(true);
 
   local_meter_per_pixel_zoom_0_property_ =
     new FloatProperty(
-    "Local Meter per Pixel at Zoom 0", 156543.033928,
+    "Meter per Pixel (Zoom 0)", 4891.96981025,
     "Defines the meter per pixel at zoom level 0",
-    this, SLOT(updateLocalMap));
+    local_map_property_, SLOT(updateLocalMap));
   local_meter_per_pixel_zoom_0_property_->setMin(0.0);
   local_meter_per_pixel_zoom_0_property_->setShouldBeSaved(true);
 
   local_origin_crs_property_ =
     new StringProperty(
-    "Local origin CRS", "", 
-    "Defines the CRS of the local origin", this,
+    "Origin CRS", "EPSG_25832_16", 
+    "Defines the CRS of the local origin", local_map_property_,
     SLOT(updateLocalMap));
   local_origin_crs_property_->setShouldBeSaved(true);
 
   local_origin_x_property_ =
     new FloatProperty(
-    "Local origin X ", 0.0,
+    "Origin X ", -46133.17,
     "Defines the local origin in given CRS system",
-    this, SLOT(updateLocalMap));
+    local_map_property_, SLOT(updateLocalMap));
   local_origin_x_property_->setShouldBeSaved(true);
 
   local_origin_y_property_ =
     new FloatProperty(
-    "Local origin Y ", 0.0,
+    "Origin Y ", 6301219.54,
     "Defines the local origin in given CRS system",
-    this, SLOT(updateLocalMap));
+    local_map_property_, SLOT(updateLocalMap));
   local_origin_y_property_->setShouldBeSaved(true);
 }
 
