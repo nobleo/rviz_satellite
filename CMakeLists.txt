@@ -9,11 +9,11 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wunused)
 endif()
 
-set(CMAKE_PREFIX_PATH "/usr/include/proj")
-set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu")
+#set(CMAKE_PREFIX_PATH "/usr/include/proj")
+#set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu")
 
-include_directories(/usr/include/proj)
-link_directories(/usr/lib/x86_64-linux-gnu)
+#include_directories(/usr/include/proj)
+#link_directories(/usr/lib/x86_64-linux-gnu)
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
