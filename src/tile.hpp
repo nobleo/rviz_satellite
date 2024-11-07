@@ -22,6 +22,8 @@ limitations under the License. */
 #include <QMetaType>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 
+#include <proj.h>
+
 namespace rviz_satellite
 {
 
@@ -77,6 +79,14 @@ static constexpr int MAX_BLOCKS = 8;
 
 /// Max zoom level to support.
 static constexpr int MAX_ZOOM = 22;
+
+static bool local_map_;
+static double local_meter_per_pixel_zoom_0_;
+static std::string local_origin_crs_;
+static double local_origin_x_;
+static double local_origin_y_;
+static PJ_CONTEXT *local_map_context_;
+static PJ* local_map_transformation_;
 
 /**
  * Compute length of tile in meters at given latitude and zoom level.

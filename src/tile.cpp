@@ -15,21 +15,22 @@ limitations under the License. */
 #include <angles/angles.h>
 #include <string>
 #include <rcpputils/find_and_replace.hpp>
-#include <GeographicLib/UTMUPS.hpp>
 namespace rviz_satellite
 {
 
 double zoomSize(double lat, int zoom)
 {
-  // according to https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
-  // and Open Geospatial Consortium Inc: Web Map Tile Service Implementation Standard
-  // and WMTSCapabilities.xml from NRW DOP 
-  int constexpr tile_w_h_px = 256;
-  double const  pixel_size = 0.00028;
-  double const scale_denominator_at_0 = 17471320.750897426;
-  double scale_denominator = scale_denominator_at_0 / (1 << zoom);
+  int constexpr TILE_SIZE = 256;
+  double meter_per_pixel_zoom_0;
+
+  if (!local_map_) {
+    meter_per_pixel_zoom_0 = 156543.034 * std::cos(angles::from_degrees(lat));
+  } 
+  else {
+    meter_per_pixel_zoom_0 = local_meter_per_pixel_zoom_0_;
+  }
   
-  return tile_w_h_px * scale_denominator * pixel_size;
+  return meter_per_pixel_zoom_0 * TILE_SIZE / (1 << zoom);
 }
 
 std::string tileURL(const TileId & tile_id)
@@ -64,28 +65,25 @@ Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, i
     throw std::invalid_argument("Longitude " + std::to_string(point.longitude) + " invalid");
   }
 
-  // convert lat lon to utm coordinates
-  double utm_x, utm_y;
-  int zone;
-  bool northp;
-  GeographicLib::UTMUPS::Forward(point.latitude, point.longitude, zone, northp, utm_x, utm_y);
-  
-  // according to : OpenGIS® Web Map Tile Service Implementation Standard, page 8-9
-  // and WMTSCapabilities.xml from NRW DOP
-  const double scale_denominator_at_0 = 17471320.750897426;
-  const double tile_width_height = 256.0;
-  const double pixel_size = 0.00028;
+  double x,y;
 
-  const double tile_matrix_x_min = -46133.17;
-  const double tile_matrix_y_max = 6301219.54;
+  if (!local_map_)
+  {
+    const double lat = angles::from_degrees(point.latitude);
+    const int n = 1 << zoom;
+    x = n * ((point.longitude + 180) / 360.0);
+    y = n * (1 - (std::log(std::tan(lat) + 1 / std::cos(lat)) / M_PI)) / 2;
+  }
+  else 
+  {
+    double tile_span = zoomSize(point.latitude, zoom);
 
-  double scale_denominator = scale_denominator_at_0 / (1 << zoom);
-  double pixel_span = scale_denominator * pixel_size;
-  double tile_span = tile_width_height * pixel_span;
+    PJ_COORD input = proj_coord(point.longitude, point.latitude, 0, 0);
+    PJ_COORD output = proj_trans(local_map_transformation_, PJ_FWD, input);
 
-  // according to : OpenGIS® Web Map Tile Service Implementation Standard, Annex H
-  const double x = (utm_x - tile_matrix_x_min) / tile_span;
-  const double y = (tile_matrix_y_max - utm_y) / tile_span;
+    x = (output.xy.x - local_origin_x_) / tile_span;
+    y = (local_origin_y_ - output.xy.y) / tile_span;
+  }
   
   return {x, y};
 }

@@ -122,6 +122,41 @@ AerialMapDisplay::AerialMapDisplay()
     this);
   tf_tolerance_property_->setMin(0.0);
   tf_tolerance_property_->setShouldBeSaved(true);
+
+  local_map_property_ = new Property(
+    "Local Map", false,
+    "Defines wether the map is bounded to a local region",
+    this, SLOT(updateLocalMap));
+  local_map_property_->setShouldBeSaved(true);
+
+  local_meter_per_pixel_zoom_0_property_ =
+    new FloatProperty(
+    "Local Meter per Pixel at Zoom 0", 156543.033928,
+    "Defines the meter per pixel at zoom level 0",
+    this, SLOT(updateLocalMap));
+  local_meter_per_pixel_zoom_0_property_->setMin(0.0);
+  local_meter_per_pixel_zoom_0_property_->setShouldBeSaved(true);
+
+  local_origin_crs_property_ =
+    new StringProperty(
+    "Local origin CRS", "", 
+    "Defines the CRS of the local origin", this,
+    SLOT(updateLocalMap));
+  local_origin_crs_property_->setShouldBeSaved(true);
+
+  local_origin_x_property_ =
+    new FloatProperty(
+    "Local origin X ", 0.0,
+    "Defines the local origin in given CRS system",
+    this, SLOT(updateLocalMap));
+  local_origin_x_property_->setShouldBeSaved(true);
+
+  local_origin_y_property_ =
+    new FloatProperty(
+    "Local origin Y ", 0.0,
+    "Defines the local origin in given CRS system",
+    this, SLOT(updateLocalMap));
+  local_origin_y_property_->setShouldBeSaved(true);
 }
 
 AerialMapDisplay::~AerialMapDisplay()
@@ -214,6 +249,26 @@ void AerialMapDisplay::updateBlocks()
 {
   // rebuild on next received message
   resetMap();
+}
+
+void AerialMapDisplay::updateLocalMap()
+{
+  local_map_ = local_map_property_->getValue().toBool();
+  local_meter_per_pixel_zoom_0_ = local_meter_per_pixel_zoom_0_property_->getFloat();
+  local_origin_x_ = local_origin_x_property_->getFloat();
+  local_origin_y_ = local_origin_y_property_->getFloat();
+
+  if (!local_map_) return;
+
+  // initialize the PROJ context
+  PJ_CONTEXT *local_map_context_ = proj_context_create();
+  const char * targetCRS = local_origin_crs_property_->getStdString().c_str();
+
+  // Create a transformation object between the source and target CRS
+  PJ* local_map_transformation_ = proj_create_crs_to_crs(local_map_context_, "EPSG:4326", targetCRS, NULL);
+  if (local_map_transformation_ == nullptr) {
+    std::cerr << "Error: could not create transformation from 'EPSG:4326' to " << targetCRS << std::endl;
+  }
 }
 
 void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
@@ -408,7 +463,7 @@ void AerialMapDisplay::update(float, float)
   // resolve pending tile requests, and set the received images as textures of their tiles
   for (auto it = pending_tiles_.begin(); it != pending_tiles_.end(); ) {
     try {
-      if (it->second.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+      if (it->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
         try {
           auto image = it->second.get();
           if (image.isNull()) {

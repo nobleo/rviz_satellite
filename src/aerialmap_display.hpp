@@ -17,6 +17,7 @@ limitations under the License. */
 #include <string>
 #include <memory>
 #include <map>
+#include <proj.h>
 #include <utility>
 
 #include <rclcpp/rclcpp.hpp>
@@ -55,6 +56,7 @@ protected Q_SLOTS:
   void updateTileUrl();
   void updateZoom();
   void updateBlocks();
+  void updateLocalMap();
 
 protected:
   void onEnable() override;
@@ -89,6 +91,12 @@ protected:
   rviz_common::properties::FloatProperty * timeout_property_ = nullptr;
   rviz_common::properties::FloatProperty * tf_tolerance_property_ = nullptr;
   rviz_common::properties::Property * draw_under_property_ = nullptr;
+
+  rviz_common::properties::Property * local_map_property_ = nullptr;
+  rviz_common::properties::FloatProperty * local_meter_per_pixel_zoom_0_property_ = nullptr;
+  rviz_common::properties::StringProperty * local_origin_crs_property_ = nullptr;
+  rviz_common::properties::FloatProperty * local_origin_x_property_ = nullptr;
+  rviz_common::properties::FloatProperty * local_origin_y_property_ = nullptr;
 
   std::mutex tiles_mutex_;
   TileClient tile_client_;
