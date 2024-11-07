@@ -23,7 +23,6 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(angles REQUIRED)
-#find_package(proj REQUIRED)
 find_package(Qt5 COMPONENTS Network REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
