@@ -57,14 +57,14 @@ Please refer to the respective terms of service and copyrights.
 
 ## Local Maps
 
-If you want to use a tile server which only supports a specific region instead of the whole world you can enable the `Use Local Map` option. This also means that the zoom levels and tile coverage (see [here](https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Zoom_levels)) deviates and needs to be manually defined. In particular, the local origin is the to the top-left corner of the local map region.
+If you want to use a tile server which only supports a specific region instead of the whole world you can enable the `Use Local Map` option. This also means that the zoom levels and tile coverage (see [here](https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Zoom_levels)) deviate and need to be defined manually. In particular, the `local origin` is the to the top-left corner of the local map region.
 
 The options can be set after unfolding the top-level `Use Local Map` option:
 
-- `Meter per Pixel (Zoom 0)` is the meter amount for a pixel at zoom level 0. Default is not set.
+- `Meter per Pixel (Zoom 0)` is the meter amount for a pixel at zoom level 0. Default is 0.0.
 - `Origin CRS` is the CRS of the local origin (should be a cartesian coordinate system). Default is not set.
-- `Origin X` is the X position of the local origin in given CRS system. Default is not set.
-- `Origin Y` is the X position of the local origin in given CRS system. Default is not set.
+- `Origin X` is the X position of the local origin in given CRS system. Default is 0.0.
+- `Origin Y` is the X position of the local origin in given CRS system. Default is 0.0.
 
 ### Example Usage
 
