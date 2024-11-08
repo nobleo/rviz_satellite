@@ -56,7 +56,7 @@ protected Q_SLOTS:
   void updateTileUrl();
   void updateZoom();
   void updateBlocks();
-  void updateLocalMap();
+  void updateLocalTileMapInformation();
 
 protected:
   void onEnable() override;
@@ -93,7 +93,7 @@ protected:
   rviz_common::properties::Property * draw_under_property_ = nullptr;
 
   rviz_common::properties::Property * local_map_property_ = nullptr;
-  rviz_common::properties::FloatProperty * local_meter_per_pixel_zoom_0_property_ = nullptr;
+  rviz_common::properties::FloatProperty * local_meter_per_pixel_z0_property_ = nullptr;
   rviz_common::properties::StringProperty * local_origin_crs_property_ = nullptr;
   rviz_common::properties::FloatProperty * local_origin_x_property_ = nullptr;
   rviz_common::properties::FloatProperty * local_origin_y_property_ = nullptr;
@@ -101,6 +101,7 @@ protected:
   std::mutex tiles_mutex_;
   TileClient tile_client_;
 
+  TileMapInformation tile_map_info_;
   std::map<TileId, std::future<QImage>> pending_tiles_;
   std::map<TileId, TileObject> tiles_;
 

@@ -19,19 +19,19 @@ limitations under the License. */
 namespace rviz_satellite
 {
 
-double zoomSize(double lat, int zoom)
+double zoomSize(double lat, TileMapInformation tile_map_info)
 {
   int constexpr TILE_SIZE = 256;
-  double meter_per_pixel_zoom_0;
+  double meter_per_pixel_z0;
 
-  if (!local_map_) {
-    meter_per_pixel_zoom_0 = 156543.034 * std::cos(angles::from_degrees(lat));
+  if (!tile_map_info.local_map) {
+    meter_per_pixel_z0 = 156543.034 * std::cos(angles::from_degrees(lat));
   } 
   else {
-    meter_per_pixel_zoom_0 = local_meter_per_pixel_zoom_0_;
+    meter_per_pixel_z0 = tile_map_info.meter_per_pixel_z0;
   }
   
-  return meter_per_pixel_zoom_0 * TILE_SIZE / (1 << zoom);
+  return meter_per_pixel_z0 * TILE_SIZE / (1 << tile_map_info.zoom);
 }
 
 std::string tileURL(const TileId & tile_id)
@@ -56,55 +56,60 @@ struct Vector2Double {
 /**
  * @see https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames for explanation of these calculations.
  */
-Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, int zoom)
+Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, TileMapInformation tile_map_info)
 {
-  if (zoom > MAX_ZOOM) {
-    throw std::invalid_argument("Zoom level " + std::to_string(zoom) + " too high");
+  if (tile_map_info.zoom > MAX_ZOOM) {
+    throw std::invalid_argument("Zoom level " + std::to_string(tile_map_info.zoom) + " too high");
   } else if (point.latitude < -85.0511 || point.latitude > 85.0511) {
     throw std::invalid_argument("Latitude " + std::to_string(point.latitude) + " invalid");
   } else if (point.longitude < -180 || point.longitude > 180) {
     throw std::invalid_argument("Longitude " + std::to_string(point.longitude) + " invalid");
   }
 
-  double x,y;
-
-  if (!local_map_)
+  if (!tile_map_info.local_map)
   {
     const double lat = angles::from_degrees(point.latitude);
-    const int n = 1 << zoom;
-    x = n * ((point.longitude + 180) / 360.0);
-    y = n * (1 - (std::log(std::tan(lat) + 1 / std::cos(lat)) / M_PI)) / 2;
+    const int n = 1 << tile_map_info.zoom;
+    double x = n * ((point.longitude + 180) / 360.0);
+    double y = n * (1 - (std::log(std::tan(lat) + 1 / std::cos(lat)) / M_PI)) / 2;
+
+    return {x, y};
   }
   else 
   {
-    double tile_span = zoomSize(point.latitude, zoom);
+    if (transformation == nullptr) {
+      std::cerr << "Warning: transformation from 'EPSG:4326' to " << tile_map_info.origin_crs.c_str() << " not created." << std::endl;
+      transformation = proj_create_crs_to_crs(context, "EPSG:4326", "EPSG:32632", NULL);
+    }
 
-    PJ_COORD input = proj_coord(point.longitude, point.latitude, 0, 0);
-    PJ_COORD output = proj_trans(local_map_transformation_, PJ_FWD, input);
+    double tile_span = zoomSize(point.latitude, tile_map_info);
 
-    x = (output.xy.x - local_origin_x_) / tile_span;
-    y = (local_origin_y_ - output.xy.y) / tile_span;
+    PJ_COORD input = proj_coord(point.latitude, point.longitude, 0, 0);
+    PJ_COORD output = proj_trans(transformation, PJ_FWD, input);
+
+    double x = (output.xy.x - tile_map_info.origin_x) / tile_span;
+    double y = (tile_map_info.origin_y - output.xy.y) / tile_span;
+
+    return {x, y};
   }
-  
-  return {x, y};
 }
 
-TileCoordinate fromWGS(const sensor_msgs::msg::NavSatFix & point, int zoom)
+TileCoordinate fromWGS(const sensor_msgs::msg::NavSatFix & point, TileMapInformation tile_map_info)
 {
-  auto coord = computeTileCoordinate(point, zoom);
+  auto coord = computeTileCoordinate(point, tile_map_info);
   return TileCoordinate {
     static_cast<int>(coord.x),
     static_cast<int>(coord.y),
-    zoom,
+    tile_map_info.zoom,
   };
 }
 
 /**
  * Compute the relative offset (-0.5, 0.5) of the WGS coordinate to the center of its tile.
  */
-Ogre::Vector2 tileOffset(const sensor_msgs::msg::NavSatFix & point, int zoom)
+Ogre::Vector2 tileOffset(const sensor_msgs::msg::NavSatFix & point, TileMapInformation tile_map_info)
 {
-  auto coord = computeTileCoordinate(point, zoom);
+  auto coord = computeTileCoordinate(point, tile_map_info);
   return Ogre::Vector2(coord.x - floor(coord.x) - 0.5, coord.y - floor(coord.y) - 0.5);
 }
 
