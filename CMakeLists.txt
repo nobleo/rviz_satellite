@@ -9,12 +9,6 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wunused)
 endif()
 
-#set(CMAKE_PREFIX_PATH "/usr/include/proj")
-#set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu")
-
-#include_directories(/usr/include/proj)
-#link_directories(/usr/lib/x86_64-linux-gnu)
-
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rviz_common REQUIRED)
@@ -23,6 +17,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(angles REQUIRED)
+
 find_package(Qt5 COMPONENTS Network REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED

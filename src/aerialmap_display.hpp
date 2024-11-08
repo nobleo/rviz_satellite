@@ -17,7 +17,6 @@ limitations under the License. */
 #include <string>
 #include <memory>
 #include <map>
-#include <proj.h>
 #include <utility>
 
 #include <rclcpp/rclcpp.hpp>
