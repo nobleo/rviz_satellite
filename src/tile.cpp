@@ -77,15 +77,10 @@ Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, T
   }
   else 
   {
-    if (transformation == nullptr) {
-      std::cerr << "Warning: transformation from 'EPSG:4326' to " << tile_map_info.origin_crs.c_str() << " not created." << std::endl;
-      transformation = proj_create_crs_to_crs(context, "EPSG:4326", "EPSG:32632", NULL);
-    }
-
     double tile_span = zoomSize(point.latitude, tile_map_info);
 
     PJ_COORD input = proj_coord(point.latitude, point.longitude, 0, 0);
-    PJ_COORD output = proj_trans(transformation, PJ_FWD, input);
+    PJ_COORD output = proj_trans(tile_map_info.transformation, PJ_FWD, input);
 
     double x = (output.xy.x - tile_map_info.origin_x) / tile_span;
     double y = (tile_map_info.origin_y - output.xy.y) / tile_span;

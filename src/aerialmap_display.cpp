@@ -66,6 +66,7 @@ const QString AerialMapDisplay::TILE_REQUEST_STATUS = "TileRequest"; // NOLINT
 const QString AerialMapDisplay::PROPERTIES_STATUS = "Properties"; // NOLINT
 const QString AerialMapDisplay::ORIENTATION_STATUS = "Orientation"; // NOLINT
 const QString AerialMapDisplay::TRANSFORM_STATUS = "Transform"; // NOLINT
+const QString AerialMapDisplay::PROJ_TRANSFORM_STATUS = "ProjTransform"; // NOLINT
 
 AerialMapDisplay::AerialMapDisplay()
 : RosTopicDisplay()
@@ -141,7 +142,7 @@ AerialMapDisplay::AerialMapDisplay()
   local_origin_crs_property_ =
     new StringProperty(
     "Origin CRS", "EPSG:32632", 
-    "Defines the CRS of the local origin", local_map_property_);
+    "Defines the CRS of the local origin (should be a cartesian coordinate system)", local_map_property_);
   local_origin_crs_property_->setShouldBeSaved(true);
 
   local_origin_x_property_ =
@@ -264,11 +265,19 @@ void AerialMapDisplay::updateLocalMap()
 
 void AerialMapDisplay::updateLocalTileMapInformation()
 {
-  std::cout << "updateLocalTileMapInformation" << std::endl;
   tile_map_info_.meter_per_pixel_z0 = local_meter_per_pixel_z0_property_->getFloat();
   tile_map_info_.origin_x = local_origin_x_property_->getFloat();
   tile_map_info_.origin_y = local_origin_y_property_->getFloat();
   tile_map_info_.origin_crs = local_origin_crs_property_->getStdString();
+
+  // create transformation if not already set
+  if (tile_map_info_.transformation == nullptr) {
+    tile_map_info_.transformation = proj_create_crs_to_crs(tile_map_info_.context, "EPSG:4326", tile_map_info_.origin_crs.c_str(), NULL);
+  }
+  // set status if transformation is still not set
+  if (tile_map_info_.transformation == nullptr) {
+    setStatus(rviz_common::properties::StatusProperty::Error, PROJ_TRANSFORM_STATUS, "PROJ transformation for local map origin not set.");
+  }
 }
 
 void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)

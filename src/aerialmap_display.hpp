@@ -115,6 +115,7 @@ protected:
   static const QString PROPERTIES_STATUS;
   static const QString ORIENTATION_STATUS;
   static const QString TRANSFORM_STATUS;
+  static const QString PROJ_TRANSFORM_STATUS;
 };
 
 }  // namespace rviz_satellite

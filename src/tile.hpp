@@ -77,11 +77,17 @@ struct TileId
 struct TileMapInformation
 {
   int zoom;
+
+  // local map information
   bool local_map;
   double meter_per_pixel_z0;
   double origin_x;
   double origin_y;
   std::string origin_crs;
+
+  // local map projection
+  PJ_CONTEXT * context = proj_context_create();
+  PJ * transformation = nullptr;
 };
 
 /// Max number of adjacent blocks to support.
@@ -89,10 +95,6 @@ static constexpr int MAX_BLOCKS = 8;
 
 /// Max zoom level to support
 static constexpr int MAX_ZOOM = 22;
-
-// Projection context and transformation
-static PJ_CONTEXT * context = proj_context_create();
-static PJ * transformation = nullptr;
 
 /**
  * Compute length of tile in meters at given latitude and zoom level.
