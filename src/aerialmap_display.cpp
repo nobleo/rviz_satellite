@@ -126,7 +126,7 @@ AerialMapDisplay::AerialMapDisplay()
   local_map_property_ = new BoolProperty(
     "Use Local Map", false,
     "Defines wether the map is bounded to a local region",
-    this, SLOT(updateLocalTileMapInformation()));
+    this, SLOT(updateLocalMap()));
   local_map_property_->setShouldBeSaved(true);
   tile_map_info_.local_map = local_map_property_->getValue().toBool();
 
@@ -157,8 +157,6 @@ AerialMapDisplay::AerialMapDisplay()
     "Defines the local origin in given CRS system",
     local_map_property_);
   local_origin_y_property_->setShouldBeSaved(true);
-
-  updateLocalTileMapInformation();
 }
 
 AerialMapDisplay::~AerialMapDisplay()
@@ -210,6 +208,11 @@ bool AerialMapDisplay::validateProperties()
       "Object URI is required to fetch map tiles");
     return false;
   }
+
+  if (tile_map_info_.local_map) {
+    updateLocalTileMapInformation();
+  }
+
   return true;
 }
 
@@ -253,9 +256,15 @@ void AerialMapDisplay::updateBlocks()
   resetMap();
 }
 
+void AerialMapDisplay::updateLocalMap()
+{
+  // update local map variable
+  tile_map_info_.local_map = local_map_property_->getValue().toBool();
+}
+
 void AerialMapDisplay::updateLocalTileMapInformation()
 {
-  tile_map_info_.local_map = local_map_property_->getValue().toBool();
+  std::cout << "updateLocalTileMapInformation" << std::endl;
   tile_map_info_.meter_per_pixel_z0 = local_meter_per_pixel_z0_property_->getFloat();
   tile_map_info_.origin_x = local_origin_x_property_->getFloat();
   tile_map_info_.origin_y = local_origin_y_property_->getFloat();

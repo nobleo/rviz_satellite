@@ -56,6 +56,7 @@ protected Q_SLOTS:
   void updateTileUrl();
   void updateZoom();
   void updateBlocks();
+  void updateLocalMap();
   void updateLocalTileMapInformation();
 
 protected:
