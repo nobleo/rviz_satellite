@@ -133,7 +133,7 @@ AerialMapDisplay::AerialMapDisplay()
 
   local_meter_per_pixel_z0_property_ =
     new FloatProperty(
-    "Meter per Pixel (Zoom 0)", 4891.96981025,
+    "Meter per Pixel (Zoom 0)", 0.0,
     "Defines the meter per pixel at zoom level 0",
     local_map_property_);
   local_meter_per_pixel_z0_property_->setMin(0.0);
@@ -141,21 +141,21 @@ AerialMapDisplay::AerialMapDisplay()
 
   local_origin_crs_property_ =
     new StringProperty(
-    "Origin CRS", "EPSG:32632", 
+    "Origin CRS", "", 
     "Defines the CRS of the local origin (should be a cartesian coordinate system)", local_map_property_);
   local_origin_crs_property_->setShouldBeSaved(true);
 
   local_origin_x_property_ =
     new FloatProperty(
-    "Origin X ", -46133.17,
-    "Defines the local origin in given CRS system",
+    "Origin X ", 0.0,
+    "Defines X position of the local origin in given CRS system",
     local_map_property_);
   local_origin_x_property_->setShouldBeSaved(true);
 
   local_origin_y_property_ =
     new FloatProperty(
-    "Origin Y ", 6301219.54,
-    "Defines the local origin in given CRS system",
+    "Origin Y ", 0.0,
+    "Defines Y position of the local origin in given CRS system",
     local_map_property_);
   local_origin_y_property_->setShouldBeSaved(true);
 }

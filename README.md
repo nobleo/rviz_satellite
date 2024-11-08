@@ -50,10 +50,31 @@ Please refer to the respective terms of service and copyrights.
 
 - `Topic` is the topic of the GPS measurements.
 - `Alpha` is simply the display transparency.
-- `Draw Under` will cause the map to be displayed below all other geometry.
+- `Draw Behind` will cause the map to be displayed below all other geometry.
 - `Zoom` is the zoom level of the map. Recommended values are 16-19, as anything smaller is _very_ low resolution. 22 is the current max.
 - `Blocks` number of adjacent tiles in addition to the center tile to load, 8 maximum.
 - `Timeout` specifies a timeout since the last received message timestamp, after which the map will be faded out; disable by setting to 0.
+
+## Local Maps
+
+If you want to use a tile server which only supports a specific region instead of the whole world you can enable the `Use Local Map` option. This also means that the zoom levels and tile coverage (see [here](https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Zoom_levels)) deviates and needs to be manually defined. In particular, the local origin is the to the top-left corner of the local map region.
+
+The options can be set after unfolding the top-level `Use Local Map` option:
+
+- `Meter per Pixel (Zoom 0)` is the meter amount for a pixel at zoom level 0. Default is not set.
+- `Origin CRS` is the CRS of the local origin (should be a cartesian coordinate system). Default is not set.
+- `Origin X` is the X position of the local origin in given CRS system. Default is not set.
+- `Origin Y` is the X position of the local origin in given CRS system. Default is not set.
+
+### Example Usage
+
+Public orthographic photos are povided by [Geobasis NRW](https://www.bezreg-koeln.nrw.de/geobasis-nrw/webdienste/geodatendienste) and publicly available using the scheme described [here](https://www.wmts.nrw.de/geobasis/wmts_nw_dop/tiles/nw_dop/EPSG_25832_16/1.0.0/WMTSCapabilities.xml). The tiles only cover a smaller part of western Germany but have a very high resolution. The following options can be used and directly derived from the scheme.
+
+- `Object URI: https://www.wmts.nrw.de/geobasis/wmts_nw_dop/tiles/nw_dop/EPSG_25832_16/{z}/{x}/{y}`
+- `Meter per Pixel (Zoom 0): 4897.97` 
+- `Origin CRS: EPSG:25832` 
+- `Origin X: -46133.17`
+- `Origin Y: 6301219.54`
 
 ## Support and Contributions
 
