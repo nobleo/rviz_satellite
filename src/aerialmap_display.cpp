@@ -271,7 +271,7 @@ void AerialMapDisplay::updateLocalTileMapInformation()
   tile_map_info_.origin_crs = local_origin_crs_property_->getStdString();
 
   // create transformation if not already set
-  if (tile_map_info_.transformation == nullptr) {
+  if (!tile_map_info_.origin_crs.empty()) {
     tile_map_info_.transformation = proj_create_crs_to_crs(tile_map_info_.context, "EPSG:4326", tile_map_info_.origin_crs.c_str(), NULL);
   }
   // set status if transformation is still not set
