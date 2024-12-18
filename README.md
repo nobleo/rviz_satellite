@@ -71,7 +71,7 @@ The options can be set after unfolding the top-level `Use Local Map` option:
 Public orthographic photos are povided by [Geobasis NRW](https://www.bezreg-koeln.nrw.de/geobasis-nrw/webdienste/geodatendienste) and publicly available using the scheme described [here](https://www.wmts.nrw.de/geobasis/wmts_nw_dop/tiles/nw_dop/EPSG_25832_16/1.0.0/WMTSCapabilities.xml). The tiles only cover a smaller part of western Germany but have a very high resolution. The following options can be used and directly derived from the scheme.
 
 - `Object URI: https://www.wmts.nrw.de/geobasis/wmts_nw_dop/tiles/nw_dop/EPSG_25832_16/{z}/{x}/{y}`
-- `Meter per Pixel (Zoom 0): 4897.97` 
+- `Meter per Pixel (Zoom 0): 4891.97` 
 - `Origin CRS: EPSG:25832` 
 - `Origin X: -46133.17`
 - `Origin Y: 6301219.54`
