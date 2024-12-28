@@ -81,6 +81,5 @@ std::string TilesToQuadkey(int x, int y, int z)
     }
     quadkey << b;
   }
-  // std::cout << "quadkey: " << std::endl;
   return quadkey.str();
 }
