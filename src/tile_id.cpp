@@ -45,6 +45,11 @@ std::string tileURL(TileId const& tile_id)
   boost::replace_all(url, "{x}", std::to_string(tile_id.coord.x));
   boost::replace_all(url, "{y}", std::to_string(tile_id.coord.y));
   boost::replace_all(url, "{z}", std::to_string(tile_id.zoom));
+
+  /* Added by Peixuan Shu to handle bing map */
+  boost::replace_all(url, "{quadkey}", TilesToQuadkey(tile_id.coord.x, 
+                                                tile_id.coord.y,
+                                                tile_id.zoom));
   
   return url;
 }
@@ -57,4 +62,24 @@ size_t std::hash<TileId>::operator()(TileId const& tile_id) const
   boost::hash_combine(seed, tile_id.coord.y);
   boost::hash_combine(seed, tile_id.zoom);
   return seed;
+}
+
+std::string TilesToQuadkey(int x, int y, int z) 
+{
+  std::stringstream quadkey;
+  for (int i = z; i > 0; i--) {
+    char b = '0';
+    int mask = 1 << (i - 1);
+    if ((x & mask) != 0) 
+    {
+      b++;
+    }
+    if ((y & mask) != 0) 
+    {
+      b++;
+      b++;
+    }
+    quadkey << b;
+  }
+  return quadkey.str();
 }
