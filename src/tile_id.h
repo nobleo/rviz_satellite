@@ -59,4 +59,8 @@ Q_DECLARE_METATYPE(TileId)
  */
 std::string tileURL(TileId const& tile_id);
 
+/**
+ * Get the quadkey from the tile x,y,zoom
+ * refer to https://learn.microsoft.com/en-us/bingmaps/articles/bing-maps-tile-system
+*/
 std::string TilesToQuadkey(int x, int y, int z);
