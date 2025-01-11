@@ -47,7 +47,7 @@ std::string tileURL(TileId const& tile_id)
   boost::replace_all(url, "{z}", std::to_string(tile_id.zoom));
 
   /* Added by Peixuan Shu to handle bing map */
-  boost::replace_all(url, "{q}", TilesToQuadkey(tile_id.coord.x, 
+  boost::replace_all(url, "{quadkey}", TilesToQuadkey(tile_id.coord.x, 
                                                 tile_id.coord.y,
                                                 tile_id.zoom));
   
