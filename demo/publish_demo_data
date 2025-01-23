@@ -6,9 +6,10 @@ import rclpy
 import math
 import numpy as np
 from argparse import ArgumentParser
-from rclpy.time import CONVERSION_CONSTANT
 from sensor_msgs.msg import NavSatFix, NavSatStatus
 
+
+CONVERSION_CONSTANT = 1e9
 
 class CircularTranslate():
     """Translate fix periodically in a circle"""
