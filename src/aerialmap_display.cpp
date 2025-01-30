@@ -66,6 +66,7 @@ const QString AerialMapDisplay::TILE_REQUEST_STATUS = "TileRequest"; // NOLINT
 const QString AerialMapDisplay::PROPERTIES_STATUS = "Properties"; // NOLINT
 const QString AerialMapDisplay::ORIENTATION_STATUS = "Orientation"; // NOLINT
 const QString AerialMapDisplay::TRANSFORM_STATUS = "Transform"; // NOLINT
+const QString AerialMapDisplay::PROJ_TRANSFORM_STATUS = "ProjTransform"; // NOLINT
 
 AerialMapDisplay::AerialMapDisplay()
 : RosTopicDisplay()
@@ -122,6 +123,41 @@ AerialMapDisplay::AerialMapDisplay()
     this);
   tf_tolerance_property_->setMin(0.0);
   tf_tolerance_property_->setShouldBeSaved(true);
+
+  local_map_property_ = new BoolProperty(
+    "Use Local Map", false,
+    "Defines wether the map is bounded to a local region",
+    this, SLOT(updateLocalMap()));
+  local_map_property_->setShouldBeSaved(true);
+  tile_map_info_.local_map = local_map_property_->getValue().toBool();
+
+  local_meter_per_pixel_z0_property_ =
+    new FloatProperty(
+    "Meter per Pixel (Zoom 0)", 0.0,
+    "Defines the meter per pixel at zoom level 0",
+    local_map_property_);
+  local_meter_per_pixel_z0_property_->setMin(0.0);
+  local_meter_per_pixel_z0_property_->setShouldBeSaved(true);
+
+  local_origin_crs_property_ =
+    new StringProperty(
+    "Origin CRS", "", 
+    "Defines the CRS of the local origin (should be a cartesian coordinate system)", local_map_property_);
+  local_origin_crs_property_->setShouldBeSaved(true);
+
+  local_origin_x_property_ =
+    new FloatProperty(
+    "Origin X ", 0.0,
+    "Defines X position of the local origin in given CRS system",
+    local_map_property_);
+  local_origin_x_property_->setShouldBeSaved(true);
+
+  local_origin_y_property_ =
+    new FloatProperty(
+    "Origin Y ", 0.0,
+    "Defines Y position of the local origin in given CRS system",
+    local_map_property_);
+  local_origin_y_property_->setShouldBeSaved(true);
 }
 
 AerialMapDisplay::~AerialMapDisplay()
@@ -173,6 +209,11 @@ bool AerialMapDisplay::validateProperties()
       "Object URI is required to fetch map tiles");
     return false;
   }
+
+  if (tile_map_info_.local_map) {
+    updateLocalTileMapInformation();
+  }
+
   return true;
 }
 
@@ -216,6 +257,29 @@ void AerialMapDisplay::updateBlocks()
   resetMap();
 }
 
+void AerialMapDisplay::updateLocalMap()
+{
+  // update local map variable
+  tile_map_info_.local_map = local_map_property_->getValue().toBool();
+}
+
+void AerialMapDisplay::updateLocalTileMapInformation()
+{
+  tile_map_info_.meter_per_pixel_z0 = local_meter_per_pixel_z0_property_->getFloat();
+  tile_map_info_.origin_x = local_origin_x_property_->getFloat();
+  tile_map_info_.origin_y = local_origin_y_property_->getFloat();
+  tile_map_info_.origin_crs = local_origin_crs_property_->getStdString();
+
+  // create transformation if not already set
+  if (!tile_map_info_.origin_crs.empty()) {
+    tile_map_info_.transformation = proj_create_crs_to_crs(tile_map_info_.context, "EPSG:4326", tile_map_info_.origin_crs.c_str(), NULL);
+  }
+  // set status if transformation is still not set
+  if (tile_map_info_.transformation == nullptr) {
+    setStatus(rviz_common::properties::StatusProperty::Error, PROJ_TRANSFORM_STATUS, "PROJ transformation for local map origin not set.");
+  }
+}
+
 void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
 {
   if (!isEnabled()) {
@@ -238,12 +302,12 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
   } else {
     deleteStatus(PROPERTIES_STATUS);
   }
-  auto zoom = zoom_property_->getInt();
-  auto tile_at_fix = fromWGS(*msg, zoom);
+  tile_map_info_.zoom = zoom_property_->getInt();
+  auto tile_at_fix = fromWGS(*msg, tile_map_info_);
   {
     const std::lock_guard<std::mutex> lock(tiles_mutex_);
     try {
-      double tile_size_m = zoomSize(msg->latitude, zoom);
+      double tile_size_m = zoomSize(msg->latitude, tile_map_info_);
       if (tiles_.empty()) {
         // create whole map initially
         buildMap(tile_at_fix, tile_size_m);
@@ -489,7 +553,7 @@ void AerialMapDisplay::update(float, float)
 
   // "example tile", since their zoom should be uniform
   auto example_tile = tiles_.begin();
-  auto center_tile_offset = tileOffset(*last_fix_, example_tile->first.coord.z);
+  auto center_tile_offset = tileOffset(*last_fix_, tile_map_info_);
   Ogre::Vector3 aerial_map_offset(center_tile_offset.x, -center_tile_offset.y, 0.0);
 
   scene_node_->setPosition(

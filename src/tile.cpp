@@ -19,10 +19,19 @@ limitations under the License. */
 namespace rviz_satellite
 {
 
-double zoomSize(double lat, int zoom)
+double zoomSize(double lat, TileMapInformation tile_map_info)
 {
-  double constexpr METER_PER_PIXEL_ZOOM_0 = 156543.034;
-  return METER_PER_PIXEL_ZOOM_0 * 256 * std::cos(angles::from_degrees(lat)) / (1 << zoom);
+  int constexpr TILE_SIZE = 256;
+  double meter_per_pixel_z0;
+
+  if (!tile_map_info.local_map) {
+    meter_per_pixel_z0 = 156543.034 * std::cos(angles::from_degrees(lat));
+  } 
+  else {
+    meter_per_pixel_z0 = tile_map_info.meter_per_pixel_z0;
+  }
+  
+  return meter_per_pixel_z0 * TILE_SIZE / (1 << tile_map_info.zoom);
 }
 
 std::string tileURL(const TileId & tile_id)
@@ -47,39 +56,55 @@ struct Vector2Double {
 /**
  * @see https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames for explanation of these calculations.
  */
-Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, int zoom)
+Vector2Double computeTileCoordinate(const sensor_msgs::msg::NavSatFix & point, TileMapInformation tile_map_info)
 {
-  if (zoom > MAX_ZOOM) {
-    throw std::invalid_argument("Zoom level " + std::to_string(zoom) + " too high");
+  if (tile_map_info.zoom > MAX_ZOOM) {
+    throw std::invalid_argument("Zoom level " + std::to_string(tile_map_info.zoom) + " too high");
   } else if (point.latitude < -85.0511 || point.latitude > 85.0511) {
     throw std::invalid_argument("Latitude " + std::to_string(point.latitude) + " invalid");
   } else if (point.longitude < -180 || point.longitude > 180) {
     throw std::invalid_argument("Longitude " + std::to_string(point.longitude) + " invalid");
   }
 
-  const double lat = angles::from_degrees(point.latitude);
-  const int n = 1 << zoom;
-  const double x = n * ((point.longitude + 180) / 360.0);
-  const double y = n * (1 - (std::log(std::tan(lat) + 1 / std::cos(lat)) / M_PI)) / 2;
-  return {x, y};
+  if (!tile_map_info.local_map)
+  {
+    const double lat = angles::from_degrees(point.latitude);
+    const int n = 1 << tile_map_info.zoom;
+    double x = n * ((point.longitude + 180) / 360.0);
+    double y = n * (1 - (std::log(std::tan(lat) + 1 / std::cos(lat)) / M_PI)) / 2;
+
+    return {x, y};
+  }
+  else 
+  {
+    double tile_span = zoomSize(point.latitude, tile_map_info);
+
+    PJ_COORD input = proj_coord(point.latitude, point.longitude, 0, 0);
+    PJ_COORD output = proj_trans(tile_map_info.transformation, PJ_FWD, input);
+
+    double x = (output.xy.x - tile_map_info.origin_x) / tile_span;
+    double y = (tile_map_info.origin_y - output.xy.y) / tile_span;
+
+    return {x, y};
+  }
 }
 
-TileCoordinate fromWGS(const sensor_msgs::msg::NavSatFix & point, int zoom)
+TileCoordinate fromWGS(const sensor_msgs::msg::NavSatFix & point, TileMapInformation tile_map_info)
 {
-  auto coord = computeTileCoordinate(point, zoom);
+  auto coord = computeTileCoordinate(point, tile_map_info);
   return TileCoordinate {
     static_cast<int>(coord.x),
     static_cast<int>(coord.y),
-    zoom,
+    tile_map_info.zoom,
   };
 }
 
 /**
  * Compute the relative offset (-0.5, 0.5) of the WGS coordinate to the center of its tile.
  */
-Ogre::Vector2 tileOffset(const sensor_msgs::msg::NavSatFix & point, int zoom)
+Ogre::Vector2 tileOffset(const sensor_msgs::msg::NavSatFix & point, TileMapInformation tile_map_info)
 {
-  auto coord = computeTileCoordinate(point, zoom);
+  auto coord = computeTileCoordinate(point, tile_map_info);
   return Ogre::Vector2(coord.x - floor(coord.x) - 0.5, coord.y - floor(coord.y) - 0.5);
 }
 
