@@ -33,7 +33,7 @@ target_compile_options(
   "-DRVIZ_SATELLITE_VERSION=\"${rviz_satellite_VERSION}\"")
 
 target_include_directories(${PROJECT_NAME} PRIVATE src)
-target_link_libraries(${PROJECT_NAME} Qt5::Network)
+target_link_libraries(${PROJECT_NAME} proj Qt5::Network)
 
 # prevent pluginlib from using boost
 target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
