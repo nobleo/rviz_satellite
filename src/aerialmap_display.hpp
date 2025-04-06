@@ -68,7 +68,7 @@ protected:
 
   bool validateProperties();
 
-  void shiftMap(TileCoordinate center_tile, Ogre::Vector2i offset, double size);
+  bool shiftMap(TileCoordinate center_tile, Ogre::Vector2i offset, double size);
 
   void buildMap(TileCoordinate center_tile, double size);
 
