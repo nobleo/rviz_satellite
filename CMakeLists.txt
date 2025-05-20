@@ -1,90 +1,77 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.5)
 project(rviz_satellite)
 
-find_package(catkin REQUIRED
-  COMPONENTS
-    roscpp
-    rviz
-    sensor_msgs
-    tf2
-    tf2_geometry_msgs
-)
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 
-catkin_package(
-  CATKIN_DEPENDS
-    roscpp
-    rviz
-    sensor_msgs
-    tf2
-)
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wunused)
+endif()
 
-find_package(Qt5 ${rviz_QT_VERSION} EXACT REQUIRED Core Gui Network REQUIRED)
-set(QT_LIBRARIES Qt5::Core Qt5::Gui Qt5::Network)
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rviz_common REQUIRED)
+find_package(rviz_default_plugins REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(angles REQUIRED)
 
-# Ubuntu libgeographic-dev package installs into non-standard location
-set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};/usr/share/cmake/geographiclib")
-find_package(GeographicLib REQUIRED)
+find_package(Qt5 COMPONENTS Network REQUIRED)
 
-
-## BUILD ##
-
-set(${PROJECT_NAME}_SOURCES
+add_library(${PROJECT_NAME} SHARED
   src/aerialmap_display.cpp
-  src/ogre_tile.cpp
-  src/position_reference_property.cpp
-  src/tile_id.cpp
+  src/field.cpp
+  src/tile.cpp
+  src/tile_client.cpp
+  src/tile_object.cpp
 )
 
-set(${PROJECT_NAME}_HEADERS
-  src/aerialmap_display.h
-  src/detail/tile_downloader.h
-  src/position_reference_property.h
-)
-
-# invoke MOC and UI/ include Qt headers/ link Qt libraries - alternatively, see CMAKE_AUTOMOC
-qt5_wrap_cpp(${PROJECT_NAME}_MOC_FILES ${${PROJECT_NAME}_HEADERS})
-
-set(PROJECT_SOURCE_FILES
-  ${${PROJECT_NAME}_SOURCES}
-  ${${PROJECT_NAME}_MOC_FILES}
-)
-
-include_directories(
-  src
-  ${catkin_INCLUDE_DIRS}
-)
-
-add_library(
-  ${PROJECT_NAME}
-  ${PROJECT_SOURCE_FILES}
-)
-
-# set compiler options and inject version of software (see tile_downloader.h)
-# rviz_satellite_VERSION is defined via catkin and is read from the package.xml
 target_compile_options(
   ${PROJECT_NAME}
   PUBLIC
-  -Wall -Wunused -std=c++11 "-DRVIZ_SATELLITE_VERSION=\"${rviz_satellite_VERSION}\""
+  "-DRVIZ_SATELLITE_VERSION=\"${rviz_satellite_VERSION}\"")
+
+target_include_directories(${PROJECT_NAME} PRIVATE src)
+target_link_libraries(${PROJECT_NAME} proj Qt5::Network)
+
+# prevent pluginlib from using boost
+target_compile_definitions(${PROJECT_NAME} PUBLIC "PLUGINLIB__DISABLE_BOOST_FUNCTIONS")
+set_property(TARGET ${PROJECT_NAME} PROPERTY AUTOMOC ON)
+
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_field test/test_field.cpp)
+  target_link_libraries(test_field ${PROJECT_NAME})
+  target_include_directories(test_field PRIVATE src)
+endif()
+
+ament_target_dependencies(${PROJECT_NAME} SYSTEM angles rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs)
+ament_export_dependencies(rclcpp pluginlib rviz_common rviz_default_plugins sensor_msgs)
+ament_export_libraries(${PROJECT_NAME})
+ament_export_targets(${PROJECT_NAME} HAS_LIBRARY_TARGET)
+
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/icons"
+  DESTINATION "share/${PROJECT_NAME}")
+
+install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
-target_link_libraries(
-  ${PROJECT_NAME}
-  ${QT_LIBRARIES}
-  ${catkin_LIBRARIES}
-  ${GeographicLib_LIBRARIES}
-)
+# Install demo
+install(FILES demo/demo.launch.xml
+  DESTINATION share/${PROJECT_NAME}/launch)
+  install(FILES demo/demo.rviz
+  DESTINATION share/${PROJECT_NAME}/demo)
+install(PROGRAMS demo/publish_demo_data
+  DESTINATION lib/${PROJECT_NAME})
 
-
-## INSTALL ##
-
-install(TARGETS
-  ${PROJECT_NAME}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-install(FILES
-  plugin_description.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
+pluginlib_export_plugin_description_file(rviz_common plugin_description.xml)
+ament_package()
