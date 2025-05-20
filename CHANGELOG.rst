@@ -2,8 +2,8 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.2.0 (2025-05-20)
+------------------
 * Fixed demo (install rviz file)
 * Add libproj-dev as dependency at package.xml
 * Add support for sub-region tile servers (local maps)
