@@ -2,6 +2,14 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Fixed demo (install rviz file)
+* Add libproj-dev as dependency at package.xml
+* Add support for sub-region tile servers (local maps)
+* fix: time conversion constant in publish_demo_data
+* Contributors: Ahmad Kamal Nasir, Christian Geller, David Alejo Teissière, Tim Clephas, nmitropoulos
+
 4.1.0 (2024-08-27)
 ------------------
 * Fix tile map not moving
