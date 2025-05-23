@@ -2,8 +2,8 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.2.1 (2025-05-23)
+------------------
 * List Tim Clephas as maintainer to receive buildfarm emails
 * Replace ament_target_dependencies with target_link_libraries
 * Contributors: Alejandro Hernández Cordero, Tim Clephas
