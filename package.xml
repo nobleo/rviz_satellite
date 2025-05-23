@@ -4,8 +4,8 @@
   <version>4.2.0</version>
   <description>Display satellite map tiles in RViz</description>
   <author email="gcross.code@icloud.com">Gareth Cross</author>
-  <maintainer email="andre.schroeder@tomtom.com">Andre Schröder</maintainer>
-  <maintainer email="marcel.zeilinger@ait.ac.at">Marcel Zeilinger</maintainer>
+  <maintainer email="tim.clephas@nobleo.nl">Tim Clephas</maintainer>
+
   <license>Apache 2</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
