@@ -86,6 +86,12 @@ AerialMapDisplay::AerialMapDisplay()
     this, SLOT(updateDrawUnder()));
   draw_under_property_->setShouldBeSaved(true);
 
+  visualize_in_utm_frame = new BoolProperty(
+      "Visualize in UTM Frame", false,
+      "If true, calculate UTM to LL rotation",
+      this, SLOT(updateBlocks()));
+  visualize_in_utm_frame->setShouldBeSaved(true);
+
   // properties for map
   tile_url_property_ =
     new StringProperty(
@@ -269,6 +275,7 @@ void AerialMapDisplay::updateLocalTileMapInformation()
   tile_map_info_.origin_x = local_origin_x_property_->getFloat();
   tile_map_info_.origin_y = local_origin_y_property_->getFloat();
   tile_map_info_.origin_crs = local_origin_crs_property_->getStdString();
+  tile_map_info_.project_to_utm = visualize_in_utm_frame->getBool();
 
   // create transformation if not already set
   if (!tile_map_info_.origin_crs.empty()) {
@@ -564,10 +571,31 @@ void AerialMapDisplay::update(float, float)
   auto center_tile_offset = tileOffset(*last_fix_, tile_map_info_);
   Ogre::Vector3 aerial_map_offset(center_tile_offset.x, -center_tile_offset.y, 0.0);
 
-  scene_node_->setPosition(
-    sensor_translation - orientation_to_map *
-    (aerial_map_offset * example_tile->second.tileSize()));
-  scene_node_->setOrientation(-orientation_to_map);
+  if (visualize_in_utm_frame->getValue().toBool()) {
+    const double lon = last_fix_->longitude * M_PI / 180.0;
+    const double lat = last_fix_->latitude * M_PI / 180.0;
+    const double lon0 = 9.0 * M_PI / 180.0;  // Mean Meridian of Zone UTM32
+                                             // TODO calculate Mean Meridian generically
+
+    double convergence_rad = (lon - lon0) * sin(lat);
+
+    Ogre::Quaternion utm_rotation(Ogre::Radian(convergence_rad), Ogre::Vector3::UNIT_Z);
+    Ogre::Vector3 map_offset_rotated =
+    utm_rotation * (aerial_map_offset * example_tile->second.tileSize());
+
+    scene_node_->setPosition(
+      sensor_translation - orientation_to_map * map_offset_rotated);
+
+    scene_node_->setOrientation(utm_rotation * -orientation_to_map);
+    // scene_node_->setOrientation(orientation_to_map * utm_rotation);
+  }
+  else {
+    scene_node_->setPosition(
+      sensor_translation - orientation_to_map *
+      (aerial_map_offset * example_tile->second.tileSize()));
+
+    scene_node_->setOrientation(-orientation_to_map);
+  }
 
   // update alpha here to account for changing age
   updateAlpha(t);
