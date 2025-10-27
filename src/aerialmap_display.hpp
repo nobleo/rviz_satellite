@@ -84,6 +84,8 @@ protected:
 
   TileCoordinate centerTile() const;
 
+  double computeUTMrotation(double latitude, double longitude);
+
   rviz_common::properties::StringProperty * tile_url_property_ = nullptr;
   rviz_common::properties::IntProperty * zoom_property_ = nullptr;
   rviz_common::properties::IntProperty * blocks_property_ = nullptr;

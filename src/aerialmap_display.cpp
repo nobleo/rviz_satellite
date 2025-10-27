@@ -572,12 +572,7 @@ void AerialMapDisplay::update(float, float)
   Ogre::Vector3 aerial_map_offset(center_tile_offset.x, -center_tile_offset.y, 0.0);
 
   if (visualize_in_utm_frame->getValue().toBool()) {
-    const double lon = last_fix_->longitude * M_PI / 180.0;
-    const double lat = last_fix_->latitude * M_PI / 180.0;
-    const double lon0 = 9.0 * M_PI / 180.0;  // Mean Meridian of Zone UTM32
-                                             // TODO calculate Mean Meridian generically
-
-    double convergence_rad = (lon - lon0) * sin(lat);
+    double convergence_rad = computeUTMrotation(last_fix_->latitude, last_fix_->longitude);
 
     Ogre::Quaternion utm_rotation(Ogre::Radian(convergence_rad), Ogre::Vector3::UNIT_Z);
     Ogre::Vector3 map_offset_rotated =
@@ -587,7 +582,7 @@ void AerialMapDisplay::update(float, float)
       sensor_translation - orientation_to_map * map_offset_rotated);
 
     scene_node_->setOrientation(utm_rotation * -orientation_to_map);
-    // scene_node_->setOrientation(orientation_to_map * utm_rotation);
+
   }
   else {
     scene_node_->setPosition(
@@ -658,6 +653,26 @@ TileCoordinate AerialMapDisplay::centerTile() const
   std::advance(it, tiles_.size() / 2);
   return it->first.coord;
 }
+
+double AerialMapDisplay::computeUTMrotation(double latitude, double longitude)
+{
+  // 1. get UTM zone (1 to 60)
+  int utm_zone = static_cast<int>(std::floor((longitude + 180.0) / 6.0)) + 1;
+
+  // 2. Mean Meridian of zone
+  double lon0 = (utm_zone - 1) * 6.0 - 180.0 + 3.0; // in degrees
+
+  // 3. Convert angles to radians
+  double lat_rad = latitude * M_PI / 180.0;
+  double lon_rad = longitude * M_PI / 180.0;
+  double lon0_rad = lon0 * M_PI / 180.0;
+
+  // 4. Compute meridian convergence (gamma)
+  double gamma_rad = (lon_rad - lon0_rad) * std::sin(lat_rad);
+
+  return gamma_rad;
+}
+
 
 void AerialMapDisplay::reset()
 {
