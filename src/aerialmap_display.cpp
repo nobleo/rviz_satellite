@@ -321,7 +321,11 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
           {
             // if center tile changed to some index direction, within the bounds of the surrounding blocks,
             // create only the missing tiles
-            shiftMap(center, offset, tile_size_m);
+            if (!shiftMap(center, offset, tile_size_m)) {
+              pending_tiles_.clear();
+              tiles_.clear();
+              buildMap(tile_at_fix, tile_size_m);
+            }
           } else {
             // if more tiles than blocks are skipped, recreate the entire map
             pending_tiles_.clear();
@@ -342,7 +346,7 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
   updateDrawUnder();
 }
 
-void AerialMapDisplay::shiftMap(TileCoordinate center, Ogre::Vector2i offset, double tile_size_m)
+bool AerialMapDisplay::shiftMap(TileCoordinate center, Ogre::Vector2i offset, double tile_size_m)
 {
   int delta_x = offset.data[0];
   int delta_y = offset.data[1];
@@ -358,8 +362,11 @@ void AerialMapDisplay::shiftMap(TileCoordinate center, Ogre::Vector2i offset, do
     const TileCoordinate coordinate_to_delete{x, y, center.z};
     const TileId tile_to_delete{tile_url, coordinate_to_delete};
     auto erased = tiles_.erase(tile_to_delete);
-    // TODO(ZeilingerM) assertion is not correct on border of map
-    rcpputils::assert_true(erased == 1, "failed to erase tile at far end");
+    if (erased != 1) {
+      // Add error logging if needed
+      RVIZ_COMMON_LOG_ERROR("Failed to erase tile at far end");
+      return false;
+    }
   }
 
   // shift existing tiles to new center
@@ -376,6 +383,7 @@ void AerialMapDisplay::shiftMap(TileCoordinate center, Ogre::Vector2i offset, do
     // set tile offset with the assumption of a new center
     buildTile(new_coordinate, near_offset - offset, tile_size_m);
   }
+  return true;
 }
 
 void AerialMapDisplay::buildMap(TileCoordinate center_tile, double size)
