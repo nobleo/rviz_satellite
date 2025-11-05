@@ -2,6 +2,13 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* added generic utm rotation calculation based on only latitude and longitude
+* added property to visualize in utm frame, if activated utm_rotation factor will be calculated to correct position and orientation of tiles
+* Add exception handling for the shiftMap error
+* Contributors: Florian, junhee.lee
+
 4.2.1 (2025-05-23)
 ------------------
 * List Tim Clephas as maintainer to receive buildfarm emails
