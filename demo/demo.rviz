@@ -52,7 +52,7 @@ Visualization Manager:
       Draw Behind: false
       Enabled: true
       Name: AerialMap
-      Object URI: http://a.tile.openstreetmap.org/{z}/{x}/{y}.png
+      Object URI: https://tile.openstreetmap.org/{z}/{x}/{y}.png
       TF tolerance: 0.10000000149011612
       Timeout: 3
       Topic:
