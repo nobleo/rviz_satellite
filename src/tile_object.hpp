@@ -13,14 +13,14 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 #pragma once
 
+#include <OgreBlendMode.h>
+#include <OgrePrerequisites.h>
+#include <OgreSharedPtr.h>
+
+#include <QImage>
 #include <cstddef>
 #include <string>
 
-#include <OgreSharedPtr.h>
-#include <OgrePrerequisites.h>
-#include <OgreBlendMode.h>
-
-#include <QImage>
 #include "rviz_default_plugins/visibility_control.hpp"
 
 namespace rviz_satellite
@@ -30,9 +30,7 @@ class TileObject
 {
 public:
   TileObject(
-    Ogre::SceneManager * scene_manager,
-    Ogre::SceneNode * parent_scene_node,
-    std::string unique_id,
+    Ogre::SceneManager * scene_manager, Ogre::SceneNode * parent_scene_node, std::string unique_id,
     Ogre::Real tile_size, Ogre::Real x, Ogre::Real y, bool draw_under);
 
   TileObject() = delete;

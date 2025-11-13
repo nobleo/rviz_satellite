@@ -14,22 +14,20 @@ limitations under the License. */
 
 #pragma once
 
-#include <string>
-#include <memory>
 #include <map>
-#include <utility>
-
+#include <memory>
 #include <rclcpp/rclcpp.hpp>
+#include <rviz_common/ros_topic_display.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <string>
+#include <utility>
 
 #include "rviz_common/properties/float_property.hpp"
 #include "rviz_common/properties/int_property.hpp"
 #include "rviz_common/properties/string_property.hpp"
-#include <rviz_common/ros_topic_display.hpp>
-
 #include "tile.hpp"
-#include "tile_object.hpp"
 #include "tile_client.hpp"
+#include "tile_object.hpp"
 
 namespace rviz_satellite
 {
@@ -100,8 +98,8 @@ protected:
   rviz_common::properties::FloatProperty * local_origin_x_property_ = nullptr;
   rviz_common::properties::FloatProperty * local_origin_y_property_ = nullptr;
 
-  rviz_common::properties::BoolProperty* use_local_tiles_property_ = nullptr;
-  rviz_common::properties::BoolProperty* visualize_in_utm_frame = nullptr;
+  rviz_common::properties::BoolProperty * use_local_tiles_property_ = nullptr;
+  rviz_common::properties::BoolProperty * visualize_in_utm_frame = nullptr;
 
   std::mutex tiles_mutex_;
   TileClient tile_client_;
@@ -111,7 +109,7 @@ protected:
   std::map<TileId, TileObject> tiles_;
 
   sensor_msgs::msg::NavSatFix::ConstSharedPtr last_fix_;
-  bool tile_server_had_errors_ {false};
+  bool tile_server_had_errors_{false};
 
   static const std::string MAP_FRAME;
   static const QString MESSAGE_STATUS;

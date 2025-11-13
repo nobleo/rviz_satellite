@@ -1,0 +1,42 @@
+# Copyright (C) 2024 Nobleo Autonomous Solutions B.V.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# This config uses industrial_ci (https://github.com/ros-industrial/industrial_ci.git).
+# For troubleshooting, see README (https://github.com/ros-industrial/industrial_ci/blob/master/README.rst)
+
+name: ros-industrial
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  industrial_ci:
+    name: ROS ${{ matrix.ROS_DISTRO }} (${{ matrix.ROS_REPO }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ROS_DISTRO:
+          - humble
+          - jazzy
+          - kilted
+          - rolling
+        ROS_REPO:
+          - main
+    env:
+      CCACHE_DIR: "${{ github.workspace }}/.ccache"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ matrix.ROS_DISTRO }}-${{ matrix.ROS_REPO }}-${{github.run_id}}
+          restore-keys: |
+            ccache-${{ matrix.ROS_DISTRO }}-${{ matrix.ROS_REPO }}-
+      - uses: 'ros-industrial/industrial_ci@master'
+        env:
+          ROS_DISTRO: ${{ matrix.ROS_DISTRO }}
+          ROS_REPO: ${{ matrix.ROS_REPO }}

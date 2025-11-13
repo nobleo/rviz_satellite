@@ -30,10 +30,6 @@
 
 #include "tile_object.hpp"
 
-#include <algorithm>
-#include <string>
-#include <vector>
-
 #include <OgreManualObject.h>
 #include <OgreMaterialManager.h>
 #include <OgreRenderable.h>
@@ -43,16 +39,18 @@
 #include <OgreTechnique.h>
 #include <OgreTextureManager.h>
 
-#include "rviz_rendering/material_manager.hpp"
+#include <algorithm>
+#include <string>
+#include <vector>
+
 #include "rviz_rendering/custom_parameter_indices.hpp"
+#include "rviz_rendering/material_manager.hpp"
 
 namespace rviz_satellite
 {
 
 TileObject::TileObject(
-  Ogre::SceneManager * scene_manager,
-  Ogre::SceneNode * parent_scene_node,
-  std::string unique_id,
+  Ogre::SceneManager * scene_manager, Ogre::SceneNode * parent_scene_node, std::string unique_id,
   Ogre::Real tile_size, Ogre::Real x, Ogre::Real y, bool draw_under)
 : scene_manager_(scene_manager),
   parent_scene_node_(parent_scene_node),
@@ -110,9 +108,7 @@ void TileObject::updateData(QImage & image)
   }
   Ogre::DataStreamPtr pixel_stream;
   pixel_stream.reset(
-    new Ogre::MemoryDataStream(
-      reinterpret_cast<void *>(image.bits()),
-      image.sizeInBytes()));
+    new Ogre::MemoryDataStream(reinterpret_cast<void *>(image.bits()), image.sizeInBytes()));
 
   if (texture_) {
     Ogre::TextureManager::getSingleton().remove(texture_);
@@ -121,37 +117,19 @@ void TileObject::updateData(QImage & image)
 
   // TODO(ZeilingerM) check whether returned image is grayscale, and use reduced texture space Ogre::PF_L8
   texture_ = Ogre::TextureManager::getSingleton().loadRawData(
-    objectId(),
-    "rviz_rendering",
-    pixel_stream,
-    image.width(),
-    image.height(),
-    ogre_format,
-    Ogre::TEX_TYPE_2D,
-    2);
+    objectId(), "rviz_rendering", pixel_stream, image.width(), image.height(), ogre_format,
+    Ogre::TEX_TYPE_2D, 2);
   material_->getTechnique(0)->getPass(0)->getTextureUnitState(0)->setTextureName(
     texture_->getName());
 }
 
-std::string TileObject::objectId() const
-{
-  return unique_id_;
-}
+std::string TileObject::objectId() const { return unique_id_; }
 
-Ogre::Real TileObject::tileSize() const
-{
-  return scene_node_->getScale().x;
-}
+Ogre::Real TileObject::tileSize() const { return scene_node_->getScale().x; }
 
-void TileObject::setVisible(bool visible)
-{
-  scene_node_->setVisible(visible);
-}
+void TileObject::setVisible(bool visible) { scene_node_->setVisible(visible); }
 
-void TileObject::translate(Ogre::Vector3 d)
-{
-  scene_node_->translate(d);
-}
+void TileObject::translate(Ogre::Vector3 d) { scene_node_->translate(d); }
 
 void TileObject::setRenderQueueGroup(uint8_t group)
 {

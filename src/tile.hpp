@@ -13,16 +13,15 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 #pragma once
 
+#include <Ogre.h>
+#include <proj.h>
+
+#include <QMetaType>
 #include <cmath>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <stdexcept>
 #include <string>
 #include <tuple>
-#include <Ogre.h>
-
-#include <QMetaType>
-#include <sensor_msgs/msg/nav_sat_fix.hpp>
-
-#include <proj.h>
 
 namespace rviz_satellite
 {

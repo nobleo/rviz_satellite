@@ -12,26 +12,25 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 #include "aerialmap_display.hpp"
-#include "field.hpp"
-
-#include <limits>
-#include <algorithm>
-#include <utility>
-#include <string>
 
 #include <OgreManualObject.h>
 #include <OgreMaterialManager.h>
 #include <OgreSceneManager.h>
 #include <OgreSceneNode.h>
-#include <OgreTextureManager.h>
 #include <OgreTechnique.h>
+#include <OgreTextureManager.h>
 
+#include <algorithm>
+#include <limits>
 #include <rcpputils/asserts.hpp>
-#include "rviz_common/validate_floats.hpp"
+#include <string>
+#include <utility>
+
+#include "field.hpp"
 #include "rviz_common/display_context.hpp"
 #include "rviz_common/logging.hpp"
 #include "rviz_common/msg_conversions.hpp"
-
+#include "rviz_common/validate_floats.hpp"
 #include "rviz_default_plugins/transformation/tf_wrapper.hpp"
 
 namespace rviz_satellite
@@ -49,32 +48,29 @@ namespace rviz_satellite
  * Splitting this transform lookup is necessary to mitigate frame jitter.
  */
 
-using rviz_common::properties::Property;
 using rviz_common::properties::FloatProperty;
 using rviz_common::properties::IntProperty;
+using rviz_common::properties::Property;
 using rviz_common::properties::RosTopicProperty;
-using rviz_common::properties::StringProperty;
 using rviz_common::properties::StatusProperty;
+using rviz_common::properties::StringProperty;
 
 using sensor_msgs::msg::NavSatFix;
 
 // disable cpplint: not using string as const char*
 // declaring as std::string and QString to avoid copies
-const std::string AerialMapDisplay::MAP_FRAME = "map"; // NOLINT
-const QString AerialMapDisplay::MESSAGE_STATUS = "Message"; // NOLINT
-const QString AerialMapDisplay::TILE_REQUEST_STATUS = "TileRequest"; // NOLINT
-const QString AerialMapDisplay::PROPERTIES_STATUS = "Properties"; // NOLINT
-const QString AerialMapDisplay::ORIENTATION_STATUS = "Orientation"; // NOLINT
-const QString AerialMapDisplay::TRANSFORM_STATUS = "Transform"; // NOLINT
-const QString AerialMapDisplay::PROJ_TRANSFORM_STATUS = "ProjTransform"; // NOLINT
+const std::string AerialMapDisplay::MAP_FRAME = "map";                    // NOLINT
+const QString AerialMapDisplay::MESSAGE_STATUS = "Message";               // NOLINT
+const QString AerialMapDisplay::TILE_REQUEST_STATUS = "TileRequest";      // NOLINT
+const QString AerialMapDisplay::PROPERTIES_STATUS = "Properties";         // NOLINT
+const QString AerialMapDisplay::ORIENTATION_STATUS = "Orientation";       // NOLINT
+const QString AerialMapDisplay::TRANSFORM_STATUS = "Transform";           // NOLINT
+const QString AerialMapDisplay::PROJ_TRANSFORM_STATUS = "ProjTransform";  // NOLINT
 
-AerialMapDisplay::AerialMapDisplay()
-: RosTopicDisplay()
+AerialMapDisplay::AerialMapDisplay() : RosTopicDisplay()
 {
-  alpha_property_ =
-    new FloatProperty(
-    "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
-    SLOT(updateAlpha()));
+  alpha_property_ = new FloatProperty(
+    "Alpha", 0.7, "Amount of transparency to apply to the map.", this, SLOT(updateAlpha()));
   alpha_property_->setMin(0);
   alpha_property_->setMax(1);
   alpha_property_->setShouldBeSaved(true);
@@ -87,21 +83,17 @@ AerialMapDisplay::AerialMapDisplay()
   draw_under_property_->setShouldBeSaved(true);
 
   visualize_in_utm_frame = new BoolProperty(
-      "Visualize in UTM Frame", false,
-      "If true, calculate UTM to LL rotation",
-      this, SLOT(updateBlocks()));
+    "Visualize in UTM Frame", false, "If true, calculate UTM to LL rotation", this,
+    SLOT(updateBlocks()));
   visualize_in_utm_frame->setShouldBeSaved(true);
 
   // properties for map
-  tile_url_property_ =
-    new StringProperty(
-    "Object URI", "", "URL from which to retrieve map tiles.", this,
-    SLOT(updateTileUrl()));
+  tile_url_property_ = new StringProperty(
+    "Object URI", "", "URL from which to retrieve map tiles.", this, SLOT(updateTileUrl()));
   tile_url_property_->setShouldBeSaved(true);
 
-  QString const zoom_desc = QString::fromStdString(
-    "Zoom level (0 - " + std::to_string(
-      MAX_ZOOM) + ")");
+  QString const zoom_desc =
+    QString::fromStdString("Zoom level (0 - " + std::to_string(MAX_ZOOM) + ")");
   zoom_property_ = new IntProperty("Zoom", 16, zoom_desc, this, SLOT(updateZoom()));
   zoom_property_->setMin(0);
   zoom_property_->setMax(MAX_ZOOM);
@@ -114,71 +106,53 @@ AerialMapDisplay::AerialMapDisplay()
   blocks_property_->setMax(MAX_BLOCKS);
   blocks_property_->setShouldBeSaved(true);
 
-  timeout_property_ =
-    new FloatProperty(
+  timeout_property_ = new FloatProperty(
     "Timeout", 3.0,
-    "Message header timestamp timeout in seconds. Will start to fade out at half time, ignored if 0.",
+    "Message header timestamp timeout in seconds. Will start to fade out at half time, ignored if "
+    "0.",
     this);
   timeout_property_->setMin(0.0);
   timeout_property_->setShouldBeSaved(true);
 
-  tf_tolerance_property_ =
-    new FloatProperty(
-    "TF tolerance", 0.1,
-    "Maximum allowed age of latest transformation looked up from TF.",
-    this);
+  tf_tolerance_property_ = new FloatProperty(
+    "TF tolerance", 0.1, "Maximum allowed age of latest transformation looked up from TF.", this);
   tf_tolerance_property_->setMin(0.0);
   tf_tolerance_property_->setShouldBeSaved(true);
 
   local_map_property_ = new BoolProperty(
-    "Use Local Map", false,
-    "Defines wether the map is bounded to a local region",
-    this, SLOT(updateLocalMap()));
+    "Use Local Map", false, "Defines whether the map is bounded to a local region", this,
+    SLOT(updateLocalMap()));
   local_map_property_->setShouldBeSaved(true);
   tile_map_info_.local_map = local_map_property_->getValue().toBool();
 
-  local_meter_per_pixel_z0_property_ =
-    new FloatProperty(
-    "Meter per Pixel (Zoom 0)", 0.0,
-    "Defines the meter per pixel at zoom level 0",
+  local_meter_per_pixel_z0_property_ = new FloatProperty(
+    "Meter per Pixel (Zoom 0)", 0.0, "Defines the meter per pixel at zoom level 0",
     local_map_property_);
   local_meter_per_pixel_z0_property_->setMin(0.0);
   local_meter_per_pixel_z0_property_->setShouldBeSaved(true);
 
-  local_origin_crs_property_ =
-    new StringProperty(
-    "Origin CRS", "", 
-    "Defines the CRS of the local origin (should be a cartesian coordinate system)", local_map_property_);
+  local_origin_crs_property_ = new StringProperty(
+    "Origin CRS", "",
+    "Defines the CRS of the local origin (should be a cartesian coordinate system)",
+    local_map_property_);
   local_origin_crs_property_->setShouldBeSaved(true);
 
-  local_origin_x_property_ =
-    new FloatProperty(
-    "Origin X ", 0.0,
-    "Defines X position of the local origin in given CRS system",
+  local_origin_x_property_ = new FloatProperty(
+    "Origin X ", 0.0, "Defines X position of the local origin in given CRS system",
     local_map_property_);
   local_origin_x_property_->setShouldBeSaved(true);
 
-  local_origin_y_property_ =
-    new FloatProperty(
-    "Origin Y ", 0.0,
-    "Defines Y position of the local origin in given CRS system",
+  local_origin_y_property_ = new FloatProperty(
+    "Origin Y ", 0.0, "Defines Y position of the local origin in given CRS system",
     local_map_property_);
   local_origin_y_property_->setShouldBeSaved(true);
 }
 
-AerialMapDisplay::~AerialMapDisplay()
-{
-}
+AerialMapDisplay::~AerialMapDisplay() {}
 
-void AerialMapDisplay::onInitialize()
-{
-  RTDClass::onInitialize();
-}
+void AerialMapDisplay::onInitialize() { RTDClass::onInitialize(); }
 
-void AerialMapDisplay::onEnable()
-{
-  scene_node_->setVisible(true);
-}
+void AerialMapDisplay::onEnable() { scene_node_->setVisible(true); }
 
 void AerialMapDisplay::onDisable()
 {
@@ -190,9 +164,9 @@ void AerialMapDisplay::onDisable()
 bool AerialMapDisplay::validateMessage(const NavSatFix::ConstSharedPtr message)
 {
   bool message_is_valid = true;
-  if (!rviz_common::validateFloats(message->latitude) ||
-    !rviz_common::validateFloats(message->longitude))
-  {
+  if (
+    !rviz_common::validateFloats(message->latitude) ||
+    !rviz_common::validateFloats(message->longitude)) {
     setStatus(
       rviz_common::properties::StatusProperty::Error, MESSAGE_STATUS,
       "Message contains invalid floating point values (nans or infs)");
@@ -200,8 +174,7 @@ bool AerialMapDisplay::validateMessage(const NavSatFix::ConstSharedPtr message)
   }
   if (message->status.status == sensor_msgs::msg::NavSatStatus::STATUS_NO_FIX) {
     setStatus(
-      rviz_common::properties::StatusProperty::Error, MESSAGE_STATUS,
-      "NavSatFix status NO_FIX");
+      rviz_common::properties::StatusProperty::Error, MESSAGE_STATUS, "NavSatFix status NO_FIX");
     message_is_valid = false;
   }
   return message_is_valid;
@@ -279,11 +252,14 @@ void AerialMapDisplay::updateLocalTileMapInformation()
 
   // create transformation if not already set
   if (!tile_map_info_.origin_crs.empty()) {
-    tile_map_info_.transformation = proj_create_crs_to_crs(tile_map_info_.context, "EPSG:4326", tile_map_info_.origin_crs.c_str(), NULL);
+    tile_map_info_.transformation = proj_create_crs_to_crs(
+      tile_map_info_.context, "EPSG:4326", tile_map_info_.origin_crs.c_str(), NULL);
   }
   // set status if transformation is still not set
   if (tile_map_info_.transformation == nullptr) {
-    setStatus(rviz_common::properties::StatusProperty::Error, PROJ_TRANSFORM_STATUS, "PROJ transformation for local map origin not set.");
+    setStatus(
+      rviz_common::properties::StatusProperty::Error, PROJ_TRANSFORM_STATUS,
+      "PROJ transformation for local map origin not set.");
   }
 }
 
@@ -296,9 +272,7 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
   if (!validateMessage(msg)) {
     return;
   } else {
-    setStatus(
-      rviz_common::properties::StatusProperty::Ok, MESSAGE_STATUS,
-      "Message OK");
+    setStatus(rviz_common::properties::StatusProperty::Ok, MESSAGE_STATUS, "Message OK");
   }
   if (tile_server_had_errors_) {
     return;
@@ -323,9 +297,9 @@ void AerialMapDisplay::processMessage(const NavSatFix::ConstSharedPtr msg)
         auto offset = Ogre::Vector2i(tile_at_fix.x - center.x, tile_at_fix.y - center.y);
         if (!offset.isZeroLength()) {
           auto blocks = blocks_property_->getInt();
-          if (blocks > 0 && std::abs(offset.data[0]) <= blocks &&
-            std::abs(offset.data[1]) <= blocks)
-          {
+          if (
+            blocks > 0 && std::abs(offset.data[0]) <= blocks &&
+            std::abs(offset.data[1]) <= blocks) {
             // if center tile changed to some index direction, within the bounds of the surrounding blocks,
             // create only the missing tiles
             if (!shiftMap(center, offset, tile_size_m)) {
@@ -427,13 +401,9 @@ void AerialMapDisplay::buildTile(TileCoordinate coordinate, Ogre::Vector2i offse
   double ty = -offset.data[1] * size - size / 2;
   std::stringstream ss;
   ss << tile_id;
-  auto tile_emplace_result =
-    tiles_.emplace(
-    std::piecewise_construct,
-    std::forward_as_tuple(tile_id),
-    std::forward_as_tuple(
-      scene_manager_, scene_node_,
-      ss.str(), size, tx, ty, false));
+  auto tile_emplace_result = tiles_.emplace(
+    std::piecewise_construct, std::forward_as_tuple(tile_id),
+    std::forward_as_tuple(scene_manager_, scene_node_, ss.str(), size, tx, ty, false));
   // hide until the tile request was completed
   tile_emplace_result.first->second.setVisible(false);
   rcpputils::assert_true(tile_emplace_result.second, "failed to store tile object");
@@ -441,11 +411,8 @@ void AerialMapDisplay::buildTile(TileCoordinate coordinate, Ogre::Vector2i offse
 
 // Try to get transform to fixed frame at given time, fallback to latest time within tolerance otherwise
 static void get_fixed_frame_transform_fallback_to_latest(
-  rviz_common::FrameManagerIface * frame_manager,
-  const std::string & frame_id,
-  const rclcpp::Time & t,
-  const rclcpp::Duration & tolerance,
-  Ogre::Vector3 & position,
+  rviz_common::FrameManagerIface * frame_manager, const std::string & frame_id,
+  const rclcpp::Time & t, const rclcpp::Duration & tolerance, Ogre::Vector3 & position,
   Ogre::Quaternion & orientation)
 {
   position = Ogre::Vector3::ZERO;
@@ -485,7 +452,7 @@ void AerialMapDisplay::update(float, float)
   }
 
   // resolve pending tile requests, and set the received images as textures of their tiles
-  for (auto it = pending_tiles_.begin(); it != pending_tiles_.end(); ) {
+  for (auto it = pending_tiles_.begin(); it != pending_tiles_.end();) {
     try {
       if (it->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
         try {
@@ -543,12 +510,9 @@ void AerialMapDisplay::update(float, float)
     get_fixed_frame_transform_fallback_to_latest(
       context_->getFrameManager(), MAP_FRAME, t, tf_tolerance(), _ignored_translation,
       orientation_to_map);
-    setStatus(
-      rviz_common::properties::StatusProperty::Ok, ORIENTATION_STATUS,
-      "Map transform OK");
+    setStatus(rviz_common::properties::StatusProperty::Ok, ORIENTATION_STATUS, "Map transform OK");
   } catch (const rviz_common::transformation::FrameTransformerException & e) {
-    setStatus(
-      rviz_common::properties::StatusProperty::Ok, TRANSFORM_STATUS, e.what());
+    setStatus(rviz_common::properties::StatusProperty::Ok, TRANSFORM_STATUS, e.what());
   }
 
   Ogre::Vector3 sensor_translation;
@@ -556,13 +520,11 @@ void AerialMapDisplay::update(float, float)
   try {
     // get transformation of sensor frame
     get_fixed_frame_transform_fallback_to_latest(
-      context_->getFrameManager(),
-      last_fix_->header.frame_id, t, tf_tolerance(), sensor_translation,
-      _ignored_orientation);
+      context_->getFrameManager(), last_fix_->header.frame_id, t, tf_tolerance(),
+      sensor_translation, _ignored_orientation);
     setStatus(rviz_common::properties::StatusProperty::Ok, TRANSFORM_STATUS, "Transform OK");
   } catch (const rviz_common::transformation::FrameTransformerException & e) {
-    setStatus(
-      rviz_common::properties::StatusProperty::Error, TRANSFORM_STATUS, e.what());
+    setStatus(rviz_common::properties::StatusProperty::Error, TRANSFORM_STATUS, e.what());
     return;
   }
 
@@ -576,18 +538,16 @@ void AerialMapDisplay::update(float, float)
 
     Ogre::Quaternion utm_rotation(Ogre::Radian(convergence_rad), Ogre::Vector3::UNIT_Z);
     Ogre::Vector3 map_offset_rotated =
-    utm_rotation * (aerial_map_offset * example_tile->second.tileSize());
+      utm_rotation * (aerial_map_offset * example_tile->second.tileSize());
 
-    scene_node_->setPosition(
-      sensor_translation - orientation_to_map * map_offset_rotated);
+    scene_node_->setPosition(sensor_translation - orientation_to_map * map_offset_rotated);
 
     scene_node_->setOrientation(utm_rotation * -orientation_to_map);
 
-  }
-  else {
+  } else {
     scene_node_->setPosition(
-      sensor_translation - orientation_to_map *
-      (aerial_map_offset * example_tile->second.tileSize()));
+      sensor_translation -
+      orientation_to_map * (aerial_map_offset * example_tile->second.tileSize()));
 
     scene_node_->setOrientation(-orientation_to_map);
   }
@@ -607,8 +567,7 @@ void AerialMapDisplay::resetTileServerError()
 {
   tile_server_had_errors_ = false;
   setStatus(
-    rviz_common::properties::StatusProperty::Ok, TILE_REQUEST_STATUS,
-    "Last tile request OK");
+    rviz_common::properties::StatusProperty::Ok, TILE_REQUEST_STATUS, "Last tile request OK");
 }
 
 void AerialMapDisplay::updateAlpha(const rclcpp::Time & t)
@@ -624,9 +583,8 @@ void AerialMapDisplay::updateAlpha(const rclcpp::Time & t)
       auto timeout = rclcpp::Duration(std::chrono::duration<double>(timeout_s));
       auto age = t - last_fix_->header.stamp;
       // age ratio is a value from 0 to 1, where 1 means timeout is reached
-      auto age_ratio = std::min(
-        1.0,
-        age.nanoseconds() / static_cast<double>(timeout.nanoseconds()));
+      auto age_ratio =
+        std::min(1.0, age.nanoseconds() / static_cast<double>(timeout.nanoseconds()));
       // only start fading out from ratio 0.5 to 1
       age_ratio = std::max(0.0, age_ratio - 0.5) * 2;
       alpha = max_alpha * (1.0 - age_ratio);
@@ -637,7 +595,8 @@ void AerialMapDisplay::updateAlpha(const rclcpp::Time & t)
   }
 }
 
-rclcpp::Duration AerialMapDisplay::tf_tolerance() const {
+rclcpp::Duration AerialMapDisplay::tf_tolerance() const
+{
   auto tf_tolerance_sec = tf_tolerance_property_->getFloat();
   return rclcpp::Duration(std::chrono::duration<double>(tf_tolerance_sec));
 }
@@ -660,7 +619,7 @@ double AerialMapDisplay::computeUTMrotation(double latitude, double longitude)
   int utm_zone = static_cast<int>(std::floor((longitude + 180.0) / 6.0)) + 1;
 
   // 2. Mean Meridian of zone
-  double lon0 = (utm_zone - 1) * 6.0 - 180.0 + 3.0; // in degrees
+  double lon0 = (utm_zone - 1) * 6.0 - 180.0 + 3.0;  // in degrees
 
   // 3. Convert angles to radians
   double lat_rad = latitude * M_PI / 180.0;
@@ -672,7 +631,6 @@ double AerialMapDisplay::computeUTMrotation(double latitude, double longitude)
 
   return gamma_rad;
 }
-
 
 void AerialMapDisplay::reset()
 {
