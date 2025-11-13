@@ -2,16 +2,18 @@
 """
 Periodically publish gps positions in a circle around a given origin as NavSatFix messages.
 """
-import rclpy
-import math
-import numpy as np
-from argparse import ArgumentParser
-from sensor_msgs.msg import NavSatFix, NavSatStatus
 
+import math
+from argparse import ArgumentParser
+
+import numpy as np
+import rclpy
+from sensor_msgs.msg import NavSatFix, NavSatStatus
 
 CONVERSION_CONSTANT = 1e9
 
-class CircularTranslate():
+
+class CircularTranslate:
     """Translate fix periodically in a circle"""
 
     def update(self, t, fix):
@@ -23,8 +25,9 @@ class CircularTranslate():
         fix.longitude += math.sin(phi) * r
 
 
-class ApplyNoise():
+class ApplyNoise:
     """Translate fix position using gaussian noise"""
+
     def __init__(self, stddev):
         self.stddev = stddev
 
@@ -34,8 +37,9 @@ class ApplyNoise():
         fix.longitude += noise[1]
 
 
-class LooseFix():
+class LooseFix:
     """Set NavSatFix status to NO_FIX periodically"""
+
     def __init__(self, phase, period):
         self.phase = phase
         self.period = period
@@ -76,13 +80,14 @@ def main():
         fix = NavSatFix()
         t = node.get_clock().now()
         fix.header.stamp = t.to_msg()
-        fix.header.frame_id = "gps_sensor"
+        fix.header.frame_id = 'gps_sensor'
         fix.latitude = origin.latitude
         fix.longitude = origin.longitude
         for u in updaters:
             u.update(t, fix)
         node.get_logger().info(
-            f'Publishing NavSatFix at ({fix.latitude:.5f}, {fix.longitude:.5f})')
+            f'Publishing NavSatFix at ({fix.latitude:.5f}, {fix.longitude:.5f})'
+        )
         publisher.publish(fix)
 
     node.create_timer(0.1, timer_callback)

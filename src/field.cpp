@@ -11,16 +11,18 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
-#include <vector>
-#include <assert.h>
-#include <algorithm>
 #include "field.hpp"
+
+#include <assert.h>
+
+#include <algorithm>
+#include <vector>
 
 namespace rviz_satellite
 {
 
 // https://stackoverflow.com/questions/1903954/is-there-a-standard-sign-function-signum-sgn-in-c-c
-template<typename T>
+template <typename T>
 int signum(T val)
 {
   return (T(0) < val) - (val < T(0));

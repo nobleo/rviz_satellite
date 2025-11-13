@@ -13,9 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 #pragma once
 
-#include <string>
-#include <map>
 #include <QtNetwork>
+#include <map>
+#include <string>
+
 #include "tile.hpp"
 
 namespace rviz_satellite
@@ -27,19 +28,13 @@ private:
   std::string message_;
 
 public:
-  explicit tile_request_error(const std::string & message)
-  : message_(message)
-  {
-  }
+  explicit tile_request_error(const std::string & message) : message_(message) {}
 
-  const char * what() const noexcept override
-  {
-    return message_.c_str();
-  }
+  const char * what() const noexcept override { return message_.c_str(); }
 };
 
 /**
- * @brief Download slippy tiles from a Tile server.
+ * @brief Download tiles from a Tile server.
  */
 class TileClient : public QObject
 {

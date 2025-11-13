@@ -12,30 +12,30 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include <chrono>
+#include "tile_client.hpp"
+
 #include <QImage>
 #include <QImageReader>
 #include <QStandardPaths>
 #include <QString>
 #include <QtCore>
 #include <QtNetwork>
-#include <utility>
+#include <chrono>
 #include <regex>
+#include <utility>
 
 #include "rviz_common/logging.hpp"
-#include "tile_client.hpp"
 
 namespace rviz_satellite
 {
 
-TileClient::TileClient()
-: manager_(new QNetworkAccessManager(this)), tile_promises_()
+TileClient::TileClient() : manager_(new QNetworkAccessManager(this)), tile_promises_()
 {
-  connect(manager_, SIGNAL(finished(QNetworkReply*)), SLOT(request_finished(QNetworkReply*)));
+  connect(manager_, SIGNAL(finished(QNetworkReply *)), SLOT(request_finished(QNetworkReply *)));
   QNetworkDiskCache * disk_cache = new QNetworkDiskCache(this);
   QString const cache_path =
-    QDir(QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation)).filePath(
-    "rviz_satellite");
+    QDir(QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation))
+      .filePath("rviz_satellite");
   disk_cache->setCacheDirectory(cache_path);
   manager_->setCache(disk_cache);
 }
@@ -66,8 +66,7 @@ std::future<QImage> TileClient::request_remote(TileId const & tile_id)
   QVariant variant;
   variant.setValue(tile_id);
   request.setAttribute(
-    QNetworkRequest::CacheLoadControlAttribute,
-    QNetworkRequest::CacheLoadControl::PreferCache);
+    QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::CacheLoadControl::PreferCache);
   request.setAttribute(QNetworkRequest::User, variant);
 
   std::promise<QImage> tile_promise;
@@ -84,23 +83,21 @@ std::future<QImage> TileClient::request_remote(TileId const & tile_id)
 
 std::future<QImage> TileClient::request_local(TileId const & tile_id)
 {
-  std::future<QImage> f = std::async(std::launch::async, [tile_id]{
+  std::future<QImage> f = std::async(std::launch::async, [tile_id] {
     auto const filename_uri = tileURL(tile_id);
 
     auto filename = std::regex_replace(filename_uri, std::regex("file://"), "");
 
     QImageReader reader(QString::fromStdString(filename));
 
-    if (!reader.canRead())
-    {
+    if (!reader.canRead()) {
       RVIZ_COMMON_LOG_DEBUG_STREAM("Unable to decode image at " << filename);
-      return QImage{ };
+      return QImage{};
     }
 
     auto image = reader.read().mirrored();
 
-    if (image.isNull())
-    {
+    if (image.isNull()) {
       RVIZ_COMMON_LOG_DEBUG_STREAM("QImageReader able to decode but read failed for " << filename);
     }
 
@@ -126,8 +123,7 @@ void TileClient::request_finished(QNetworkReply * reply)
   const QUrl url = reply->url();
   if (reply->error()) {
     promise_it->second.set_exception(
-      std::make_exception_ptr(
-        tile_request_error(reply->errorString().toStdString())));
+      std::make_exception_ptr(tile_request_error(reply->errorString().toStdString())));
     return;
   }
 
@@ -142,9 +138,7 @@ void TileClient::request_finished(QNetworkReply * reply)
   QImageReader reader(reply);
   if (!reader.canRead()) {
     promise_it->second.set_exception(
-      std::make_exception_ptr(
-        tile_request_error(
-          "Failed to decode tile image")));
+      std::make_exception_ptr(tile_request_error("Failed to decode tile image")));
     RVIZ_COMMON_LOG_ERROR_STREAM(
       "Failed to decode image at " << reply->request().url().toString().toStdString());
     return;
