@@ -17,7 +17,14 @@ find_package(sensor_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(angles REQUIRED)
 
-find_package(Qt5 COMPONENTS Network REQUIRED)
+# rviz switched to Qt6: https://github.com/ros2/rviz/pull/1635
+if(rviz_common_VERSION_MAJOR GREATER_EQUAL 15 AND rviz_common_VERSION_MINOR GREATER_EQUAL 1)
+  find_package(Qt6 COMPONENTS Network REQUIRED)
+  set(QT_VERSION_MAJOR 6)
+else()
+  find_package(Qt5 COMPONENTS Network REQUIRED)
+  set(QT_VERSION_MAJOR 5)
+endif()
 
 add_library(${PROJECT_NAME} SHARED
   src/aerialmap_display.cpp
@@ -35,7 +42,7 @@ target_compile_options(
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 target_link_libraries(${PROJECT_NAME}
   PUBLIC
-  proj Qt5::Network
+  proj Qt${QT_VERSION_MAJOR}::Network
   angles::angles
   rclcpp::rclcpp
   pluginlib::pluginlib
