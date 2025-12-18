@@ -2,6 +2,14 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* rviz switched to Qt6
+  https://github.com/ros2/rviz/pull/1635
+* CI and formatting using pre-commit
+* Update demo.rviz Object URI
+* Contributors: Tim Clephas, psmh13
+
 4.3.0 (2025-11-05)
 ------------------
 * added generic utm rotation calculation based on only latitude and longitude
