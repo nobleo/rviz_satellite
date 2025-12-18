@@ -4,7 +4,7 @@
   schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>rviz_satellite</name>
-  <version>4.3.0</version>
+  <version>4.3.1</version>
   <description>Display satellite map tiles in RViz</description>
   <maintainer email="tim.clephas@nobleo.nl">Tim Clephas</maintainer>
 

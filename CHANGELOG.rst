@@ -2,8 +2,8 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.3.1 (2025-12-18)
+------------------
 * rviz switched to Qt6
   https://github.com/ros2/rviz/pull/1635
 * CI and formatting using pre-commit
