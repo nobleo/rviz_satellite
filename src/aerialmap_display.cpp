@@ -511,7 +511,7 @@ void AerialMapDisplay::update(float, float)
     return;
   }
 
-  auto t = context_->getFrameManager()->getTime();
+  auto t = last_fix_->header.stamp;
 
   Ogre::Vector3 _ignored_translation;
   Ogre::Quaternion orientation_to_map = Ogre::Quaternion::IDENTITY;
