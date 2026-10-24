@@ -162,13 +162,16 @@ void AerialMapDisplay::onInitialize()
   orientation_frame_property_->setFrameManager(context_->getFrameManager());
 }
 
-void AerialMapDisplay::onEnable() { scene_node_->setVisible(true); }
+void AerialMapDisplay::onEnable()
+{
+  RTDClass::onEnable();
+  scene_node_->setVisible(true);
+}
 
 void AerialMapDisplay::onDisable()
 {
   scene_node_->setVisible(false);
-  resetTileServerError();
-  resetMap();
+  RTDClass::onDisable();
 }
 
 bool AerialMapDisplay::validateMessage(const NavSatFix::ConstSharedPtr message)
