@@ -23,6 +23,7 @@ jobs:
           - humble
           - jazzy
           - kilted
+          - lyrical
           - rolling
         ROS_REPO:
           - main
