@@ -28,6 +28,17 @@ limitations under the License. */
 
 namespace rviz_satellite
 {
+namespace
+{
+QImage flipVertically(QImage image)
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+  return std::move(image).flipped(Qt::Vertical);
+#else
+  return std::move(image).mirrored(false, true);
+#endif
+}
+}  // namespace
 
 TileClient::TileClient() : manager_(new QNetworkAccessManager(this)), tile_promises_()
 {
@@ -95,7 +106,7 @@ std::future<QImage> TileClient::request_local(TileId const & tile_id)
       return QImage{};
     }
 
-    auto image = reader.read().mirrored();
+    auto image = flipVertically(reader.read());
 
     if (image.isNull()) {
       RVIZ_COMMON_LOG_DEBUG_STREAM("QImageReader able to decode but read failed for " << filename);
@@ -143,7 +154,7 @@ void TileClient::request_finished(QNetworkReply * reply)
       "Failed to decode image at " << reply->request().url().toString().toStdString());
     return;
   }
-  promise_it->second.set_value(reader.read().mirrored());
+  promise_it->second.set_value(flipVertically(reader.read()));
   tile_promises_.erase(promise_it);
   reply->deleteLater();
 }
