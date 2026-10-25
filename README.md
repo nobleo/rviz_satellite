@@ -1,9 +1,3 @@
-See pull request for the upstream repo: https://github.com/nobleo/rviz_satellite/pull/147
-
-Visit my [Main Project Wiki](https://github.com/slgrobotics/articubot_one/wiki)
-
-=======================================
-
 # rviz_satellite
 
 Rviz plugin for displaying satellite maps at the position of a `sensor_msgs/msg/NavSatFix` message.
