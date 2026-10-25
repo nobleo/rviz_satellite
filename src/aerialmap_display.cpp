@@ -479,9 +479,8 @@ void AerialMapDisplay::update(float, float)
             // request was cleared since it was issued
             continue;
           }
-          auto & tile_object = tile_to_update->second;
-          tile_object.updateData(image);
-          tile_object.setVisible(true);
+          // the tile is made visible below, once the map transform is known to be valid
+          tile_to_update->second.updateData(image);
           // remove from pending requests
           it = pending_tiles_.erase(it);
         } catch (const tile_request_error & e) {
@@ -525,7 +524,10 @@ void AerialMapDisplay::update(float, float)
       _ignored_translation, orientation_to_map);
     setStatus(rviz_common::properties::StatusProperty::Ok, ORIENTATION_STATUS, "Map transform OK");
   } catch (const rviz_common::transformation::FrameTransformerException & e) {
-    setStatus(rviz_common::properties::StatusProperty::Ok, TRANSFORM_STATUS, e.what());
+    setStatus(rviz_common::properties::StatusProperty::Error, ORIENTATION_STATUS, e.what());
+    // without a valid transform the map would be drawn at a stale or wrong pose, so hide it
+    setTilesVisible(false);
+    return;
   }
 
   Ogre::Vector3 sensor_translation;
@@ -538,8 +540,10 @@ void AerialMapDisplay::update(float, float)
     setStatus(rviz_common::properties::StatusProperty::Ok, TRANSFORM_STATUS, "Transform OK");
   } catch (const rviz_common::transformation::FrameTransformerException & e) {
     setStatus(rviz_common::properties::StatusProperty::Error, TRANSFORM_STATUS, e.what());
+    setTilesVisible(false);
     return;
   }
+  setTilesVisible(true);
 
   // "example tile", since their zoom should be uniform
   auto example_tile = tiles_.begin();
@@ -605,6 +609,15 @@ void AerialMapDisplay::updateAlpha(const rclcpp::Time & t)
   }
   for (auto & tile : tiles_) {
     tile.second.updateAlpha(alpha);
+  }
+}
+
+void AerialMapDisplay::setTilesVisible(bool visible)
+{
+  // set visibility per tile instead of on scene_node_, since that would cascade and also show
+  // tiles whose request has not completed yet
+  for (auto & tile : tiles_) {
+    tile.second.setVisible(visible && tile.second.hasData());
   }
 }
 

@@ -47,6 +47,8 @@ public:
 
   void setVisible(bool visible);
 
+  bool hasData() const;
+
   void translate(Ogre::Vector3);
 
   void setRenderQueueGroup(uint8_t group);
