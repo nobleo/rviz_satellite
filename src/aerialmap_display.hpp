@@ -79,6 +79,8 @@ protected:
 
   void updateAlpha(const rclcpp::Time & t);
 
+  void setTilesVisible(bool visible);
+
   rclcpp::Duration tf_tolerance() const;
 
   TileCoordinate centerTile() const;
