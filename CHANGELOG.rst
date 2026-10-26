@@ -2,8 +2,8 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.4.0 (2026-10-26)
+------------------
 * Hide tiles stale or wrong transforms
 * Changes for Lyrical, fixing the "flip QoS to see map" issue
 * Add 'lyrical' to supported ROS_DISTRO versions
