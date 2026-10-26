@@ -2,6 +2,15 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Hide tiles stale or wrong transforms
+* Changes for Lyrical, fixing the "flip QoS to see map" issue
+* Add 'lyrical' to supported ROS_DISTRO versions
+* Do not hardcode the map frame
+  solves `#110 <https://github.com/nobleo/rviz_satellite/issues/110>`_
+* Contributors: Sergei Grichine, Tim Clephas
+
 4.3.1 (2025-12-18)
 ------------------
 * rviz switched to Qt6

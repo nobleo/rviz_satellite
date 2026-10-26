@@ -24,11 +24,14 @@ jobs:
           - jazzy
           - kilted
           - lyrical
-          - rolling
         ROS_REPO:
           - main
+        include:
+          # Rolling on resolute is only available in ros2-testing
+          - ROS_DISTRO: rolling
+            ROS_REPO: testing
     env:
-      CCACHE_DIR: "${{ github.workspace }}/.ccache"
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -37,7 +40,7 @@ jobs:
           key: ccache-${{ matrix.ROS_DISTRO }}-${{ matrix.ROS_REPO }}-${{github.run_id}}
           restore-keys: |
             ccache-${{ matrix.ROS_DISTRO }}-${{ matrix.ROS_REPO }}-
-      - uses: 'ros-industrial/industrial_ci@master'
+      - uses: ros-industrial/industrial_ci@master
         env:
           ROS_DISTRO: ${{ matrix.ROS_DISTRO }}
           ROS_REPO: ${{ matrix.ROS_REPO }}
