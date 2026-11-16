@@ -456,7 +456,7 @@ static void get_fixed_frame_transform_fallback_to_latest(
   orientation = rviz_common::quaternionMsgToOgre(pose_out.pose.orientation);
 }
 
-void AerialMapDisplay::update(float, float)
+void AerialMapDisplay::update(Duration, Duration)
 {
   std::unique_lock<std::mutex> lock(tiles_mutex_, std::try_to_lock);
   if (!lock.owns_lock()) {
