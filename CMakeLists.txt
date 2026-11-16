@@ -18,12 +18,16 @@ find_package(pluginlib REQUIRED)
 find_package(angles REQUIRED)
 
 # rviz switched to Qt6: https://github.com/ros2/rviz/pull/1635
-if(rviz_common_VERSION_MAJOR GREATER_EQUAL 15 AND rviz_common_VERSION_MINOR GREATER_EQUAL 1)
+if(rviz_common_VERSION VERSION_GREATER_EQUAL 15.1)
   find_package(Qt6 COMPONENTS Network REQUIRED)
   set(QT_VERSION_MAJOR 6)
 else()
   find_package(Qt5 COMPONENTS Network REQUIRED)
   set(QT_VERSION_MAJOR 5)
+endif()
+
+if(rviz_common_VERSION VERSION_GREATER_EQUAL 15.1.7)
+  set(RVIZ_COMMON_CHRONO_UPDATE TRUE)
 endif()
 
 add_library(${PROJECT_NAME} SHARED
@@ -38,6 +42,10 @@ target_compile_options(
   ${PROJECT_NAME}
   PUBLIC
   "-DRVIZ_SATELLITE_VERSION=\"${rviz_satellite_VERSION}\"")
+
+if(RVIZ_COMMON_CHRONO_UPDATE)
+  target_compile_definitions(${PROJECT_NAME} PUBLIC "RVIZ_COMMON_CHRONO_UPDATE")
+endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 target_link_libraries(${PROJECT_NAME}

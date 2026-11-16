@@ -14,6 +14,7 @@ limitations under the License. */
 
 #pragma once
 
+#include <chrono>
 #include <map>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
@@ -46,7 +47,12 @@ public:
 
   void onInitialize() override;
   void reset() override;
-  void update(float, float) override;
+#ifdef RVIZ_COMMON_CHRONO_UPDATE
+  using Duration = std::chrono::nanoseconds;
+#else
+  using Duration = float;
+#endif
+  void update(Duration, Duration) override;
 
 protected Q_SLOTS:
   void updateAlpha();
