@@ -2,6 +2,11 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Support rviz 16: Qt6 version check and chrono update()
+* Contributors: Michael Carroll
+
 4.4.0 (2026-10-26)
 ------------------
 * Hide tiles stale or wrong transforms
