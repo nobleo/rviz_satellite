@@ -2,8 +2,8 @@
 Changelog for package rviz_satellite
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.4.1 (2026-11-17)
+------------------
 * Support rviz 16: Qt6 version check and chrono update()
 * Contributors: Michael Carroll
 
