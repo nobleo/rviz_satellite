@@ -121,6 +121,16 @@ protected:
   sensor_msgs::msg::NavSatFix::ConstSharedPtr last_fix_;
   bool tile_server_had_errors_{false};
 
+  // Cache for UTM projection transformations to avoid recreating on every frame
+  struct UTMProjectionCache
+  {
+    int zone = -1;
+    bool northern = true;
+    PJ_CONTEXT * context = nullptr;
+    PJ * transformation = nullptr;
+  };
+  UTMProjectionCache utm_projection_cache_;
+
   static const QString MESSAGE_STATUS;
   static const QString TILE_REQUEST_STATUS;
   static const QString PROPERTIES_STATUS;
