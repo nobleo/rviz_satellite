@@ -154,7 +154,18 @@ AerialMapDisplay::AerialMapDisplay() : RosTopicDisplay()
   local_origin_y_property_->setShouldBeSaved(true);
 }
 
-AerialMapDisplay::~AerialMapDisplay() {}
+AerialMapDisplay::~AerialMapDisplay()
+{
+  // Clean up PROJ cache
+  if (utm_projection_cache_.transformation) {
+    proj_destroy(utm_projection_cache_.transformation);
+    utm_projection_cache_.transformation = nullptr;
+  }
+  if (utm_projection_cache_.context) {
+    proj_context_destroy(utm_projection_cache_.context);
+    utm_projection_cache_.context = nullptr;
+  }
+}
 
 void AerialMapDisplay::onInitialize()
 {
@@ -644,18 +655,60 @@ double AerialMapDisplay::computeUTMrotation(double latitude, double longitude)
   // 1. get UTM zone (1 to 60)
   int utm_zone = static_cast<int>(std::floor((longitude + 180.0) / 6.0)) + 1;
 
-  // 2. Mean Meridian of zone
-  double lon0 = (utm_zone - 1) * 6.0 - 180.0 + 3.0;  // in degrees
+  // 2. Determine hemisphere
+  bool northern_hemisphere = latitude >= 0;
 
-  // 3. Convert angles to radians
-  double lat_rad = latitude * M_PI / 180.0;
-  double lon_rad = longitude * M_PI / 180.0;
-  double lon0_rad = lon0 * M_PI / 180.0;
+  // 3. Check if we can reuse cached transformation
+  if (utm_projection_cache_.zone != utm_zone || utm_projection_cache_.northern != northern_hemisphere ||
+      utm_projection_cache_.transformation == nullptr) {
+    // Clean up old cache
+    if (utm_projection_cache_.transformation) {
+      proj_destroy(utm_projection_cache_.transformation);
+      utm_projection_cache_.transformation = nullptr;
+    }
+    if (utm_projection_cache_.context) {
+      proj_context_destroy(utm_projection_cache_.context);
+      utm_projection_cache_.context = nullptr;
+    }
 
-  // 4. Compute meridian convergence (gamma)
-  double gamma_rad = (lon_rad - lon0_rad) * std::sin(lat_rad);
+    // 4. Determine hemisphere and EPSG code
+    // Northern hemisphere: EPSG:32601 - 32660
+    // Southern hemisphere: EPSG:32701 - 32760
+    int epsg_code = northern_hemisphere ? 32600 + utm_zone : 32700 + utm_zone;
+    std::string utm_crs = "EPSG:" + std::to_string(epsg_code);
 
-  return gamma_rad;
+    // 5. Create PROJ transformation from WGS84 (EPSG:4326) to UTM zone
+    // Note: When using authority codes (EPSG:4326), PROJ respects the authority-defined
+    // axis order which is (latitude, longitude) for EPSG:4326.
+    PJ_CONTEXT * context = proj_context_create();
+    PJ * transformation = proj_create_crs_to_crs(context, "EPSG:4326", utm_crs.c_str(), nullptr);
+
+    if (!transformation) {
+      proj_context_destroy(context);
+      // Fallback to simplified spherical approximation if PROJ fails
+      double lon0 = (utm_zone - 1) * 6.0 - 180.0 + 3.0;  // in degrees
+      double lat_rad = latitude * M_PI / 180.0;
+      double lon_rad = longitude * M_PI / 180.0;
+      double lon0_rad = lon0 * M_PI / 180.0;
+      double gamma_rad = (lon_rad - lon0_rad) * std::sin(lat_rad);
+      return gamma_rad;
+    }
+
+    // Update cache
+    utm_projection_cache_.zone = utm_zone;
+    utm_projection_cache_.northern = northern_hemisphere;
+    utm_projection_cache_.context = context;
+    utm_projection_cache_.transformation = transformation;
+  }
+
+  // 6. Compute grid convergence (meridian convergence) using PROJ's accurate ellipsoidal calculation
+  // PROJ expects (latitude, longitude) for EPSG:4326 when using authority codes
+  PJ_COORD input = proj_coord(latitude, longitude, 0, 0);
+  PROJ_FACTORS factors = proj_factors(utm_projection_cache_.transformation, input);
+
+  // 7. Return meridian convergence in radians
+  // factors.meridian_convergence is in radians
+  return factors.meridian_convergence;
 }
 
 void AerialMapDisplay::reset()
@@ -664,6 +717,18 @@ void AerialMapDisplay::reset()
   resetMap();
   last_fix_.reset();
   resetTileServerError();
+
+  // Clear UTM projection cache
+  if (utm_projection_cache_.transformation) {
+    proj_destroy(utm_projection_cache_.transformation);
+    utm_projection_cache_.transformation = nullptr;
+  }
+  if (utm_projection_cache_.context) {
+    proj_context_destroy(utm_projection_cache_.context);
+    utm_projection_cache_.context = nullptr;
+  }
+  utm_projection_cache_.zone = -1;
+  utm_projection_cache_.northern = true;
 }
 
 }  // namespace rviz_satellite
